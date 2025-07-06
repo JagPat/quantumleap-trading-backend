@@ -12,43 +12,40 @@ if %errorlevel% neq 0 (
 )
 
 REM Check if we're in the right directory
-if not exist "backend\main.py" (
+if not exist "main.py" (
     echo ❌ Please run this script from the project root directory.
     pause
     exit /b 1
 )
 
 REM Create virtual environment if it doesn't exist
-if not exist "backend\venv" (
+if not exist "venv" (
     echo 📦 Creating virtual environment...
-    cd backend
     python -m venv venv
-    cd ..
 )
 
 REM Activate virtual environment
 echo 🔧 Activating virtual environment...
-call backend\venv\Scripts\activate.bat
+call venv\Scripts\activate.bat
 
 REM Install dependencies
 echo 📥 Installing dependencies...
 pip install -r requirements.txt
 
 REM Create .env file if it doesn't exist
-if not exist "backend\.env" (
+if not exist ".env" (
     echo ⚙️ Creating environment configuration...
-    copy backend\env.example backend\.env
+    copy env.example .env
     
     REM Generate encryption key
-    python -c "from cryptography.fernet import Fernet; import os; key = Fernet.generate_key().decode(); content = open('backend/.env', 'r').read(); open('backend/.env', 'w').write(content.replace('your_encryption_key_here', key))"
+    python -c "from cryptography.fernet import Fernet; import os; key = Fernet.generate_key().decode(); content = open('.env', 'r').read(); open('.env', 'w').write(content.replace('your_encryption_key_here', key))"
     
-    echo ✅ Environment file created at backend\.env
+    echo ✅ Environment file created at .env
     echo 🔑 Encryption key generated automatically
 )
 
 REM Start the server
 echo 🌟 Starting the backend server...
-cd backend
 python run.py
 
 pause 
