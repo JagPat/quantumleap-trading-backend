@@ -94,6 +94,33 @@ from kite_service import (
 )
 from kiteconnect.exceptions import KiteException
 
+@app.get("/api/broker/callback", tags=["Broker Authentication"])
+async def broker_callback(request_token: str = Query(...), action: str = Query(...)):
+    """
+    Broker OAuth Callback
+    
+    Handles the OAuth callback from Kite Connect after user authorization.
+    This endpoint receives the request_token and can redirect to frontend.
+    """
+    try:
+        # Log the callback
+        logger.info(f"Received broker callback with request_token: {request_token}")
+        
+        # You can either:
+        # 1. Redirect to frontend with request_token
+        # 2. Process the token here and redirect with status
+        
+        # For now, redirect to frontend with the request_token
+        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:8501")
+        redirect_url = f"{frontend_url}/broker/callback?request_token={request_token}&action={action}"
+        
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=redirect_url)
+        
+    except Exception as e:
+        logger.error(f"Error in broker_callback: {str(e)}")
+        raise HTTPException(status_code=500, detail="Callback processing failed")
+
 @app.post("/api/broker/generate-session", response_model=GenerateSessionResponse, tags=["Broker Authentication"])
 async def generate_session(request: GenerateSessionRequest):
     """
