@@ -100,7 +100,7 @@ async def broker_callback(request_token: str = Query(...), action: str = Query(.
     Broker OAuth Callback
     
     Handles the OAuth callback from Kite Connect after user authorization.
-    This endpoint receives the request_token and can redirect to frontend.
+    This endpoint receives the request_token and redirects to frontend /BrokerCallback route.
     """
     try:
         # Log the callback
@@ -112,7 +112,7 @@ async def broker_callback(request_token: str = Query(...), action: str = Query(.
         
         # For now, redirect to frontend with the request_token
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:8501")
-        redirect_url = f"{frontend_url}/broker/callback?request_token={request_token}&action={action}"
+        redirect_url = f"{frontend_url}/BrokerCallback?request_token={request_token}&action={action}"
         
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=redirect_url)
