@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -95,7 +95,7 @@ from kite_service import (
 from kiteconnect.exceptions import KiteException
 
 @app.get("/api/broker/callback", tags=["Broker Authentication"])
-async def broker_callback(request_token: str = Query(...), action: str = Query(...)):
+async def broker_callback(request: Request, request_token: str = Query(...), action: str = Query(...)):
     """
     Broker OAuth Callback
     
@@ -103,16 +103,38 @@ async def broker_callback(request_token: str = Query(...), action: str = Query(.
     This endpoint receives the request_token and redirects to frontend /BrokerCallback route.
     """
     try:
-        # Log the callback
+        # Log the full request for debugging
         logger.info(f"Received broker callback with request_token: {request_token}")
+        logger.info(f"Full URL: {request.url}")
+        logger.info(f"Query params: {dict(request.query_params)}")
         
-        # You can either:
-        # 1. Redirect to frontend with request_token
-        # 2. Process the token here and redirect with status
+        # Clean and validate the request_token
+        # Remove any URL encoding and ensure it's a clean token
+        clean_token = request_token.strip()
         
-        # For now, redirect to frontend with the request_token
+        # Validate that this looks like a proper request_token (not a URL)
+        if clean_token.startswith('http') or '://' in clean_token:
+            logger.error(f"Invalid request_token format - appears to be a URL: {clean_token}")
+            # Try to extract token from URL if it's embedded
+            if 'request_token=' in clean_token:
+                import urllib.parse as urlparse
+                parsed = urlparse.parse_qs(urlparse.urlparse(clean_token).query)
+                if 'request_token' in parsed:
+                    clean_token = parsed['request_token'][0]
+                    logger.info(f"Extracted token from URL: {clean_token}")
+        
+        # Additional validation - Zerodha request tokens are typically alphanumeric
+        if not clean_token or len(clean_token) < 10:
+            logger.error(f"Request token appears invalid or too short: {clean_token}")
+            raise HTTPException(status_code=400, detail="Invalid request_token received from Zerodha")
+        
+        logger.info(f"Cleaned request_token: {clean_token}")
+        
+        # Redirect to frontend with the cleaned request_token
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:8501")
-        redirect_url = f"{frontend_url}/BrokerCallback?request_token={request_token}&action={action}"
+        redirect_url = f"{frontend_url}/BrokerCallback?request_token={clean_token}&action={action}"
+        
+        logger.info(f"Redirecting to: {redirect_url}")
         
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=redirect_url)
