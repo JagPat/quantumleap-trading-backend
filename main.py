@@ -159,6 +159,18 @@ async def generate_session(request: GenerateSessionRequest):
     
     Exchanges a request_token from the broker's OAuth flow for a valid access_token 
     and stores it securely for the user.
+    
+    Returns:
+        {
+            "status": "success",
+            "access_token": "xxx",
+            "user_data": {
+                "user_id": "xxx",
+                "user_name": "xxx", 
+                "email": "xxx",
+                "profile": {...}
+            }
+        }
     """
     try:
         # Create KiteService instance
@@ -200,7 +212,17 @@ async def generate_session(request: GenerateSessionRequest):
         
         logger.info(f"Successfully generated session for user: {user_id}")
         
-        return {"status": "success", "message": "Broker connected successfully."}
+        # Return the session data with access_token and user_data as required by Base44
+        return {
+            "status": "success", 
+            "access_token": access_token,
+            "user_data": {
+                "user_id": user_id,
+                "user_name": user_name,
+                "email": email,
+                "profile": profile
+            }
+        }
         
     except KiteException as e:
         logger.error(f"Kite API error in generate_session: {str(e)}")
