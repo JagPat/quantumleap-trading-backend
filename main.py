@@ -121,7 +121,7 @@ async def broker_callback(request_token: str = Query(...), action: str = Query(.
         logger.error(f"Error in broker_callback: {str(e)}")
         raise HTTPException(status_code=500, detail="Callback processing failed")
 
-@app.post("/api/broker/generate-session", response_model=GenerateSessionResponse, tags=["Broker Authentication"])
+@app.post("/api/broker/generate-session", tags=["Broker Authentication"])
 async def generate_session(request: GenerateSessionRequest):
     """
     Generate Broker Session
@@ -141,18 +141,22 @@ async def generate_session(request: GenerateSessionRequest):
         access_token = session_data.get("access_token")
         
         if not access_token:
-            raise HTTPException(status_code=400, detail="Failed to generate access token")
+            return {"status": "error", "message": "Failed to generate access token from Zerodha"}
         
-        # Get user profile
+        # Get user profile to get user_id for storage
         kite_service.kite.set_access_token(access_token)
         profile = kite_service.get_profile()
         
+        user_id = profile.get("user_id", "")
         user_name = profile.get("user_name", "")
         email = profile.get("email", "")
         
-        # Store credentials in database
+        if not user_id:
+            return {"status": "error", "message": "Unable to retrieve user ID from Zerodha profile"}
+        
+        # Store credentials in database using user_id from profile
         success = store_user_credentials(
-            user_id=request.user_id,
+            user_id=user_id,
             api_key=request.api_key,
             api_secret=request.api_secret,
             access_token=access_token,
@@ -161,28 +165,18 @@ async def generate_session(request: GenerateSessionRequest):
         )
         
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to store user credentials")
+            return {"status": "error", "message": "Failed to store user credentials securely"}
         
-        logger.info(f"Successfully generated session for user: {request.user_id}")
+        logger.info(f"Successfully generated session for user: {user_id}")
         
-        return GenerateSessionResponse(
-            status="success",
-            message="Broker connected successfully.",
-            data=UserData(
-                user_id=request.user_id,
-                user_name=user_name,
-                email=email
-            )
-        )
+        return {"status": "success", "message": "Broker connected successfully."}
         
     except KiteException as e:
         logger.error(f"Kite API error in generate_session: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Broker API error: {str(e)}")
-    except HTTPException:
-        raise
+        return {"status": "error", "message": f"The error from Zerodha was: {str(e)}"}
     except Exception as e:
         logger.error(f"Unexpected error in generate_session: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return {"status": "error", "message": f"Internal server error: {str(e)}"}
 
 @app.get("/api/portfolio/summary", response_model=PortfolioSummaryResponse, tags=["Portfolio Data"])
 async def get_portfolio_summary(user_id: str = Query(..., description="User ID")):

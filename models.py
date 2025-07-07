@@ -5,7 +5,6 @@ from datetime import datetime
 # Request Models
 class GenerateSessionRequest(BaseModel):
     request_token: str = Field(..., description="The one-time request token from the broker's successful login redirect.")
-    user_id: str = Field(..., description="The unique ID of the user from the frontend.")
     api_key: str = Field(..., description="The user's broker API key.")
     api_secret: str = Field(..., description="The user's broker API secret.")
 
@@ -18,7 +17,6 @@ class UserData(BaseModel):
 class GenerateSessionResponse(BaseModel):
     status: str = Field(example="success")
     message: str = Field(example="Broker connected successfully.")
-    data: UserData
 
 class PortfolioSummaryData(BaseModel):
     total_value: float
