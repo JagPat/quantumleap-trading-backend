@@ -124,7 +124,7 @@ async def broker_callback(request: Request, request_token: str = Query(...), act
                     logger.info(f"Extracted token from URL: {clean_token}")
         
         # Additional validation - Zerodha request tokens are typically alphanumeric
-        if not clean_token or len(clean_token) < 10:
+        if not clean_token or len(clean_token) < 10 or not clean_token.replace('_', '').replace('-', '').isalnum():
             logger.error(f"Request token appears invalid or too short: {clean_token}")
             raise HTTPException(status_code=400, detail="Invalid request_token received from Zerodha")
         
