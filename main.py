@@ -115,13 +115,22 @@ async def broker_callback(request: Request, request_token: str = Query(...), act
         # Validate that this looks like a proper request_token (not a URL)
         if clean_token.startswith('http') or '://' in clean_token:
             logger.error(f"Invalid request_token format - appears to be a URL: {clean_token}")
-            # Try to extract token from URL if it's embedded
-            if 'request_token=' in clean_token:
-                import urllib.parse as urlparse
-                parsed = urlparse.parse_qs(urlparse.urlparse(clean_token).query)
-                if 'request_token' in parsed:
-                    clean_token = parsed['request_token'][0]
-                    logger.info(f"Extracted token from URL: {clean_token}")
+            # Try to extract token from URL - Zerodha uses sess_id parameter for request_token
+            import urllib.parse as urlparse
+            parsed_url = urlparse.urlparse(clean_token)
+            query_params = urlparse.parse_qs(parsed_url.query)
+            
+            # Check for request_token parameter first
+            if 'request_token' in query_params:
+                clean_token = query_params['request_token'][0]
+                logger.info(f"Extracted token from request_token parameter: {clean_token}")
+            # Check for sess_id parameter (Zerodha's format)
+            elif 'sess_id' in query_params:
+                clean_token = query_params['sess_id'][0]
+                logger.info(f"Extracted token from sess_id parameter: {clean_token}")
+            else:
+                logger.error(f"Could not find token in URL parameters: {query_params}")
+                raise HTTPException(status_code=400, detail="No valid token found in URL parameters")
         
         # Additional validation - Zerodha request tokens are typically alphanumeric
         if not clean_token or len(clean_token) < 10 or not clean_token.replace('_', '').replace('-', '').isalnum():
