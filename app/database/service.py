@@ -1,0 +1,159 @@
+"""
+Database service - handles all database operations
+"""
+import sqlite3
+import logging
+from typing import Optional, Dict, Any
+from cryptography.fernet import Fernet
+from ..core.config import settings
+
+logger = logging.getLogger(__name__)
+
+# Initialize cipher suite for encryption
+cipher_suite = Fernet(settings.encryption_key)
+
+
+def encrypt_data(data: str) -> str:
+    """Encrypt sensitive data"""
+    return cipher_suite.encrypt(data.encode()).decode()
+
+
+def decrypt_data(encrypted_data: str) -> str:
+    """Decrypt sensitive data"""
+    return cipher_suite.decrypt(encrypted_data.encode()).decode()
+
+
+def init_database():
+    """Initialize SQLite database with required tables"""
+    conn = sqlite3.connect(settings.database_path)
+    cursor = conn.cursor()
+    
+    # Create users table for storing broker credentials
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT UNIQUE NOT NULL,
+            api_key TEXT NOT NULL,
+            api_secret TEXT NOT NULL,
+            access_token TEXT,
+            user_name TEXT,
+            email TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+
+def store_user_credentials(
+    user_id: str, 
+    api_key: str, 
+    api_secret: str, 
+    access_token: str,
+    user_name: Optional[str] = None,
+    email: Optional[str] = None
+) -> bool:
+    """
+    Store user credentials securely in database
+    
+    Args:
+        user_id: User identifier from broker
+        api_key: Broker API key
+        api_secret: Broker API secret  
+        access_token: Broker access token
+        user_name: User's name
+        email: User's email
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        # Encrypt sensitive data
+        encrypted_api_secret = encrypt_data(api_secret)
+        encrypted_access_token = encrypt_data(access_token)
+        
+        # Insert or update user credentials
+        cursor.execute('''
+            INSERT OR REPLACE INTO users 
+            (user_id, api_key, api_secret, access_token, user_name, email, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (user_id, api_key, encrypted_api_secret, encrypted_access_token, user_name, email))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Successfully stored credentials for user: {user_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error storing user credentials: {str(e)}")
+        return False
+
+
+def get_user_credentials(user_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve user credentials from database
+    
+    Args:
+        user_id: User identifier
+        
+    Returns:
+        Dict with user credentials or None if not found
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT user_id, api_key, api_secret, access_token, user_name, email
+            FROM users WHERE user_id = ?
+        ''', (user_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            return {
+                "user_id": result[0],
+                "api_key": result[1],
+                "api_secret": decrypt_data(result[2]),
+                "access_token": decrypt_data(result[3]),
+                "user_name": result[4],
+                "email": result[5]
+            }
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error retrieving user credentials: {str(e)}")
+        return None
+
+
+def user_exists(user_id: str) -> bool:
+    """
+    Check if user exists in database
+    
+    Args:
+        user_id: User identifier
+        
+    Returns:
+        bool: True if user exists, False otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT 1 FROM users WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        return result is not None
+        
+    except Exception as e:
+        logger.error(f"Error checking if user exists: {str(e)}")
+        return False 
