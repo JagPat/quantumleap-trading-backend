@@ -20,7 +20,7 @@ if __name__ == "__main__":
     print(f"Railway deployment: {IS_RAILWAY}")
     
     uvicorn.run(
-        "main_v2:app",  # Updated to use modular backend
+        "main:app",  # Using modular backend (renamed from main_v2)
         host=HOST,
         port=PORT,
         reload=DEBUG and not IS_RAILWAY,  # Disable reload in production
