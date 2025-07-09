@@ -1,8 +1,8 @@
 """
-Authentication module models
+Authentication models - Request/Response schemas for broker authentication
 """
-from pydantic import BaseModel
 from typing import Optional, Dict, Any
+from pydantic import BaseModel
 
 
 class GenerateSessionRequest(BaseModel):
@@ -13,19 +13,21 @@ class GenerateSessionRequest(BaseModel):
 
 
 class GenerateSessionResponse(BaseModel):
-    """Response model for session generation"""
+    """Response model for broker session generation"""
     status: str
     access_token: Optional[str] = None
     user_data: Optional[Dict[str, Any]] = None
     message: Optional[str] = None
 
 
-class BrokerConnectionStatus(BaseModel):
-    """Broker connection status model"""
-    user_id: str
+class BrokerStatusResponse(BaseModel):
+    """Response model for broker connection status"""
+    status: str
     is_connected: bool
-    connection_status: str
-    last_connected: Optional[str] = None
+    user_id: Optional[str] = None
+    user_name: Optional[str] = None
+    last_sync: Optional[str] = None
+    message: Optional[str] = None
 
 
 class UserCredentials(BaseModel):
@@ -35,4 +37,19 @@ class UserCredentials(BaseModel):
     api_secret: str
     access_token: Optional[str] = None
     user_name: Optional[str] = None
-    email: Optional[str] = None 
+    email: Optional[str] = None
+
+
+class Base44User(BaseModel):
+    """Base44 user information extracted from JWT token"""
+    email: str
+    user_id: str
+    app_id: Optional[str] = None
+    permissions: Optional[list] = None
+
+
+class BrokerProfileResponse(BaseModel):
+    """Response model for broker profile information"""
+    status: str
+    user_data: Optional[Dict[str, Any]] = None
+    message: Optional[str] = None 

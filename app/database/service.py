@@ -166,6 +166,45 @@ def delete_user_credentials(user_id: str) -> bool:
         return False
 
 
+def get_user_credentials_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve user credentials from database by email
+    
+    Args:
+        email: User email address
+        
+    Returns:
+        Dict with user credentials or None if not found
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT user_id, api_key, api_secret, access_token, user_name, email
+            FROM users WHERE email = ?
+        ''', (email,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            return {
+                "user_id": result[0],
+                "api_key": result[1],
+                "api_secret": decrypt_data(result[2]),
+                "access_token": decrypt_data(result[3]),
+                "user_name": result[4],
+                "email": result[5]
+            }
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error retrieving user credentials by email: {str(e)}")
+        return None
+
+
 def user_exists(user_id: str) -> bool:
     """
     Check if user exists in database

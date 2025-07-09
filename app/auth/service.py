@@ -2,6 +2,8 @@
 Authentication service - handles all broker authentication logic
 """
 import logging
+import jwt
+import requests
 from typing import Optional, Dict, Any
 from fastapi import HTTPException
 from kiteconnect import KiteConnect
@@ -9,7 +11,7 @@ from kiteconnect.exceptions import KiteException
 
 from ..core.config import settings
 from ..database.service import store_user_credentials, get_user_credentials, delete_user_credentials
-from .models import GenerateSessionResponse
+from .models import GenerateSessionResponse, Base44User, BrokerProfileResponse
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +268,160 @@ class AuthService:
                 "is_connected": False,
                 "message": f"Status check failed: {str(e)}"
             }
+
+
+    def validate_base44_token(self, authorization_header: str) -> Base44User:
+        """
+        Validate Base44 JWT token and extract user information
+        
+        Args:
+            authorization_header: Authorization header with Bearer token
+            
+        Returns:
+            Base44User object with user information
+            
+        Raises:
+            HTTPException: If token is invalid or expired
+        """
+        try:
+            if not authorization_header or not authorization_header.startswith('Bearer '):
+                raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+            
+            token = authorization_header.split(' ')[1]
+            
+            # For now, we'll decode without verification since we don't have Base44's public key
+            # In production, you should verify the token with Base44's public key
+            try:
+                # Decode token without verification for now
+                decoded = jwt.decode(token, options={"verify_signature": False})
+                logger.info(f"✅ Base44 token decoded successfully")
+                
+                # Extract user information
+                user_email = decoded.get('email')
+                user_id = decoded.get('sub') or decoded.get('user_id')
+                app_id = decoded.get('app_id')
+                
+                if not user_email:
+                    raise HTTPException(status_code=401, detail="Token missing email claim")
+                
+                logger.info(f"✅ Valid Base44 token for user: {user_email}")
+                
+                return Base44User(
+                    email=user_email,
+                    user_id=user_id or user_email,
+                    app_id=app_id,
+                    permissions=decoded.get('permissions', [])
+                )
+                
+            except jwt.InvalidTokenError as e:
+                logger.error(f"❌ JWT decode error: {str(e)}")
+                raise HTTPException(status_code=401, detail="Invalid JWT token")
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Base44 token validation failed: {str(e)}")
+            raise HTTPException(status_code=401, detail="Token validation failed")
+    
+    def get_broker_profile(self, authorization_header: str) -> BrokerProfileResponse:
+        """
+        Get broker profile information for authenticated Base44 user
+        
+        Args:
+            authorization_header: Authorization header with Bearer token
+            
+        Returns:
+            BrokerProfileResponse with user profile data
+        """
+        try:
+            # Validate Base44 token and get user info
+            base44_user = self.validate_base44_token(authorization_header)
+            logger.info(f"🔍 Getting broker profile for Base44 user: {base44_user.email}")
+            
+            # Look up user's broker credentials by email
+            credentials = self.get_user_credentials_by_email(base44_user.email)
+            
+            if not credentials:
+                logger.warning(f"❌ No broker credentials found for user: {base44_user.email}")
+                return BrokerProfileResponse(
+                    status="error",
+                    message="No active broker session found. Please authenticate with your broker first."
+                )
+            
+            api_key = credentials.get("api_key")
+            access_token = credentials.get("access_token")
+            
+            if not api_key or not access_token:
+                logger.warning(f"❌ Incomplete broker credentials for user: {base44_user.email}")
+                return BrokerProfileResponse(
+                    status="error",
+                    message="Incomplete broker credentials. Please re-authenticate with your broker."
+                )
+            
+            # Test the broker connection and get profile
+            try:
+                kite = KiteConnect(api_key=api_key)
+                kite.set_access_token(access_token)
+                
+                # Get user profile from Zerodha
+                profile = kite.profile()
+                
+                logger.info(f"✅ Successfully retrieved broker profile for user: {base44_user.email}")
+                
+                return BrokerProfileResponse(
+                    status="success",
+                    user_data={
+                        "user_id": profile.get("user_id"),
+                        "user_name": profile.get("user_name"),
+                        "email": profile.get("email"),
+                        "broker": "ZERODHA",
+                        "profile": profile,
+                        "base44_user": base44_user.email
+                    }
+                )
+                
+            except KiteException as e:
+                logger.error(f"❌ Zerodha API failed for user {base44_user.email}: {str(e)}")
+                
+                # Check if it's a token/session issue
+                if "token" in str(e).lower() or "session" in str(e).lower() or "invalid" in str(e).lower():
+                    return BrokerProfileResponse(
+                        status="error",
+                        message="Session expired or invalid. Please re-authenticate with your broker."
+                    )
+                else:
+                    return BrokerProfileResponse(
+                        status="error",
+                        message=f"Broker API error: {str(e)}"
+                    )
+                    
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error getting broker profile: {str(e)}")
+            return BrokerProfileResponse(
+                status="error",
+                message=f"Internal server error: {str(e)}"
+            )
+    
+    def get_user_credentials_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """
+        Get user credentials by email address
+        
+        Args:
+            email: User email address
+            
+        Returns:
+            User credentials dict or None if not found
+        """
+        try:
+            # For now, we'll search by email in the database
+            # This assumes the email is stored when credentials are saved
+            from ..database.service import get_user_credentials_by_email
+            return get_user_credentials_by_email(email)
+        except Exception as e:
+            logger.error(f"Error getting user credentials by email {email}: {str(e)}")
+            return None
 
 
 # Service instance

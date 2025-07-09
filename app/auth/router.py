@@ -2,11 +2,11 @@
 Authentication router - FastAPI endpoints for broker authentication
 """
 import logging
-from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from fastapi import APIRouter, HTTPException, Depends, Query, Request, Header
 from fastapi.responses import RedirectResponse
 
 from ..core.config import settings
-from .models import GenerateSessionRequest, GenerateSessionResponse
+from .models import GenerateSessionRequest, GenerateSessionResponse, BrokerProfileResponse
 from .service import auth_service
 
 logger = logging.getLogger(__name__)
@@ -111,6 +111,35 @@ async def invalidate_broker_session(user_id: str = Query(..., description="User 
     except Exception as e:
         logger.error(f"Error invalidating broker session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to invalidate session: {str(e)}")
+
+
+@router.get("/broker/profile", response_model=BrokerProfileResponse)
+async def get_broker_profile(authorization: str = Header(..., description="Bearer token from Base44")):
+    """
+    Get Broker Profile
+    
+    Retrieves broker profile information for authenticated Base44 user.
+    This endpoint validates the Base44 JWT token and returns the user's broker profile.
+    """
+    try:
+        result = auth_service.get_broker_profile(authorization)
+        
+        if result.status == "success":
+            return result
+        else:
+            # Map error messages to appropriate HTTP status codes
+            if "No active broker session" in result.message:
+                raise HTTPException(status_code=404, detail=result.message)
+            elif "Session expired" in result.message or "invalid" in result.message.lower():
+                raise HTTPException(status_code=401, detail=result.message)
+            else:
+                raise HTTPException(status_code=500, detail=result.message)
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting broker profile: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get broker profile")
 
 
 @router.delete("/broker/disconnect")
