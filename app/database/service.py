@@ -10,7 +10,7 @@ from ..core.config import settings
 logger = logging.getLogger(__name__)
 
 # Initialize cipher suite for encryption
-cipher_suite = Fernet(settings.encryption_key)
+cipher_suite = Fernet(settings.get_encryption_key())
 
 
 def encrypt_data(data: str) -> str:
@@ -132,6 +132,38 @@ def get_user_credentials(user_id: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error retrieving user credentials: {str(e)}")
         return None
+
+
+def delete_user_credentials(user_id: str) -> bool:
+    """
+    Delete user credentials from database
+    
+    Args:
+        user_id: User identifier
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('DELETE FROM users WHERE user_id = ?', (user_id,))
+        rows_affected = cursor.rowcount
+        
+        conn.commit()
+        conn.close()
+        
+        if rows_affected > 0:
+            logger.info(f"Successfully deleted credentials for user: {user_id}")
+            return True
+        else:
+            logger.warning(f"No credentials found to delete for user: {user_id}")
+            return False
+        
+    except Exception as e:
+        logger.error(f"Error deleting user credentials: {str(e)}")
+        return False
 
 
 def user_exists(user_id: str) -> bool:

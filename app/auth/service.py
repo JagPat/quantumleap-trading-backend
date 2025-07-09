@@ -8,7 +8,7 @@ from kiteconnect import KiteConnect
 from kiteconnect.exceptions import KiteException
 
 from ..core.config import settings
-from ..database.service import store_user_credentials
+from ..database.service import store_user_credentials, get_user_credentials, delete_user_credentials
 from .models import GenerateSessionResponse
 
 logger = logging.getLogger(__name__)
@@ -145,6 +145,66 @@ class AuthService:
                 message=f"Internal server error: {str(e)}"
             )
     
+    def invalidate_session(self, user_id: str) -> Dict[str, Any]:
+        """
+        Invalidate broker session for user (logout)
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            Status of invalidation operation
+        """
+        try:
+            # Get user credentials from database
+            credentials = get_user_credentials(user_id)
+            
+            if not credentials:
+                logger.warning(f"No credentials found for user: {user_id}")
+                return {
+                    "status": "warning",
+                    "message": "No active session found for user"
+                }
+            
+            api_key = credentials.get("api_key")
+            access_token = credentials.get("access_token")
+            
+            if api_key and access_token:
+                try:
+                    # Create KiteConnect instance and invalidate token
+                    kite = KiteConnect(api_key=api_key)
+                    kite.invalidate_access_token(access_token=access_token)
+                    logger.info(f"Successfully invalidated Zerodha session for user: {user_id}")
+                except KiteException as e:
+                    logger.warning(f"Zerodha invalidation failed for user {user_id}: {str(e)}")
+                    # Continue with local cleanup even if Zerodha fails
+                except Exception as e:
+                    logger.warning(f"Error during Zerodha invalidation for user {user_id}: {str(e)}")
+                    # Continue with local cleanup
+            
+            # Remove credentials from local database
+            delete_success = delete_user_credentials(user_id)
+            
+            if delete_success:
+                logger.info(f"Successfully removed local credentials for user: {user_id}")
+                return {
+                    "status": "success",
+                    "message": "Session invalidated and credentials removed"
+                }
+            else:
+                logger.error(f"Failed to remove local credentials for user: {user_id}")
+                return {
+                    "status": "error",
+                    "message": "Failed to remove local credentials"
+                }
+                
+        except Exception as e:
+            logger.error(f"Unexpected error invalidating session for user {user_id}: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Session invalidation failed: {str(e)}"
+            }
+    
     def get_connection_status(self, user_id: str) -> Dict[str, Any]:
         """
         Get broker connection status for user
@@ -155,9 +215,57 @@ class AuthService:
         Returns:
             Connection status information
         """
-        # This would check database for user credentials and verify connection
-        # Implementation depends on your database service
-        pass
+        try:
+            credentials = get_user_credentials(user_id)
+            
+            if not credentials:
+                return {
+                    "status": "disconnected",
+                    "is_connected": False,
+                    "message": "No active session"
+                }
+            
+            access_token = credentials.get("access_token")
+            api_key = credentials.get("api_key")
+            
+            if not access_token or not api_key:
+                return {
+                    "status": "disconnected",
+                    "is_connected": False,
+                    "message": "Incomplete credentials"
+                }
+            
+            # Test connection with simple API call
+            try:
+                kite = KiteConnect(api_key=api_key)
+                kite.set_access_token(access_token)
+                profile = kite.profile()  # Simple test call
+                
+                return {
+                    "status": "connected",
+                    "is_connected": True,
+                    "user_data": {
+                        "user_id": profile.get("user_id"),
+                        "user_name": profile.get("user_name"),
+                        "email": profile.get("email")
+                    },
+                    "message": "Active connection verified"
+                }
+            except KiteException as e:
+                logger.warning(f"Connection test failed for user {user_id}: {str(e)}")
+                return {
+                    "status": "disconnected",
+                    "is_connected": False,
+                    "message": f"Connection test failed: {str(e)}"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error checking connection status for user {user_id}: {str(e)}")
+            return {
+                "status": "error", 
+                "is_connected": False,
+                "message": f"Status check failed: {str(e)}"
+            }
 
 
 # Service instance

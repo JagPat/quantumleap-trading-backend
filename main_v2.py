@@ -83,6 +83,11 @@ async def legacy_generate_session(request: Request):
     """Legacy redirect to new auth module"""
     return RedirectResponse(url=str(request.url).replace("/api/broker/generate-session", "/api/auth/broker/generate-session"))
 
+@app.post("/api/broker/invalidate-session")
+async def legacy_invalidate_session(request: Request):
+    """Legacy redirect to new auth module"""
+    return RedirectResponse(url=str(request.url).replace("/api/broker/invalidate-session", "/api/auth/broker/invalidate-session"))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(

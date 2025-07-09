@@ -90,16 +90,45 @@ async def get_broker_status(user_id: str = Query(..., description="User ID")):
         raise HTTPException(status_code=500, detail="Failed to get broker status")
 
 
+@router.post("/broker/invalidate-session")
+async def invalidate_broker_session(user_id: str = Query(..., description="User ID")):
+    """
+    Invalidate Broker Session
+    
+    Invalidates the user's broker access token (logout) and removes stored credentials.
+    This is the proper way to disconnect a user from their broker account.
+    """
+    try:
+        result = auth_service.invalidate_session(user_id)
+        
+        if result["status"] == "success":
+            return {"status": "success", "message": result["message"]}
+        elif result["status"] == "warning":
+            return {"status": "success", "message": result["message"]}  # Treat warning as success for Base44
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
+            
+    except Exception as e:
+        logger.error(f"Error invalidating broker session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to invalidate session: {str(e)}")
+
+
 @router.delete("/broker/disconnect")
 async def disconnect_broker(user_id: str = Query(..., description="User ID")):
     """
-    Disconnect Broker
+    Disconnect Broker (Legacy endpoint)
     
     Removes stored broker credentials for user.
+    For full session invalidation, use /broker/invalidate-session instead.
     """
     try:
-        # Implementation would remove user credentials from database
-        return {"status": "success", "message": "Broker disconnected successfully"}
+        result = auth_service.invalidate_session(user_id)
+        
+        if result["status"] in ["success", "warning"]:
+            return {"status": "success", "message": "Broker disconnected successfully"}
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
+            
     except Exception as e:
         logger.error(f"Error disconnecting broker: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to disconnect broker") 

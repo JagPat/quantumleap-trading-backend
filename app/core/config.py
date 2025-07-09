@@ -3,7 +3,10 @@ Core configuration management for QuantumLeap Trading Backend
 """
 import os
 from typing import Optional
-from pydantic import BaseSettings
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings
 from cryptography.fernet import Fernet
 
 
@@ -19,7 +22,7 @@ class Settings(BaseSettings):
     database_path: str = "trading_app.db"
     
     # Security
-    encryption_key: bytes = None
+    encryption_key: Optional[str] = None
     
     # External URLs
     frontend_url: str = "http://localhost:8501"
@@ -27,15 +30,16 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
     
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Generate or get encryption key
-        if not self.encryption_key:
-            env_key = os.environ.get("ENCRYPTION_KEY")
-            if env_key:
-                self.encryption_key = env_key.encode()
-            else:
-                self.encryption_key = Fernet.generate_key()
+    def get_encryption_key(self) -> bytes:
+        """Get encryption key as bytes"""
+        if self.encryption_key:
+            return self.encryption_key.encode()
+        
+        env_key = os.environ.get("ENCRYPTION_KEY")
+        if env_key:
+            return env_key.encode()
+        
+        return Fernet.generate_key()
     
     class Config:
         env_file = ".env"
