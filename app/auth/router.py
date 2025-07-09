@@ -106,11 +106,51 @@ async def invalidate_broker_session(user_id: str = Query(..., description="User 
         elif result["status"] == "warning":
             return {"status": "success", "message": result["message"]}  # Treat warning as success for Base44
         else:
-            raise HTTPException(status_code=500, detail=result["message"])
+            raise HTTPException(status_code=400, detail=result["message"])
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error invalidating broker session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to invalidate session: {str(e)}")
+
+
+@router.post("/broker/disconnect-session")
+async def disconnect_broker_session_jwt(authorization: str = Header(..., description="Bearer token from Base44")):
+    """
+    Disconnect Broker Session (JWT-based)
+    
+    Disconnects the user's broker session using Base44 JWT token.
+    This is the recommended endpoint for Base44 integration as it doesn't require user_id.
+    """
+    try:
+        result = auth_service.disconnect_session_by_jwt(authorization)
+        
+        if result["status"] == "success":
+            return {
+                "status": "success", 
+                "message": result["message"],
+                "data": result["data"]
+            }
+        else:
+            # Map error types to appropriate HTTP status codes
+            if "Authentication failed" in result["message"]:
+                raise HTTPException(status_code=401, detail=result["message"])
+            elif "No active session" in result["message"]:
+                # Treat "no session" as success for disconnect operations
+                return {
+                    "status": "success", 
+                    "message": result["message"],
+                    "data": result["data"]
+                }
+            else:
+                raise HTTPException(status_code=400, detail=result["message"])
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in JWT-based disconnect: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to disconnect session: {str(e)}")
 
 
 @router.get("/broker/profile", response_model=BrokerProfileResponse)
@@ -149,6 +189,7 @@ async def disconnect_broker(user_id: str = Query(..., description="User ID")):
     
     Removes stored broker credentials for user.
     For full session invalidation, use /broker/invalidate-session instead.
+    For JWT-based disconnect, use /broker/disconnect-session instead.
     """
     try:
         result = auth_service.invalidate_session(user_id)
@@ -156,8 +197,10 @@ async def disconnect_broker(user_id: str = Query(..., description="User ID")):
         if result["status"] in ["success", "warning"]:
             return {"status": "success", "message": "Broker disconnected successfully"}
         else:
-            raise HTTPException(status_code=500, detail=result["message"])
+            raise HTTPException(status_code=400, detail=result["message"])
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error disconnecting broker: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to disconnect broker") 

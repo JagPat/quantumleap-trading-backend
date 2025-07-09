@@ -10,7 +10,7 @@ from kiteconnect import KiteConnect
 from kiteconnect.exceptions import KiteException
 
 from ..core.config import settings
-from ..database.service import store_user_credentials, get_user_credentials, delete_user_credentials
+from ..database.service import store_user_credentials, get_user_credentials, delete_user_credentials, get_user_credentials_by_email
 from .models import GenerateSessionResponse, Base44User, BrokerProfileResponse
 
 logger = logging.getLogger(__name__)
@@ -158,6 +158,13 @@ class AuthService:
             Status of invalidation operation
         """
         try:
+            if not user_id or user_id.strip() == "":
+                logger.warning("Empty or invalid user_id provided for invalidate_session")
+                return {
+                    "status": "error",
+                    "message": "User ID is required for session invalidation"
+                }
+            
             # Get user credentials from database
             credentials = get_user_credentials(user_id)
             
@@ -207,6 +214,81 @@ class AuthService:
                 "message": f"Session invalidation failed: {str(e)}"
             }
     
+    def invalidate_session_by_email(self, email: str) -> Dict[str, Any]:
+        """
+        Invalidate broker session for user by email (for JWT-based disconnect)
+        
+        Args:
+            email: User email address
+            
+        Returns:
+            Status of invalidation operation
+        """
+        try:
+            if not email or email.strip() == "":
+                logger.warning("Empty or invalid email provided for invalidate_session_by_email")
+                return {
+                    "status": "error",
+                    "message": "Email is required for session invalidation"
+                }
+            
+            # Get user credentials from database by email
+            credentials = get_user_credentials_by_email(email)
+            
+            if not credentials:
+                logger.warning(f"No credentials found for email: {email}")
+                return {
+                    "status": "warning",
+                    "message": "No active session found for user"
+                }
+            
+            user_id = credentials.get("user_id")
+            api_key = credentials.get("api_key")
+            access_token = credentials.get("access_token")
+            
+            if api_key and access_token:
+                try:
+                    # Create KiteConnect instance and invalidate token
+                    kite = KiteConnect(api_key=api_key)
+                    kite.invalidate_access_token(access_token=access_token)
+                    logger.info(f"Successfully invalidated Zerodha session for email: {email}")
+                except KiteException as e:
+                    logger.warning(f"Zerodha invalidation failed for email {email}: {str(e)}")
+                    # Continue with local cleanup even if Zerodha fails
+                except Exception as e:
+                    logger.warning(f"Error during Zerodha invalidation for email {email}: {str(e)}")
+                    # Continue with local cleanup
+            
+            # Remove credentials from local database using user_id
+            if user_id:
+                delete_success = delete_user_credentials(user_id)
+                
+                if delete_success:
+                    logger.info(f"Successfully removed local credentials for email: {email}")
+                    return {
+                        "status": "success",
+                        "message": "Session invalidated and credentials removed"
+                    }
+                else:
+                    logger.error(f"Failed to remove local credentials for email: {email}")
+                    return {
+                        "status": "error",
+                        "message": "Failed to remove local credentials"
+                    }
+            else:
+                logger.error(f"No user_id found for email: {email}")
+                return {
+                    "status": "error",
+                    "message": "Invalid user data found"
+                }
+                
+        except Exception as e:
+            logger.error(f"Unexpected error invalidating session for email {email}: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Session invalidation failed: {str(e)}"
+            }
+
     def get_connection_status(self, user_id: str) -> Dict[str, Any]:
         """
         Get broker connection status for user
@@ -218,6 +300,13 @@ class AuthService:
             Connection status information
         """
         try:
+            if not user_id or user_id.strip() == "":
+                return {
+                    "status": "error",
+                    "is_connected": False,
+                    "message": "User ID is required for status check"
+                }
+            
             credentials = get_user_credentials(user_id)
             
             if not credentials:
@@ -404,6 +493,79 @@ class AuthService:
                 message=f"Internal server error: {str(e)}"
             )
     
+    def disconnect_session_by_jwt(self, authorization_header: str) -> Dict[str, Any]:
+        """
+        Disconnect broker session using JWT token (for Base44 integration)
+        
+        Args:
+            authorization_header: Authorization header with Bearer token
+            
+        Returns:
+            Status of disconnect operation
+        """
+        try:
+            # Validate Base44 token and get user info
+            base44_user = self.validate_base44_token(authorization_header)
+            logger.info(f"🔌 Disconnecting broker session for Base44 user: {base44_user.email}")
+            
+            # Use email-based disconnect
+            result = self.invalidate_session_by_email(base44_user.email)
+            
+            if result["status"] == "success":
+                logger.info(f"✅ Successfully disconnected session for Base44 user: {base44_user.email}")
+                return {
+                    "status": "success",
+                    "message": "Broker session disconnected successfully",
+                    "data": {
+                        "is_connected": False,
+                        "connection_status": "disconnected",
+                        "user_email": base44_user.email
+                    }
+                }
+            elif result["status"] == "warning":
+                logger.info(f"⚠️ No active session found for Base44 user: {base44_user.email}")
+                return {
+                    "status": "success",
+                    "message": "No active session found (already disconnected)",
+                    "data": {
+                        "is_connected": False,
+                        "connection_status": "disconnected",
+                        "user_email": base44_user.email
+                    }
+                }
+            else:
+                logger.error(f"❌ Failed to disconnect session for Base44 user: {base44_user.email}")
+                return {
+                    "status": "error",
+                    "message": result["message"],
+                    "data": {
+                        "is_connected": False,
+                        "connection_status": "error",
+                        "user_email": base44_user.email
+                    }
+                }
+                
+        except HTTPException as e:
+            logger.error(f"❌ JWT validation failed for disconnect: {str(e.detail)}")
+            return {
+                "status": "error",
+                "message": f"Authentication failed: {str(e.detail)}",
+                "data": {
+                    "is_connected": False,
+                    "connection_status": "error"
+                }
+            }
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in JWT-based disconnect: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Disconnect failed: {str(e)}",
+                "data": {
+                    "is_connected": False,
+                    "connection_status": "error"
+                }
+            }
+    
     def get_user_credentials_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """
         Get user credentials by email address
@@ -415,9 +577,6 @@ class AuthService:
             User credentials dict or None if not found
         """
         try:
-            # For now, we'll search by email in the database
-            # This assumes the email is stored when credentials are saved
-            from ..database.service import get_user_credentials_by_email
             return get_user_credentials_by_email(email)
         except Exception as e:
             logger.error(f"Error getting user credentials by email {email}: {str(e)}")
