@@ -7,10 +7,12 @@ Modular architecture with separate authentication, portfolio, and trading module
 import logging
 import os
 import sys
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime
 from kiteconnect.exceptions import KiteException
+from typing import Optional
 
 # Import configuration
 from app.core.config import settings
@@ -28,6 +30,45 @@ from kite_service import KiteService, get_kite_service, calculate_portfolio_summ
 # Configure logging
 logging.basicConfig(level=getattr(logging, settings.log_level))
 logger = logging.getLogger(__name__)
+
+# Security scheme for API documentation
+security = HTTPBearer()
+
+def get_user_from_headers(
+    authorization: Optional[str] = Header(None),
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+) -> str:
+    """
+    Extract user ID from Kite Connect authorization headers.
+    
+    Expected format: Authorization: token api_key:access_token
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization header")
+    
+    if not authorization.startswith("token "):
+        raise HTTPException(status_code=401, detail="Invalid authorization format. Expected 'token api_key:access_token'")
+    
+    try:
+        # Extract api_key:access_token part
+        token_part = authorization[6:]  # Remove "token " prefix
+        if ":" not in token_part:
+            raise HTTPException(status_code=401, detail="Invalid token format. Expected 'api_key:access_token'")
+        
+        api_key, access_token = token_part.split(":", 1)
+        
+        if not api_key or not access_token:
+            raise HTTPException(status_code=401, detail="Missing api_key or access_token")
+        
+        # Use X-User-ID header if provided, otherwise use api_key as fallback
+        user_id = x_user_id if x_user_id and x_user_id != 'unknown' else api_key
+        
+        logger.info(f"🔐 Authentication extracted - user_id: {user_id}, api_key: {api_key[:8]}...")
+        return user_id
+        
+    except ValueError as e:
+        logger.error(f"Failed to parse authorization header: {str(e)}")
+        raise HTTPException(status_code=401, detail="Invalid authorization header format")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -85,13 +126,14 @@ async def health_check():
         "version": settings.app_version
     }
 
-# Portfolio endpoints
+# Portfolio endpoints with header-based authentication
 @app.get("/api/portfolio/data", tags=["Portfolio Data"])
-async def get_portfolio_data(user_id: str = Query(..., description="User ID")):
+async def get_portfolio_data(user_id: str = Depends(get_user_from_headers)):
     """
     Get Portfolio Data
     
     Fetches combined portfolio data including summary, holdings, and positions.
+    Requires Kite Connect authorization header: Authorization: token api_key:access_token
     """
     try:
         # Get KiteService for user
@@ -130,11 +172,12 @@ async def get_portfolio_data(user_id: str = Query(..., description="User ID")):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/portfolio/summary", response_model=PortfolioSummaryResponse, tags=["Portfolio Data"])
-async def get_portfolio_summary(user_id: str = Query(..., description="User ID")):
+async def get_portfolio_summary(user_id: str = Depends(get_user_from_headers)):
     """
     Get Portfolio Summary
     
     Fetches a high-level summary of the user's portfolio, including P&L.
+    Requires Kite Connect authorization header: Authorization: token api_key:access_token
     """
     try:
         # Get KiteService for user
@@ -170,11 +213,12 @@ async def get_portfolio_summary(user_id: str = Query(..., description="User ID")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/portfolio/holdings", response_model=HoldingsResponse, tags=["Portfolio Data"])
-async def get_holdings(user_id: str = Query(..., description="User ID")):
+async def get_holdings(user_id: str = Depends(get_user_from_headers)):
     """
     Get Holdings
     
     Fetches the user's long-term equity holdings from the broker.
+    Requires Kite Connect authorization header: Authorization: token api_key:access_token
     """
     try:
         # Get KiteService for user
@@ -205,11 +249,12 @@ async def get_holdings(user_id: str = Query(..., description="User ID")):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/portfolio/positions", response_model=PositionsResponse, tags=["Portfolio Data"])
-async def get_positions(user_id: str = Query(..., description="User ID")):
+async def get_positions(user_id: str = Depends(get_user_from_headers)):
     """
     Get Positions
     
     Fetches the user's current day (intraday and F&O) positions from the broker.
+    Requires Kite Connect authorization header: Authorization: token api_key:access_token
     """
     try:
         # Get KiteService for user
