@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     encryption_key: Optional[str] = None
     
     # External URLs
-    frontend_url: str = "http://localhost:8501"
+    frontend_url: str = "http://localhost:5173"
     
     # Logging
     log_level: str = "INFO"

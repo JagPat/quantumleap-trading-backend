@@ -74,7 +74,7 @@ async def broker_callback(
         clean_token = auth_service.clean_request_token(request_token)
         
         # Redirect to frontend with the cleaned request_token
-        redirect_url = f"{settings.frontend_url}/BrokerCallback?request_token={clean_token}&action={action}"
+        redirect_url = f"{settings.frontend_url}/broker/callback?request_token={clean_token}&action={action}"
         
         logger.info(f"Redirecting to: {redirect_url}")
         
