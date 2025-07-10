@@ -73,8 +73,12 @@ async def broker_callback(
         # Clean and validate the request_token
         clean_token = auth_service.clean_request_token(request_token)
         
+        # CRITICAL FIX: Override Railway environment variable until manually updated
+        # Railway still has old Base44 URL in FRONTEND_URL environment variable
+        frontend_url_override = "http://localhost:5173"
+        
         # Redirect to frontend with the cleaned request_token
-        redirect_url = f"{settings.frontend_url}/broker/callback?request_token={clean_token}&action={action}"
+        redirect_url = f"{frontend_url_override}/broker/callback?request_token={clean_token}&action={action}"
         
         logger.info(f"Redirecting to: {redirect_url}")
         
