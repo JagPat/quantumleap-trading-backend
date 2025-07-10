@@ -7,9 +7,10 @@ Modular architecture with separate authentication, portfolio, and trading module
 import logging
 import os
 import sys
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
+from kiteconnect.exceptions import KiteException
 
 # Import configuration
 from app.core.config import settings
@@ -19,6 +20,10 @@ from app.database.service import init_database
 
 # Import routers
 from app.auth.router import router as auth_router
+
+# Import models and services for portfolio endpoints
+from models import PortfolioSummaryResponse, PortfolioSummaryData, HoldingsResponse, PositionsResponse
+from kite_service import KiteService, get_kite_service, calculate_portfolio_summary, format_holdings_data
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, settings.log_level))
@@ -79,6 +84,157 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "version": settings.app_version
     }
+
+# Portfolio endpoints
+@app.get("/api/portfolio/data", tags=["Portfolio Data"])
+async def get_portfolio_data(user_id: str = Query(..., description="User ID")):
+    """
+    Get Portfolio Data
+    
+    Fetches combined portfolio data including summary, holdings, and positions.
+    """
+    try:
+        # Get KiteService for user
+        kite_service = get_kite_service(user_id)
+        if not kite_service:
+            raise HTTPException(status_code=401, detail="Unauthorized or broker not connected")
+        
+        # Fetch all portfolio data
+        holdings = kite_service.get_holdings()
+        positions = kite_service.get_positions()
+        
+        # Calculate portfolio summary
+        summary = calculate_portfolio_summary(holdings, positions)
+        
+        # Format holdings data
+        formatted_holdings = format_holdings_data(holdings)
+        
+        logger.info(f"Successfully fetched portfolio data for user: {user_id}")
+        
+        return {
+            "status": "success",
+            "data": {
+                "summary": summary,
+                "holdings": formatted_holdings,
+                "positions": positions
+            }
+        }
+        
+    except KiteException as e:
+        logger.error(f"Kite API error in get_portfolio_data: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Broker API error: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_portfolio_data: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/portfolio/summary", response_model=PortfolioSummaryResponse, tags=["Portfolio Data"])
+async def get_portfolio_summary(user_id: str = Query(..., description="User ID")):
+    """
+    Get Portfolio Summary
+    
+    Fetches a high-level summary of the user's portfolio, including P&L.
+    """
+    try:
+        # Get KiteService for user
+        kite_service = get_kite_service(user_id)
+        if not kite_service:
+            raise HTTPException(status_code=401, detail="Unauthorized or broker not connected")
+        
+        # Fetch holdings and positions
+        holdings = kite_service.get_holdings()
+        positions = kite_service.get_positions()
+        
+        # Calculate portfolio summary
+        summary = calculate_portfolio_summary(holdings, positions)
+        
+        logger.info(f"Successfully fetched portfolio summary for user: {user_id}")
+        
+        return PortfolioSummaryResponse(
+            status="success",
+            data=PortfolioSummaryData(
+                total_value=summary["total_value"],
+                total_pnl=summary["total_pnl"],
+                todays_pnl=summary["todays_pnl"]
+            )
+        )
+        
+    except KiteException as e:
+        logger.error(f"Kite API error in get_portfolio_summary: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Broker API error: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_portfolio_summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/portfolio/holdings", response_model=HoldingsResponse, tags=["Portfolio Data"])
+async def get_holdings(user_id: str = Query(..., description="User ID")):
+    """
+    Get Holdings
+    
+    Fetches the user's long-term equity holdings from the broker.
+    """
+    try:
+        # Get KiteService for user
+        kite_service = get_kite_service(user_id)
+        if not kite_service:
+            raise HTTPException(status_code=401, detail="Unauthorized or broker not connected")
+        
+        # Fetch holdings
+        holdings = kite_service.get_holdings()
+        
+        # Format holdings data
+        formatted_holdings = format_holdings_data(holdings)
+        
+        logger.info(f"Successfully fetched holdings for user: {user_id}")
+        
+        return HoldingsResponse(
+            status="success",
+            data=formatted_holdings
+        )
+        
+    except KiteException as e:
+        logger.error(f"Kite API error in get_holdings: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Broker API error: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_holdings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/portfolio/positions", response_model=PositionsResponse, tags=["Portfolio Data"])
+async def get_positions(user_id: str = Query(..., description="User ID")):
+    """
+    Get Positions
+    
+    Fetches the user's current day (intraday and F&O) positions from the broker.
+    """
+    try:
+        # Get KiteService for user
+        kite_service = get_kite_service(user_id)
+        if not kite_service:
+            raise HTTPException(status_code=401, detail="Unauthorized or broker not connected")
+        
+        # Fetch positions
+        positions = kite_service.get_positions()
+        
+        logger.info(f"Successfully fetched positions for user: {user_id}")
+        
+        return PositionsResponse(
+            status="success",
+            data=positions
+        )
+        
+    except KiteException as e:
+        logger.error(f"Kite API error in get_positions: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Broker API error: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_positions: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # Legacy compatibility endpoints
 # These will redirect to the new auth module endpoints
