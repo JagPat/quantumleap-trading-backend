@@ -8,6 +8,7 @@ try:
 except ImportError:
     from pydantic import BaseSettings
 from cryptography.fernet import Fernet
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -25,7 +26,11 @@ class Settings(BaseSettings):
     encryption_key: Optional[str] = None
     
     # External URLs
-    frontend_url: str = "http://localhost:5173"
+    frontend_url: str = Field(
+        default="http://localhost:5173",
+        env="FRONTEND_URL",
+        description="Frontend application URL for OAuth redirects"
+    )
     
     # Logging
     log_level: str = "INFO"
