@@ -115,7 +115,7 @@ async def startup_event():
     logger.info("✅ Backend startup complete - all modules loaded")
 
 # Include routers
-app.include_router(auth_router)
+app.include_router(auth_router, prefix="/api/auth")
 
 # Health check endpoints
 @app.get("/")

@@ -232,12 +232,7 @@ async def get_broker_session(request: Request, user_id: str = Query(..., descrip
         
         if not credentials:
             logger.info(f"❌ No credentials found for user: {user_id}")
-            return {
-                "status": "error",
-                "message": "No session found for user",
-                "is_connected": False,
-                "connection_status": "disconnected"
-            }
+            raise HTTPException(status_code=401, detail="No session found for user")
         
         # Check if credentials are valid by testing a simple API call
         api_key = credentials.get("api_key")
