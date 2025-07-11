@@ -128,22 +128,22 @@ async def broker_callback(
                     if 'zerodha_oauth' in request.session:
                         del request.session['zerodha_oauth']
                     
-                    # Redirect to frontend with success status
-                    redirect_url = f"{frontend_url_override}/broker/callback?status=success&user_id={user_id}&action={action}"
+                    # CRITICAL FIX: Use correct frontend callback URL with hyphen
+                    redirect_url = f"{frontend_url_override}/broker-callback?status=success&user_id={user_id}&action={action}"
                     
                 else:
                     logger.error(f"❌ Token exchange failed: {session_result.message}")
                     # Redirect to frontend with error
-                    redirect_url = f"{frontend_url_override}/broker/callback?status=error&error={session_result.message}&action={action}"
+                    redirect_url = f"{frontend_url_override}/broker-callback?status=error&error={session_result.message}&action={action}"
                     
             except Exception as exchange_error:
                 logger.error(f"❌ Token exchange error: {str(exchange_error)}")
                 # Redirect to frontend with error
-                redirect_url = f"{frontend_url_override}/broker/callback?status=error&error={str(exchange_error)}&action={action}"
+                redirect_url = f"{frontend_url_override}/broker-callback?status=error&error={str(exchange_error)}&action={action}"
         else:
             # No credentials available - redirect to frontend with request_token for manual exchange
             logger.info(f"🔄 No API credentials available, redirecting to frontend with request_token")
-            redirect_url = f"{frontend_url_override}/broker/callback?request_token={clean_token}&action={action}"
+            redirect_url = f"{frontend_url_override}/broker-callback?request_token={clean_token}&action={action}"
         
         logger.info(f"🔄 Redirecting to: {redirect_url}")
         return RedirectResponse(url=redirect_url)
@@ -152,7 +152,7 @@ async def broker_callback(
         logger.error(f"❌ Error in broker_callback: {str(e)}")
         # Redirect to frontend with error status
         frontend_url_override = "http://localhost:5173"
-        error_url = f"{frontend_url_override}/broker/callback?status=error&error={str(e)}&action={action}"
+        error_url = f"{frontend_url_override}/broker-callback?status=error&error={str(e)}&action={action}"
         return RedirectResponse(url=error_url)
 
 
