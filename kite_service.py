@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from kiteconnect import KiteConnect
 from kiteconnect.exceptions import KiteException
-from database import get_user_credentials
+from app.database.service import get_user_credentials
 
 logger = logging.getLogger(__name__)
 
