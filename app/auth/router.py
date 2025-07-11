@@ -14,7 +14,7 @@ from .service import auth_service
 logger = logging.getLogger(__name__)
 
 # Create router
-router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+router = APIRouter(tags=["Authentication"])
 
 def get_user_from_auth_headers(
     authorization: Optional[str] = Header(None),
