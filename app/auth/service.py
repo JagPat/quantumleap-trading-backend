@@ -582,6 +582,22 @@ class AuthService:
             logger.error(f"Error getting user credentials by email {email}: {str(e)}")
             return None
 
+    def get_user_credentials(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get user credentials from database
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            User credentials dictionary or None if not found
+        """
+        try:
+            return get_user_credentials(user_id)
+        except Exception as e:
+            logger.error(f"Error getting user credentials: {str(e)}")
+            return None
+
 
 # Service instance
 auth_service = AuthService() 

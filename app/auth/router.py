@@ -56,13 +56,19 @@ def get_user_from_auth_headers(
 async def broker_callback(
     request: Request, 
     request_token: str = Query(...), 
-    action: str = Query(...)
+    action: str = Query(...),
+    api_key: str = Query(None),
+    api_secret: str = Query(None)
 ):
     """
     Broker OAuth Callback
     
     Handles the OAuth callback from Kite Connect after user authorization.
-    This endpoint receives the request_token and redirects to frontend /BrokerCallback route.
+    This endpoint:
+    1. Receives the request_token from Zerodha
+    2. Exchanges it for access_token (if credentials available)
+    3. Stores session data
+    4. Redirects to frontend with success/error status
     """
     try:
         # Log the full request for debugging
@@ -77,16 +83,57 @@ async def broker_callback(
         # Railway still has old Base44 URL in FRONTEND_URL environment variable
         frontend_url_override = "http://localhost:5173"
         
-        # Redirect to frontend with the cleaned request_token
-        redirect_url = f"{frontend_url_override}/broker/callback?request_token={clean_token}&action={action}"
+        # Try to get API credentials from query params or session
+        stored_api_key = api_key
+        stored_api_secret = api_secret
+        
+        # If no credentials in query params, try to get from session/temp storage
+        if not stored_api_key or not stored_api_secret:
+            # For now, redirect to frontend with request_token so frontend can complete the exchange
+            # This maintains compatibility with existing frontend flow
+            redirect_url = f"{frontend_url_override}/broker/callback?request_token={clean_token}&action={action}"
+            logger.info(f"No API credentials available, redirecting to frontend: {redirect_url}")
+            return RedirectResponse(url=redirect_url)
+        
+        # If we have credentials, attempt token exchange here
+        try:
+            logger.info(f"Attempting token exchange with API key: {stored_api_key[:8]}...")
+            
+            # Generate session using the auth service
+            session_result = auth_service.generate_session(
+                request_token=clean_token,
+                api_key=stored_api_key,
+                api_secret=stored_api_secret
+            )
+            
+            if session_result.status == "success":
+                # Store session data in request session or database
+                user_id = session_result.user_data.get("user_id")
+                access_token = session_result.access_token
+                
+                logger.info(f"✅ Token exchange successful for user: {user_id}")
+                
+                # Redirect to frontend with success status
+                redirect_url = f"{frontend_url_override}/broker/callback?status=success&user_id={user_id}&action={action}"
+                
+            else:
+                logger.error(f"❌ Token exchange failed: {session_result.message}")
+                # Redirect to frontend with error
+                redirect_url = f"{frontend_url_override}/broker/callback?status=error&error={session_result.message}&action={action}"
+                
+        except Exception as exchange_error:
+            logger.error(f"❌ Token exchange error: {str(exchange_error)}")
+            # Fallback: redirect to frontend with request_token for manual exchange
+            redirect_url = f"{frontend_url_override}/broker/callback?request_token={clean_token}&action={action}&exchange_error={str(exchange_error)}"
         
         logger.info(f"Redirecting to: {redirect_url}")
-        
         return RedirectResponse(url=redirect_url)
         
     except Exception as e:
         logger.error(f"Error in broker_callback: {str(e)}")
-        raise HTTPException(status_code=500, detail="Callback processing failed")
+        # Redirect to frontend with error status
+        error_url = f"{frontend_url_override}/broker/callback?status=error&error={str(e)}&action={action}"
+        return RedirectResponse(url=error_url)
 
 
 @router.post("/broker/generate-session", response_model=GenerateSessionResponse)
@@ -129,6 +176,58 @@ async def get_broker_status(user_id: str = Query(..., description="User ID")):
     except Exception as e:
         logger.error(f"Error getting broker status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get broker status")
+
+
+@router.get("/broker/session")
+async def get_broker_session(user_id: str = Query(..., description="User ID")):
+    """
+    Get Stored Broker Session Data
+    
+    Returns the stored session data for a user including access_token and profile info.
+    This is used by the frontend to check if a user is already authenticated.
+    """
+    try:
+        # Get user credentials from database
+        credentials = auth_service.get_user_credentials(user_id)
+        
+        if not credentials:
+            return {
+                "status": "error",
+                "message": "No session found for user",
+                "is_connected": False
+            }
+        
+        # Check if credentials are valid by testing a simple API call
+        api_key = credentials.get("api_key")
+        access_token = credentials.get("access_token")
+        
+        if not api_key or not access_token:
+            return {
+                "status": "error", 
+                "message": "Incomplete session data",
+                "is_connected": False
+            }
+        
+        # Return session data (without sensitive info)
+        return {
+            "status": "success",
+            "is_connected": True,
+            "user_data": {
+                "user_id": credentials.get("user_id"),
+                "user_name": credentials.get("user_name"),
+                "email": credentials.get("email"),
+                "api_key": api_key
+            },
+            "access_token": access_token  # Frontend needs this for API calls
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting broker session: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to get session: {str(e)}",
+            "is_connected": False
+        }
 
 
 @router.get("/broker/status-header")
