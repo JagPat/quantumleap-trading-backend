@@ -10,6 +10,7 @@ import sys
 from fastapi import FastAPI, Query, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from starlette.middleware.sessions import SessionMiddleware
 from datetime import datetime
 from kiteconnect.exceptions import KiteException
 from typing import Optional
@@ -75,6 +76,15 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="Modernized API with modular architecture for broker authentication, portfolio management, and trading operations."
+)
+
+# Add session middleware for OAuth state management
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SESSION_SECRET", "quantum-leap-trading-secret-key-change-in-production"),
+    max_age=3600,  # 1 hour session timeout
+    same_site="lax",
+    https_only=False  # Set to True in production with HTTPS
 )
 
 # Add CORS middleware

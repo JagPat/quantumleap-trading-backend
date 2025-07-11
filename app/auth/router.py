@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Depends, Query, Request, Header
 from fastapi.responses import RedirectResponse
 from typing import Optional
+from datetime import datetime
 
 from ..core.config import settings
 from .models import GenerateSessionRequest, GenerateSessionResponse, BrokerProfileResponse
@@ -72,9 +73,9 @@ async def broker_callback(
     """
     try:
         # Log the full request for debugging
-        logger.info(f"Received broker callback with request_token: {request_token}")
-        logger.info(f"Full URL: {request.url}")
-        logger.info(f"Query params: {dict(request.query_params)}")
+        logger.info(f"🔄 Received broker callback with request_token: {request_token}")
+        logger.info(f"🔄 Full URL: {request.url}")
+        logger.info(f"🔄 Query params: {dict(request.query_params)}")
         
         # Clean and validate the request_token
         clean_token = auth_service.clean_request_token(request_token)
@@ -87,51 +88,70 @@ async def broker_callback(
         stored_api_key = api_key
         stored_api_secret = api_secret
         
-        # If no credentials in query params, try to get from session/temp storage
+        # If no credentials in query params, try to get from session
         if not stored_api_key or not stored_api_secret:
-            # For now, redirect to frontend with request_token so frontend can complete the exchange
-            # This maintains compatibility with existing frontend flow
-            redirect_url = f"{frontend_url_override}/broker/callback?request_token={clean_token}&action={action}"
-            logger.info(f"No API credentials available, redirecting to frontend: {redirect_url}")
-            return RedirectResponse(url=redirect_url)
+            session_data = request.session.get('zerodha_oauth', {})
+            stored_api_key = session_data.get('api_key')
+            stored_api_secret = session_data.get('api_secret')
+            logger.info(f"🔍 Retrieved credentials from session: api_key={stored_api_key[:8] if stored_api_key else 'None'}...")
         
         # If we have credentials, attempt token exchange here
-        try:
-            logger.info(f"Attempting token exchange with API key: {stored_api_key[:8]}...")
-            
-            # Generate session using the auth service
-            session_result = auth_service.generate_session(
-                request_token=clean_token,
-                api_key=stored_api_key,
-                api_secret=stored_api_secret
-            )
-            
-            if session_result.status == "success":
-                # Store session data in request session or database
-                user_id = session_result.user_data.get("user_id")
-                access_token = session_result.access_token
+        if stored_api_key and stored_api_secret:
+            try:
+                logger.info(f"🔄 Attempting token exchange with API key: {stored_api_key[:8]}...")
                 
-                logger.info(f"✅ Token exchange successful for user: {user_id}")
+                # Generate session using the auth service with direct token exchange
+                session_result = auth_service.generate_session(
+                    request_token=clean_token,
+                    api_key=stored_api_key,
+                    api_secret=stored_api_secret
+                )
                 
-                # Redirect to frontend with success status
-                redirect_url = f"{frontend_url_override}/broker/callback?status=success&user_id={user_id}&action={action}"
-                
-            else:
-                logger.error(f"❌ Token exchange failed: {session_result.message}")
+                if session_result.status == "success":
+                    # Store session data in FastAPI session
+                    user_id = session_result.user_data.get("user_id")
+                    access_token = session_result.access_token
+                    
+                    # Store in session for later retrieval
+                    request.session['zerodha_auth'] = {
+                        'user_id': user_id,
+                        'access_token': access_token,
+                        'api_key': stored_api_key,
+                        'user_data': session_result.user_data,
+                        'is_connected': True,
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    
+                    logger.info(f"✅ Token exchange successful for user: {user_id}")
+                    
+                    # Clear OAuth temp data
+                    if 'zerodha_oauth' in request.session:
+                        del request.session['zerodha_oauth']
+                    
+                    # Redirect to frontend with success status
+                    redirect_url = f"{frontend_url_override}/broker/callback?status=success&user_id={user_id}&action={action}"
+                    
+                else:
+                    logger.error(f"❌ Token exchange failed: {session_result.message}")
+                    # Redirect to frontend with error
+                    redirect_url = f"{frontend_url_override}/broker/callback?status=error&error={session_result.message}&action={action}"
+                    
+            except Exception as exchange_error:
+                logger.error(f"❌ Token exchange error: {str(exchange_error)}")
                 # Redirect to frontend with error
-                redirect_url = f"{frontend_url_override}/broker/callback?status=error&error={session_result.message}&action={action}"
-                
-        except Exception as exchange_error:
-            logger.error(f"❌ Token exchange error: {str(exchange_error)}")
-            # Fallback: redirect to frontend with request_token for manual exchange
-            redirect_url = f"{frontend_url_override}/broker/callback?request_token={clean_token}&action={action}&exchange_error={str(exchange_error)}"
+                redirect_url = f"{frontend_url_override}/broker/callback?status=error&error={str(exchange_error)}&action={action}"
+        else:
+            # No credentials available - redirect to frontend with request_token for manual exchange
+            logger.info(f"🔄 No API credentials available, redirecting to frontend with request_token")
+            redirect_url = f"{frontend_url_override}/broker/callback?request_token={clean_token}&action={action}"
         
-        logger.info(f"Redirecting to: {redirect_url}")
+        logger.info(f"🔄 Redirecting to: {redirect_url}")
         return RedirectResponse(url=redirect_url)
         
     except Exception as e:
-        logger.error(f"Error in broker_callback: {str(e)}")
+        logger.error(f"❌ Error in broker_callback: {str(e)}")
         # Redirect to frontend with error status
+        frontend_url_override = "http://localhost:5173"
         error_url = f"{frontend_url_override}/broker/callback?status=error&error={str(e)}&action={action}"
         return RedirectResponse(url=error_url)
 
@@ -179,7 +199,7 @@ async def get_broker_status(user_id: str = Query(..., description="User ID")):
 
 
 @router.get("/broker/session")
-async def get_broker_session(user_id: str = Query(..., description="User ID")):
+async def get_broker_session(request: Request, user_id: str = Query(..., description="User ID")):
     """
     Get Stored Broker Session Data
     
@@ -187,14 +207,36 @@ async def get_broker_session(user_id: str = Query(..., description="User ID")):
     This is used by the frontend to check if a user is already authenticated.
     """
     try:
+        # First check FastAPI session storage
+        session_auth = request.session.get('zerodha_auth', {})
+        
+        if session_auth and session_auth.get('is_connected'):
+            # Validate session is for the requested user
+            session_user_id = session_auth.get('user_id')
+            if session_user_id == user_id or not user_id or user_id == 'unknown':
+                logger.info(f"✅ Found active session for user: {session_user_id}")
+                return {
+                    "status": "success",
+                    "is_connected": True,
+                    "user_data": session_auth.get('user_data', {}),
+                    "access_token": session_auth.get('access_token'),
+                    "connection_status": "connected",
+                    "timestamp": session_auth.get('timestamp')
+                }
+        
+        # Fallback to database lookup
+        logger.info(f"🔍 No session found, checking database for user: {user_id}")
+        
         # Get user credentials from database
         credentials = auth_service.get_user_credentials(user_id)
         
         if not credentials:
+            logger.info(f"❌ No credentials found for user: {user_id}")
             return {
                 "status": "error",
                 "message": "No session found for user",
-                "is_connected": False
+                "is_connected": False,
+                "connection_status": "disconnected"
             }
         
         # Check if credentials are valid by testing a simple API call
@@ -202,31 +244,69 @@ async def get_broker_session(user_id: str = Query(..., description="User ID")):
         access_token = credentials.get("access_token")
         
         if not api_key or not access_token:
+            logger.warning(f"❌ Incomplete credentials for user: {user_id}")
             return {
-                "status": "error", 
-                "message": "Incomplete session data",
-                "is_connected": False
+                "status": "error",
+                "message": "Incomplete credentials found",
+                "is_connected": False,
+                "connection_status": "disconnected"
             }
         
-        # Return session data (without sensitive info)
-        return {
-            "status": "success",
-            "is_connected": True,
-            "user_data": {
-                "user_id": credentials.get("user_id"),
-                "user_name": credentials.get("user_name"),
-                "email": credentials.get("email"),
-                "api_key": api_key
-            },
-            "access_token": access_token  # Frontend needs this for API calls
-        }
+        # Test the connection
+        from kiteconnect import KiteConnect
+        try:
+            kite = KiteConnect(api_key=api_key)
+            kite.set_access_token(access_token)
+            
+            # Test with profile call
+            profile = kite.profile()
+            
+            # Store in session for future use
+            request.session['zerodha_auth'] = {
+                'user_id': profile.get('user_id'),
+                'access_token': access_token,
+                'api_key': api_key,
+                'user_data': {
+                    'user_id': profile.get('user_id'),
+                    'user_name': profile.get('user_name'),
+                    'email': profile.get('email'),
+                    'profile': profile
+                },
+                'is_connected': True,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            logger.info(f"✅ Database credentials valid for user: {user_id}")
+            return {
+                "status": "success",
+                "is_connected": True,
+                "user_data": {
+                    'user_id': profile.get('user_id'),
+                    'user_name': profile.get('user_name'),
+                    'email': profile.get('email'),
+                    'api_key': api_key,
+                    'profile': profile
+                },
+                "access_token": access_token,
+                "connection_status": "connected"
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Database credentials invalid for user {user_id}: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Invalid or expired credentials: {str(e)}",
+                "is_connected": False,
+                "connection_status": "expired"
+            }
         
     except Exception as e:
-        logger.error(f"Error getting broker session: {str(e)}")
+        logger.error(f"❌ Error getting broker session: {str(e)}")
         return {
             "status": "error",
-            "message": f"Failed to get session: {str(e)}",
-            "is_connected": False
+            "message": f"Session retrieval failed: {str(e)}",
+            "is_connected": False,
+            "connection_status": "error"
         }
 
 
@@ -360,3 +440,77 @@ async def disconnect_broker(user_id: str = Query(..., description="User ID")):
     except Exception as e:
         logger.error(f"Error disconnecting broker: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to disconnect broker") 
+
+
+@router.post("/broker/test-oauth")
+async def test_oauth_flow(request: Request, api_key: str = Query(...), api_secret: str = Query(...)):
+    """
+    Test OAuth Flow Setup
+    
+    Stores API credentials in session for OAuth testing.
+    This endpoint helps test the complete OAuth flow.
+    """
+    try:
+        # Store credentials in session for OAuth callback
+        request.session['zerodha_oauth'] = {
+            'api_key': api_key,
+            'api_secret': api_secret,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Generate OAuth URL
+        oauth_url = f"https://kite.zerodha.com/connect/login?api_key={api_key}&v=3"
+        
+        logger.info(f"🔄 Test OAuth setup complete for API key: {api_key[:8]}...")
+        
+        return {
+            "status": "success",
+            "message": "OAuth credentials stored in session",
+            "oauth_url": oauth_url,
+            "redirect_url": "https://web-production-de0bc.up.railway.app/api/auth/broker/callback",
+            "api_key": api_key[:8] + "..."
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error setting up test OAuth: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"OAuth setup failed: {str(e)}"
+        }
+
+
+@router.get("/broker/session-debug")
+async def debug_session(request: Request):
+    """
+    Debug Session Data
+    
+    Returns current session data for debugging purposes.
+    """
+    try:
+        session_data = dict(request.session)
+        
+        # Mask sensitive data
+        if 'zerodha_auth' in session_data:
+            auth_data = session_data['zerodha_auth'].copy()
+            if 'access_token' in auth_data:
+                auth_data['access_token'] = auth_data['access_token'][:16] + "..."
+            session_data['zerodha_auth'] = auth_data
+        
+        if 'zerodha_oauth' in session_data:
+            oauth_data = session_data['zerodha_oauth'].copy()
+            if 'api_secret' in oauth_data:
+                oauth_data['api_secret'] = oauth_data['api_secret'][:8] + "..."
+            session_data['zerodha_oauth'] = oauth_data
+        
+        return {
+            "status": "success",
+            "session_data": session_data,
+            "session_keys": list(request.session.keys())
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error debugging session: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Session debug failed: {str(e)}"
+        } 

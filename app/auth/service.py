@@ -4,6 +4,7 @@ Authentication service - handles all broker authentication logic
 import logging
 import jwt
 import requests
+import hashlib
 from typing import Optional, Dict, Any
 from fastapi import HTTPException
 from kiteconnect import KiteConnect
@@ -65,6 +66,78 @@ class AuthService:
         logger.info(f"Cleaned request_token: {clean_token}")
         return clean_token
     
+    def exchange_token_direct(self, request_token: str, api_key: str, api_secret: str) -> tuple[str, str]:
+        """
+        Direct token exchange with Kite Connect API using proper SHA256 checksum
+        
+        Args:
+            request_token: Request token from Zerodha OAuth
+            api_key: Zerodha API key
+            api_secret: Zerodha API secret
+            
+        Returns:
+            Tuple of (access_token, user_id)
+            
+        Raises:
+            HTTPException: If token exchange fails
+        """
+        try:
+            # CRITICAL: Implement proper SHA256 checksum as per Kite Connect v3 docs
+            checksum_string = api_key + request_token + api_secret
+            checksum = hashlib.sha256(checksum_string.encode()).hexdigest()
+            
+            logger.info(f"🔐 Token exchange - API key: {api_key[:8]}..., Request token: {request_token[:8]}...")
+            logger.info(f"🔐 Checksum string length: {len(checksum_string)}, Checksum: {checksum[:16]}...")
+            
+            # POST to Kite Connect session endpoint
+            response = requests.post(
+                'https://api.kite.trade/session/token',
+                data={
+                    'api_key': api_key,
+                    'request_token': request_token,
+                    'checksum': checksum
+                },
+                headers={
+                    'X-Kite-Version': '3',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                timeout=30
+            )
+            
+            logger.info(f"🔐 Kite API response status: {response.status_code}")
+            
+            if response.status_code != 200:
+                logger.error(f"❌ Kite API error: {response.status_code} - {response.text}")
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Token exchange failed with status {response.status_code}: {response.text}"
+                )
+            
+            response_data = response.json()
+            logger.info(f"🔐 Kite API response keys: {list(response_data.keys())}")
+            
+            if 'data' not in response_data:
+                logger.error(f"❌ Invalid response format: {response_data}")
+                raise HTTPException(status_code=400, detail="Invalid response format from Kite API")
+            
+            data = response_data['data']
+            access_token = data.get('access_token')
+            user_id = data.get('user_id')
+            
+            if not access_token or not user_id:
+                logger.error(f"❌ Missing access_token or user_id in response: {data}")
+                raise HTTPException(status_code=400, detail="Incomplete token data from Kite API")
+            
+            logger.info(f"✅ Token exchange successful - User ID: {user_id}, Access token: {access_token[:16]}...")
+            return access_token, user_id
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Network error during token exchange: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Network error during token exchange: {str(e)}")
+        except Exception as e:
+            logger.error(f"❌ Unexpected error during token exchange: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Token exchange failed: {str(e)}")
+    
     def generate_session(self, request_token: str, api_key: str, api_secret: str) -> GenerateSessionResponse:
         """
         Generate broker session using request token
@@ -78,32 +151,18 @@ class AuthService:
             GenerateSessionResponse with access token and user data
         """
         try:
-            # Create KiteConnect instance
+            # Use direct token exchange for better control and error handling
+            access_token, user_id = self.exchange_token_direct(request_token, api_key, api_secret)
+            
+            # Get user profile using KiteConnect
             kite = KiteConnect(api_key=api_key)
-            
-            # Generate session with request token
-            session_data = kite.generate_session(request_token, api_secret=api_secret)
-            access_token = session_data.get("access_token")
-            
-            if not access_token:
-                return GenerateSessionResponse(
-                    status="error", 
-                    message="Failed to generate access token from Zerodha"
-                )
-            
-            # Get user profile
             kite.set_access_token(access_token)
             profile = kite.profile()
             
-            user_id = profile.get("user_id", "")
             user_name = profile.get("user_name", "")
             email = profile.get("email", "")
             
-            if not user_id:
-                return GenerateSessionResponse(
-                    status="error", 
-                    message="Unable to retrieve user ID from Zerodha profile"
-                )
+            logger.info(f"✅ Profile retrieved - Name: {user_name}, Email: {email}")
             
             # Store credentials in database
             success = store_user_credentials(
@@ -121,7 +180,7 @@ class AuthService:
                     message="Failed to store user credentials securely"
                 )
             
-            logger.info(f"Successfully generated session for user: {user_id}")
+            logger.info(f"✅ Successfully generated session for user: {user_id}")
             
             return GenerateSessionResponse(
                 status="success",
@@ -134,14 +193,17 @@ class AuthService:
                 }
             )
             
+        except HTTPException:
+            # Re-raise HTTP exceptions as-is
+            raise
         except KiteException as e:
-            logger.error(f"Kite API error in generate_session: {str(e)}")
+            logger.error(f"❌ Kite API error in generate_session: {str(e)}")
             return GenerateSessionResponse(
                 status="error", 
-                message=f"The error from Zerodha was: {str(e)}"
+                message=f"Zerodha API error: {str(e)}"
             )
         except Exception as e:
-            logger.error(f"Unexpected error in generate_session: {str(e)}")
+            logger.error(f"❌ Unexpected error in generate_session: {str(e)}")
             return GenerateSessionResponse(
                 status="error", 
                 message=f"Internal server error: {str(e)}"
