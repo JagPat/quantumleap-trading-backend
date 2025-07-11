@@ -71,6 +71,10 @@ async def broker_callback(
     3. Stores session data
     4. Redirects to frontend with success/error status
     """
+    # CRITICAL FIX: Override Railway environment variable until manually updated
+    # Railway still has old Base44 URL in FRONTEND_URL environment variable
+    frontend_url_override = "http://localhost:5173"
+    
     try:
         # Log the full request for debugging
         logger.info(f"🔄 Received broker callback with request_token: {request_token}")
@@ -79,10 +83,6 @@ async def broker_callback(
         
         # Clean and validate the request_token
         clean_token = auth_service.clean_request_token(request_token)
-        
-        # CRITICAL FIX: Override Railway environment variable until manually updated
-        # Railway still has old Base44 URL in FRONTEND_URL environment variable
-        frontend_url_override = "http://localhost:5173"
         
         # Try to get API credentials from query params or session
         stored_api_key = api_key
@@ -151,7 +151,6 @@ async def broker_callback(
     except Exception as e:
         logger.error(f"❌ Error in broker_callback: {str(e)}")
         # Redirect to frontend with error status
-        frontend_url_override = "http://localhost:5173"
         error_url = f"{frontend_url_override}/broker-callback?status=error&error={str(e)}&action={action}"
         return RedirectResponse(url=error_url)
 
