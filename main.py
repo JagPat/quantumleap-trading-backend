@@ -129,12 +129,8 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy", 
-        "timestamp": datetime.now().isoformat(),
-        "version": settings.app_version
-    }
+    """Simple health check endpoint for Railway deployment"""
+    return {"status": "healthy"}
 
 # Portfolio endpoints with header-based authentication
 @app.get("/api/portfolio/data", tags=["Portfolio Data"])
@@ -313,10 +309,17 @@ async def legacy_invalidate_session(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
+    
+    # Get Railway PORT if available
+    port = int(os.environ.get("PORT", 8000))
+    
+    print(f"🚀 Starting QuantumLeap Trading Backend on port {port}")
+    print(f"🔧 Debug mode: {settings.debug}")
+    
     uvicorn.run(
-        "main_v2:app",
+        "main:app",  # Correct module reference
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=settings.debug,
         log_level=settings.log_level.lower()
     ) 

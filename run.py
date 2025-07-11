@@ -19,8 +19,14 @@ if __name__ == "__main__":
     print(f"Log level: {LOG_LEVEL}")
     print(f"Railway deployment: {IS_RAILWAY}")
     
+    # Ensure we're using the Railway PORT if available
+    railway_port = os.environ.get("PORT")
+    if railway_port:
+        PORT = int(railway_port)
+        print(f"Using Railway PORT: {PORT}")
+    
     uvicorn.run(
-        "main:app",  # Using modular backend (renamed from main_v2)
+        "main:app",  # Correct module reference
         host=HOST,
         port=PORT,
         reload=DEBUG and not IS_RAILWAY,  # Disable reload in production
