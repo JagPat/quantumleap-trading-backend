@@ -14,6 +14,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from datetime import datetime
 from kiteconnect.exceptions import KiteException
 from typing import Optional
+from fastapi.staticfiles import StaticFiles
 
 # Import configuration
 from app.core.config import settings
@@ -23,6 +24,7 @@ from app.database.service import init_database
 
 # Import routers
 from app.auth.router import router as auth_router
+from app.portfolio.router import router as portfolio_router
 
 # Import models and services for portfolio endpoints
 from models import PortfolioSummaryResponse, PortfolioSummaryData, HoldingsResponse, PositionsResponse
@@ -81,16 +83,13 @@ app = FastAPI(
 # Add session middleware for OAuth state management
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.environ.get("SESSION_SECRET", "quantum-leap-trading-secret-key-change-in-production"),
-    max_age=3600,  # 1 hour session timeout
-    same_site="lax",
-    https_only=False  # Set to True in production with HTTPS
+    secret_key=os.environ.get("SESSION_SECRET", "a-secure-secret-key"),
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -98,7 +97,7 @@ app.add_middleware(
 
 # Initialize database on startup
 @app.on_event("startup")
-async def startup_event():
+async def on_startup():
     """Initialize database and startup tasks"""
     logger.info("🚀 Starting QuantumLeap Trading Backend v2.0.0")
     logger.info(f"📍 Current working directory: {os.getcwd()}")
@@ -115,177 +114,27 @@ async def startup_event():
     logger.info("✅ Backend startup complete - all modules loaded")
 
 # Include routers
-app.include_router(auth_router, prefix="/api/auth")
+app.include_router(auth_router)
+app.include_router(portfolio_router)
+
+# Serve frontend static files - adjust the path as needed
+# This assumes your 'dist' or 'build' folder from the frontend is placed at the root
+# of the backend project in a folder named 'static'.
+try:
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
+except RuntimeError:
+    logger.warning("Static files directory not found. Skipping mount.")
 
 # Health check endpoints
 @app.get("/")
-async def root():
+def read_root():
     """Root endpoint"""
-    return {
-        "message": f"{settings.app_name} v{settings.app_version}",
-        "status": "healthy",
-        "architecture": "modular"
-    }
+    return {"message": "Welcome to QuantumLeap Trading Backend"}
 
 @app.get("/health")
 async def health_check():
     """Simple health check endpoint for Railway deployment"""
     return {"status": "healthy"}
-
-# Portfolio endpoints with header-based authentication
-@app.get("/api/portfolio/data", tags=["Portfolio Data"])
-async def get_portfolio_data(user_id: str = Depends(get_user_from_headers)):
-    """
-    Get Portfolio Data
-    
-    Fetches combined portfolio data including summary, holdings, and positions.
-    Requires Kite Connect authorization header: Authorization: token api_key:access_token
-    """
-    try:
-        # Get KiteService for user
-        kite_service = get_kite_service(user_id)
-        if not kite_service:
-            raise HTTPException(status_code=401, detail="Unauthorized or broker not connected")
-        
-        # Fetch all portfolio data
-        holdings = kite_service.get_holdings()
-        positions = kite_service.get_positions()
-        
-        # Calculate portfolio summary
-        summary = calculate_portfolio_summary(holdings, positions)
-        
-        # Format holdings data
-        formatted_holdings = format_holdings_data(holdings)
-        
-        logger.info(f"Successfully fetched portfolio data for user: {user_id}")
-        
-        return {
-            "status": "success",
-            "data": {
-                "summary": summary,
-                "holdings": formatted_holdings,
-                "positions": positions
-            }
-        }
-        
-    except KiteException as e:
-        logger.error(f"Kite API error in get_portfolio_data: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Broker API error: {str(e)}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in get_portfolio_data: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.get("/api/portfolio/summary", response_model=PortfolioSummaryResponse, tags=["Portfolio Data"])
-async def get_portfolio_summary(user_id: str = Depends(get_user_from_headers)):
-    """
-    Get Portfolio Summary
-    
-    Fetches a high-level summary of the user's portfolio, including P&L.
-    Requires Kite Connect authorization header: Authorization: token api_key:access_token
-    """
-    try:
-        # Get KiteService for user
-        kite_service = get_kite_service(user_id)
-        if not kite_service:
-            raise HTTPException(status_code=401, detail="Unauthorized or broker not connected")
-        
-        # Fetch holdings and positions
-        holdings = kite_service.get_holdings()
-        positions = kite_service.get_positions()
-        
-        # Calculate portfolio summary
-        summary = calculate_portfolio_summary(holdings, positions)
-        
-        logger.info(f"Successfully fetched portfolio summary for user: {user_id}")
-        
-        return PortfolioSummaryResponse(
-            status="success",
-            data=PortfolioSummaryData(
-                total_value=summary["total_value"],
-                total_pnl=summary["total_pnl"],
-                todays_pnl=summary["todays_pnl"]
-            )
-        )
-        
-    except KiteException as e:
-        logger.error(f"Kite API error in get_portfolio_summary: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Broker API error: {str(e)}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in get_portfolio_summary: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.get("/api/portfolio/holdings", response_model=HoldingsResponse, tags=["Portfolio Data"])
-async def get_holdings(user_id: str = Depends(get_user_from_headers)):
-    """
-    Get Holdings
-    
-    Fetches the user's long-term equity holdings from the broker.
-    Requires Kite Connect authorization header: Authorization: token api_key:access_token
-    """
-    try:
-        # Get KiteService for user
-        kite_service = get_kite_service(user_id)
-        if not kite_service:
-            raise HTTPException(status_code=401, detail="Unauthorized or broker not connected")
-        
-        # Fetch holdings
-        holdings = kite_service.get_holdings()
-        
-        # Format holdings data
-        formatted_holdings = format_holdings_data(holdings)
-        
-        logger.info(f"Successfully fetched holdings for user: {user_id}")
-        
-        return HoldingsResponse(
-            status="success",
-            data=formatted_holdings
-        )
-        
-    except KiteException as e:
-        logger.error(f"Kite API error in get_holdings: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Broker API error: {str(e)}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in get_holdings: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.get("/api/portfolio/positions", response_model=PositionsResponse, tags=["Portfolio Data"])
-async def get_positions(user_id: str = Depends(get_user_from_headers)):
-    """
-    Get Positions
-    
-    Fetches the user's current day (intraday and F&O) positions from the broker.
-    Requires Kite Connect authorization header: Authorization: token api_key:access_token
-    """
-    try:
-        # Get KiteService for user
-        kite_service = get_kite_service(user_id)
-        if not kite_service:
-            raise HTTPException(status_code=401, detail="Unauthorized or broker not connected")
-        
-        # Fetch positions
-        positions = kite_service.get_positions()
-        
-        logger.info(f"Successfully fetched positions for user: {user_id}")
-        
-        return PositionsResponse(
-            status="success",
-            data=positions
-        )
-        
-    except KiteException as e:
-        logger.error(f"Kite API error in get_positions: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Broker API error: {str(e)}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in get_positions: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
 
 # Legacy compatibility endpoints
 # These will redirect to the new auth module endpoints
@@ -316,10 +165,4 @@ if __name__ == "__main__":
     print(f"🚀 Starting QuantumLeap Trading Backend on port {port}")
     print(f"🔧 Debug mode: {settings.debug}")
     
-    uvicorn.run(
-        "main:app",  # Correct module reference
-        host="0.0.0.0",
-        port=port,
-        reload=settings.debug,
-        log_level=settings.log_level.lower()
-    ) 
+    uvicorn.run(app, host="0.0.0.0", port=port) 

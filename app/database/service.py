@@ -45,9 +45,65 @@ def init_database():
             last_error TEXT
         )
     ''')
+
+    # Create portfolio_snapshots table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            timestamp DATETIME NOT NULL,
+            holdings TEXT NOT NULL,
+            positions TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
     
     conn.commit()
     conn.close()
+
+
+def store_portfolio_snapshot(user_id: str, timestamp: str, holdings: str, positions: str) -> bool:
+    """
+    Stores a snapshot of the user's portfolio.
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO portfolio_snapshots (user_id, timestamp, holdings, positions) VALUES (?, ?, ?, ?)",
+            (user_id, timestamp, holdings, positions)
+        )
+        conn.commit()
+        logger.info(f"Successfully stored portfolio snapshot for user {user_id}")
+        return True
+    except sqlite3.Error as e:
+        logger.error(f"Database error storing portfolio snapshot for user {user_id}: {e}")
+        return False
+    finally:
+        if conn:
+            conn.close()
+
+def get_latest_portfolio_snapshot(user_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieves the most recent portfolio snapshot for a given user.
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT timestamp, holdings, positions FROM portfolio_snapshots WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1",
+            (user_id,)
+        )
+        result = cursor.fetchone()
+        if result:
+            return {"timestamp": result[0], "holdings": result[1], "positions": result[2]}
+        return None
+    except sqlite3.Error as e:
+        logger.error(f"Database error retrieving latest portfolio snapshot for user {user_id}: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
 
 
 def store_user_credentials(
