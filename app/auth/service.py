@@ -354,46 +354,60 @@ class AuthService:
     def get_connection_status(self, user_id: str) -> Dict[str, Any]:
         """
         Get broker connection status for user
-        
-        Args:
-            user_id: User identifier
-            
-        Returns:
-            Connection status information
         """
+        from ..database.service import store_user_credentials
+        from datetime import datetime
         try:
             if not user_id or user_id.strip() == "":
                 return {
                     "status": "error",
                     "is_connected": False,
-                    "message": "User ID is required for status check"
+                    "message": "User ID is required for status check",
+                    "last_successful_connection": None,
+                    "token_expiry": None,
+                    "last_error": "User ID missing"
                 }
-            
             credentials = get_user_credentials(user_id)
-            
             if not credentials:
                 return {
                     "status": "disconnected",
                     "is_connected": False,
-                    "message": "No active session"
+                    "message": "No active session",
+                    "last_successful_connection": None,
+                    "token_expiry": None,
+                    "last_error": "No active session"
                 }
-            
             access_token = credentials.get("access_token")
             api_key = credentials.get("api_key")
-            
             if not access_token or not api_key:
                 return {
                     "status": "disconnected",
                     "is_connected": False,
-                    "message": "Incomplete credentials"
+                    "message": "Incomplete credentials",
+                    "last_successful_connection": credentials.get("last_successful_connection"),
+                    "token_expiry": credentials.get("token_expiry"),
+                    "last_error": "Incomplete credentials"
                 }
-            
             # Test connection with simple API call
             try:
                 kite = KiteConnect(api_key=api_key)
                 kite.set_access_token(access_token)
                 profile = kite.profile()  # Simple test call
-                
+                # Try to get token expiry if available (Kite API may not provide directly)
+                token_expiry = credentials.get("token_expiry")
+                # Update last_successful_connection and clear last_error
+                now_str = datetime.now().isoformat()
+                store_user_credentials(
+                    user_id=user_id,
+                    api_key=api_key,
+                    api_secret=credentials.get("api_secret"),
+                    access_token=access_token,
+                    user_name=credentials.get("user_name"),
+                    email=credentials.get("email"),
+                    last_successful_connection=now_str,
+                    token_expiry=token_expiry,
+                    last_error=None
+                )
                 return {
                     "status": "connected",
                     "is_connected": True,
@@ -402,25 +416,55 @@ class AuthService:
                         "user_name": profile.get("user_name"),
                         "email": profile.get("email")
                     },
-                    "message": "Active connection verified"
+                    "message": "Active connection verified",
+                    "last_successful_connection": now_str,
+                    "token_expiry": token_expiry,
+                    "last_error": None
                 }
             except KiteException as e:
-                logger.warning(f"Connection test failed for user {user_id}: {str(e)}")
+                # Update last_error
+                last_error = f"Connection test failed: {str(e)}"
+                store_user_credentials(
+                    user_id=user_id,
+                    api_key=api_key,
+                    api_secret=credentials.get("api_secret"),
+                    access_token=access_token,
+                    user_name=credentials.get("user_name"),
+                    email=credentials.get("email"),
+                    last_successful_connection=credentials.get("last_successful_connection"),
+                    token_expiry=credentials.get("token_expiry"),
+                    last_error=last_error
+                )
                 return {
                     "status": "disconnected",
                     "is_connected": False,
-                    "message": f"Connection test failed: {str(e)}"
+                    "message": last_error,
+                    "last_successful_connection": credentials.get("last_successful_connection"),
+                    "token_expiry": credentials.get("token_expiry"),
+                    "last_error": last_error
                 }
-                
         except Exception as e:
-            logger.error(f"Error checking connection status for user {user_id}: {str(e)}")
+            last_error = f"Status check failed: {str(e)}"
+            store_user_credentials(
+                user_id=user_id,
+                api_key=credentials.get("api_key") if 'credentials' in locals() and credentials else None,
+                api_secret=credentials.get("api_secret") if 'credentials' in locals() and credentials else None,
+                access_token=credentials.get("access_token") if 'credentials' in locals() and credentials else None,
+                user_name=credentials.get("user_name") if 'credentials' in locals() and credentials else None,
+                email=credentials.get("email") if 'credentials' in locals() and credentials else None,
+                last_successful_connection=credentials.get("last_successful_connection") if 'credentials' in locals() and credentials else None,
+                token_expiry=credentials.get("token_expiry") if 'credentials' in locals() and credentials else None,
+                last_error=last_error
+            )
             return {
-                "status": "error", 
+                "status": "error",
                 "is_connected": False,
-                "message": f"Status check failed: {str(e)}"
+                "message": last_error,
+                "last_successful_connection": credentials.get("last_successful_connection") if 'credentials' in locals() and credentials else None,
+                "token_expiry": credentials.get("token_expiry") if 'credentials' in locals() and credentials else None,
+                "last_error": last_error
             }
-
-
+    
     def validate_base44_token(self, authorization_header: str) -> Base44User:
         """
         Validate Base44 JWT token and extract user information

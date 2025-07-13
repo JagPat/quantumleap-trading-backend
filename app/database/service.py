@@ -39,7 +39,10 @@ def init_database():
             user_name TEXT,
             email TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_successful_connection TIMESTAMP,
+            token_expiry TIMESTAMP,
+            last_error TEXT
         )
     ''')
     
@@ -53,7 +56,10 @@ def store_user_credentials(
     api_secret: str, 
     access_token: str,
     user_name: Optional[str] = None,
-    email: Optional[str] = None
+    email: Optional[str] = None,
+    last_successful_connection: Optional[str] = None,
+    token_expiry: Optional[str] = None,
+    last_error: Optional[str] = None
 ) -> bool:
     """
     Store user credentials securely in database
@@ -80,9 +86,9 @@ def store_user_credentials(
         # Insert or update user credentials
         cursor.execute('''
             INSERT OR REPLACE INTO users 
-            (user_id, api_key, api_secret, access_token, user_name, email, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ''', (user_id, api_key, encrypted_api_secret, encrypted_access_token, user_name, email))
+            (user_id, api_key, api_secret, access_token, user_name, email, updated_at, last_successful_connection, token_expiry, last_error)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
+        ''', (user_id, api_key, encrypted_api_secret, encrypted_access_token, user_name, email, last_successful_connection, token_expiry, last_error))
         
         conn.commit()
         conn.close()
@@ -110,7 +116,7 @@ def get_user_credentials(user_id: str) -> Optional[Dict[str, Any]]:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT user_id, api_key, api_secret, access_token, user_name, email
+            SELECT user_id, api_key, api_secret, access_token, user_name, email, last_successful_connection, token_expiry, last_error
             FROM users WHERE user_id = ?
         ''', (user_id,))
         
@@ -124,7 +130,10 @@ def get_user_credentials(user_id: str) -> Optional[Dict[str, Any]]:
                 "api_secret": decrypt_data(result[2]),
                 "access_token": decrypt_data(result[3]),
                 "user_name": result[4],
-                "email": result[5]
+                "email": result[5],
+                "last_successful_connection": result[6],
+                "token_expiry": result[7],
+                "last_error": result[8]
             }
         
         return None
