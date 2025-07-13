@@ -99,19 +99,9 @@ app.add_middleware(
 @app.on_event("startup")
 async def on_startup():
     """Initialize database and startup tasks"""
-    logger.info("🚀 Starting QuantumLeap Trading Backend v2.0.0")
-    logger.info(f"📍 Current working directory: {os.getcwd()}")
-    logger.info(f"🔧 Python path: {sys.path[:3]}")
-    logger.info(f"⚙️ Settings loaded: {settings.app_name}")
-    
-    try:
-        init_database()
-        logger.info("✅ Database initialized successfully")
-    except Exception as e:
-        logger.error(f"❌ Database initialization failed: {str(e)}")
-        raise
-    
-    logger.info("✅ Backend startup complete - all modules loaded")
+    logger.info("Starting QuantumLeap Trading Backend")
+    init_database()
+    logger.info("Database initialized.")
 
 # Include routers
 app.include_router(auth_router)
@@ -126,43 +116,7 @@ except RuntimeError:
     logger.warning("Static files directory not found. Skipping mount.")
 
 # Health check endpoints
-@app.get("/")
-def read_root():
-    """Root endpoint"""
-    return {"message": "Welcome to QuantumLeap Trading Backend"}
-
 @app.get("/health")
 async def health_check():
     """Simple health check endpoint for Railway deployment"""
-    return {"status": "healthy"}
-
-# Legacy compatibility endpoints
-# These will redirect to the new auth module endpoints
-from fastapi import Request
-from fastapi.responses import RedirectResponse
-
-@app.get("/api/broker/callback")
-async def legacy_broker_callback(request: Request):
-    """Legacy redirect to new auth module"""
-    return RedirectResponse(url=str(request.url).replace("/api/broker/callback", "/api/auth/broker/callback"))
-
-@app.post("/api/broker/generate-session")
-async def legacy_generate_session(request: Request):
-    """Legacy redirect to new auth module"""
-    return RedirectResponse(url=str(request.url).replace("/api/broker/generate-session", "/api/auth/broker/generate-session"))
-
-@app.post("/api/broker/invalidate-session")
-async def legacy_invalidate_session(request: Request):
-    """Legacy redirect to new auth module"""
-    return RedirectResponse(url=str(request.url).replace("/api/broker/invalidate-session", "/api/auth/broker/invalidate-session"))
-
-if __name__ == "__main__":
-    import uvicorn
-    
-    # Get Railway PORT if available
-    port = int(os.environ.get("PORT", 8000))
-    
-    print(f"🚀 Starting QuantumLeap Trading Backend on port {port}")
-    print(f"🔧 Debug mode: {settings.debug}")
-    
-    uvicorn.run(app, host="0.0.0.0", port=port) 
+    return {"status": "healthy"} 
