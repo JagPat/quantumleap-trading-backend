@@ -1,6 +1,7 @@
 import logging
 import json
 from datetime import datetime
+from typing import Optional
 import kite_service
 from ..database.service import get_user_credentials, store_portfolio_snapshot, get_latest_portfolio_snapshot as get_snapshot_from_db
 from .models import PortfolioSnapshot
@@ -58,7 +59,7 @@ class PortfolioService:
         logger.info(f"Successfully created and stored portfolio snapshot for user {user_id}")
         return snapshot
 
-    def get_latest_portfolio(self, user_id: str) -> PortfolioSnapshot | None:
+    def get_latest_portfolio(self, user_id: str) -> Optional[PortfolioSnapshot]:
         """
         Retrieves the latest stored portfolio snapshot for the user from the database.
         """
