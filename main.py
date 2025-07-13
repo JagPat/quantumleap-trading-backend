@@ -71,4 +71,4 @@ except RuntimeError:
 @app.get("/health")
 async def health_check():
     """Simple health check endpoint for Railway deployment"""
-    return {"status": "healthy"} 
+    return {"status": "ok"} 
