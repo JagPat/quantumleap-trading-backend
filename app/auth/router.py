@@ -10,6 +10,7 @@ from datetime import datetime
 from ..core.config import settings
 from .models import GenerateSessionRequest, GenerateSessionResponse, BrokerProfileResponse
 from .service import auth_service
+from .dependencies import get_user_from_headers
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +270,7 @@ async def get_broker_session(request: Request, user_id: str = Query(..., descrip
 
 
 @router.get("/broker/status-header")
-async def get_broker_status_with_headers(user_id: str = Depends(auth_service.get_user_from_auth_headers)):
+async def get_broker_status_with_headers(user_id: str = Depends(get_user_from_headers)):
     """
     Get Broker Connection Status (Header-based Auth)
     
