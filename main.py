@@ -47,13 +47,13 @@ app = FastAPI(
 #     allow_headers=["*"],
 # )
 
-# # Initialize database on startup
-# @app.on_event("startup")
-# async def on_startup():
-#     """Initialize database and startup tasks"""
-#     logger.info("Starting QuantumLeap Trading Backend")
-#     init_database()
-#     logger.info("Database initialized.")
+# Initialize database on startup
+@app.on_event("startup")
+async def on_startup():
+    """Initialize database and startup tasks"""
+    logger.info("Starting QuantumLeap Trading Backend")
+    init_database()
+    logger.info("Database initialized.")
 
 # # Include routers
 # app.include_router(auth_router)
