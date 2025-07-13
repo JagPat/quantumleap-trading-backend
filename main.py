@@ -32,40 +32,40 @@ app = FastAPI(
     description="Modernized API with modular architecture for broker authentication, portfolio management, and trading operations."
 )
 
-# Add session middleware for OAuth state management
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=os.environ.get("SESSION_SECRET", "a-secure-secret-key"),
-)
+# # Add session middleware for OAuth state management
+# app.add_middleware(
+#     SessionMiddleware,
+#     secret_key=os.environ.get("SESSION_SECRET", "a-secure-secret-key"),
+# )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# # Add CORS middleware
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
-# Initialize database on startup
-@app.on_event("startup")
-async def on_startup():
-    """Initialize database and startup tasks"""
-    logger.info("Starting QuantumLeap Trading Backend")
-    init_database()
-    logger.info("Database initialized.")
+# # Initialize database on startup
+# @app.on_event("startup")
+# async def on_startup():
+#     """Initialize database and startup tasks"""
+#     logger.info("Starting QuantumLeap Trading Backend")
+#     init_database()
+#     logger.info("Database initialized.")
 
-# Include routers
-app.include_router(auth_router)
-app.include_router(portfolio_router)
+# # Include routers
+# app.include_router(auth_router)
+# app.include_router(portfolio_router)
 
-# Serve frontend static files - adjust the path as needed
-# This assumes your 'dist' or 'build' folder from the frontend is placed at the root
-# of the backend project in a folder named 'static'.
-try:
-    app.mount("/", StaticFiles(directory="static", html=True), name="static")
-except RuntimeError:
-    logger.warning("Static files directory not found. Skipping mount.")
+# # Serve frontend static files - adjust the path as needed
+# # This assumes your 'dist' or 'build' folder from the frontend is placed at the root
+# # of the backend project in a folder named 'static'.
+# try:
+#     app.mount("/", StaticFiles(directory="static", html=True), name="static")
+# except RuntimeError:
+#     logger.warning("Static files directory not found. Skipping mount.")
 
 # Health check endpoints
 @app.get("/health")
