@@ -36,15 +36,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     
     def get_encryption_key(self) -> bytes:
-        """Get encryption key as bytes"""
-        if self.encryption_key:
-            return self.encryption_key.encode()
-        
+        """Get encryption key from environment variable"""
         env_key = os.environ.get("ENCRYPTION_KEY")
-        if env_key:
-            return env_key.encode()
-        
-        return Fernet.generate_key()
+        if not env_key:
+            raise ValueError("ENCRYPTION_KEY environment variable not set.")
+        return env_key.encode()
     
     class Config:
         env_file = ".env"
