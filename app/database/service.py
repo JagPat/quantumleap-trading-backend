@@ -5,7 +5,7 @@ import sqlite3
 import logging
 from typing import Optional, Dict, Any
 from cryptography.fernet import Fernet
-from ..core.config import settings
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
