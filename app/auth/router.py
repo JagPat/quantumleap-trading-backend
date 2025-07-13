@@ -16,42 +16,6 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter(tags=["Authentication"])
 
-def get_user_from_auth_headers(
-    authorization: Optional[str] = Header(None),
-    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
-) -> str:
-    """
-    Extract user ID from Kite Connect authorization headers for auth endpoints.
-    
-    Expected format: Authorization: token api_key:access_token
-    """
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing authorization header")
-    
-    if not authorization.startswith("token "):
-        raise HTTPException(status_code=401, detail="Invalid authorization format. Expected 'token api_key:access_token'")
-    
-    try:
-        # Extract api_key:access_token part
-        token_part = authorization[6:]  # Remove "token " prefix
-        if ":" not in token_part:
-            raise HTTPException(status_code=401, detail="Invalid token format. Expected 'api_key:access_token'")
-        
-        api_key, access_token = token_part.split(":", 1)
-        
-        if not api_key or not access_token:
-            raise HTTPException(status_code=401, detail="Missing api_key or access_token")
-        
-        # Use X-User-ID header if provided, otherwise use api_key as fallback
-        user_id = x_user_id if x_user_id and x_user_id != 'unknown' else api_key
-        
-        logger.info(f"🔐 Auth endpoint - user_id: {user_id}, api_key: {api_key[:8]}...")
-        return user_id
-        
-    except ValueError as e:
-        logger.error(f"Failed to parse authorization header: {str(e)}")
-        raise HTTPException(status_code=401, detail="Invalid authorization header format")
-
 
 @router.get("/broker/callback")
 async def broker_callback(
@@ -305,7 +269,7 @@ async def get_broker_session(request: Request, user_id: str = Query(..., descrip
 
 
 @router.get("/broker/status-header")
-async def get_broker_status_with_headers(user_id: str = Depends(get_user_from_auth_headers)):
+async def get_broker_status_with_headers(user_id: str = Depends(auth_service.get_user_from_auth_headers)):
     """
     Get Broker Connection Status (Header-based Auth)
     

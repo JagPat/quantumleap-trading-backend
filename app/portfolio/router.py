@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from .service import portfolio_service
 from .models import FetchResponse
-from ..auth.router import get_user_from_headers
+from ..auth.dependencies import get_user_from_headers
+from ..database.service import get_latest_portfolio_snapshot as get_snapshot_from_db
 
 router = APIRouter(
     prefix="/api/portfolio",
