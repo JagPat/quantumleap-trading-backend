@@ -56,7 +56,7 @@ async def on_startup():
     logger.info("Database initialized.")
 
 # # Include routers
-app.include_router(auth_router)
+app.include_router(auth_router, prefix="/api/auth")
 app.include_router(portfolio_router)
 
 # # Serve frontend static files - adjust the path as needed
