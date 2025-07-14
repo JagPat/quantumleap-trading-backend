@@ -33,3 +33,31 @@ async def get_latest_snapshot(user_id: str = Depends(get_user_from_headers)):
             return FetchResponse(status="not_found", message="No snapshot available for this user.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/holdings")
+async def get_holdings(user_id: str = Depends(get_user_from_headers)):
+    """
+    Retrieves holdings from the latest portfolio snapshot for the user.
+    """
+    try:
+        snapshot = portfolio_service.get_latest_portfolio(user_id)
+        if snapshot and snapshot.holdings:
+            return {"status": "success", "data": snapshot.holdings}
+        else:
+            return {"status": "not_found", "data": [], "message": "No holdings data available for this user."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/positions")
+async def get_positions(user_id: str = Depends(get_user_from_headers)):
+    """
+    Retrieves positions from the latest portfolio snapshot for the user.
+    """
+    try:
+        snapshot = portfolio_service.get_latest_portfolio(user_id)
+        if snapshot and snapshot.positions:
+            return {"status": "success", "data": {"net": snapshot.positions}}
+        else:
+            return {"status": "not_found", "data": {"net": []}, "message": "No positions data available for this user."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
