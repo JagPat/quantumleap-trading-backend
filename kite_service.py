@@ -237,6 +237,12 @@ def get_kite_service(user_id: str) -> Optional[KiteService]:
         logger.error(f"Error creating KiteService for user {user_id}: {str(e)}")
         return None
 
+def create_kite_client(api_key: str, access_token: str, api_secret: str = None) -> KiteService:
+    """
+    Factory function to create a KiteService client with the given credentials.
+    """
+    return KiteService(api_key=api_key, api_secret=api_secret or '', access_token=access_token)
+
 def calculate_portfolio_summary(holdings: List[Dict[str, Any]], positions: Dict[str, Any]) -> Dict[str, float]:
     """Calculate enhanced portfolio summary from holdings and positions"""
     try:
