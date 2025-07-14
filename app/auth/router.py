@@ -376,6 +376,46 @@ async def get_broker_profile(authorization: str = Header(..., description="Beare
         logger.error(f"Error getting broker profile: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get broker profile")
 
+@router.post("/broker/profile")
+async def broker_profile(user_id: str = Query(..., description="User ID")):
+    """
+    Returns broker profile for the authenticated user.
+    """
+    try:
+        # Try to get from database
+        credentials = auth_service.get_user_credentials(user_id)
+        if not credentials:
+            raise HTTPException(status_code=404, detail="No credentials found for user")
+        # Simulate profile info (expand as needed)
+        profile = {
+            "user_id": user_id,
+            "user_name": credentials.get("user_name", ""),
+            "email": credentials.get("email", ""),
+            "api_key": credentials.get("api_key", ""),
+        }
+        return {"status": "success", "profile": profile}
+    except Exception as e:
+        logger.error(f"Error getting broker profile: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get broker profile")
+
+@router.post("/broker/margins")
+async def broker_margins(user_id: str = Query(..., description="User ID")):
+    """
+    Returns margin info for the authenticated user. Placeholder for now.
+    """
+    try:
+        # TODO: Implement real margin fetch from broker API
+        margins = {
+            "available": 1000000,
+            "utilized": 0,
+            "span": 0,
+            "exposure": 0
+        }
+        return {"status": "success", "margins": margins}
+    except Exception as e:
+        logger.error(f"Error getting broker margins: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get broker margins")
+
 
 @router.delete("/broker/disconnect")
 async def disconnect_broker(user_id: str = Query(..., description="User ID")):

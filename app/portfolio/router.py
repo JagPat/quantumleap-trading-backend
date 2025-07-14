@@ -61,3 +61,11 @@ async def get_positions(user_id: str = Depends(get_user_from_headers)):
             return {"status": "not_found", "data": {"net": []}, "message": "No positions data available for this user."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/holdings")
+async def post_holdings(user_id: str = Depends(get_user_from_headers)):
+    return await get_holdings(user_id)
+
+@router.post("/positions")
+async def post_positions(user_id: str = Depends(get_user_from_headers)):
+    return await get_positions(user_id)
