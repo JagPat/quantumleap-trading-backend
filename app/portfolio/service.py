@@ -25,8 +25,8 @@ class PortfolioService:
         
         # 2. Fetch holdings and positions from broker
         try:
-            holdings = kite.holdings()
-            positions = kite.positions()
+            holdings = kite.get_holdings()
+            positions = kite.get_positions()
             logger.info(f"Successfully fetched holdings and positions for user {user_id} from broker.")
         except Exception as e:
             logger.error(f"Error fetching portfolio from broker for user {user_id}: {e}")
