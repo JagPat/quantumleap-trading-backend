@@ -26,7 +26,8 @@ class PortfolioService:
         # 2. Fetch holdings and positions from broker
         try:
             holdings = kite.get_holdings()
-            positions = kite.get_positions()
+            positions_dict = kite.get_positions()
+            net_positions = positions_dict['net'] if isinstance(positions_dict, dict) and 'net' in positions_dict else []
             logger.info(f"Successfully fetched holdings and positions for user {user_id} from broker.")
         except Exception as e:
             logger.error(f"Error fetching portfolio from broker for user {user_id}: {e}")
@@ -38,12 +39,12 @@ class PortfolioService:
             user_id=user_id,
             timestamp=timestamp,
             holdings=holdings,
-            positions=positions
+            positions=net_positions
         )
         
         # 4. Store the snapshot in the database
         holdings_json = json.dumps(holdings)
-        positions_json = json.dumps(positions['net']) # Storing net positions
+        positions_json = json.dumps(net_positions) # Store only net positions as a list
         
         success = store_portfolio_snapshot(
             user_id=user_id,
