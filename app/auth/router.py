@@ -15,7 +15,10 @@ from .dependencies import get_user_from_headers
 logger = logging.getLogger(__name__)
 
 # Create router
-router = APIRouter(tags=["Authentication"])
+router = APIRouter(
+    prefix="/api/auth",
+    tags=["Authentication"]
+)
 
 
 @router.get("/broker/callback")
