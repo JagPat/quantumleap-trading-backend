@@ -26,12 +26,21 @@ class PortfolioService:
         # 2. Fetch holdings and positions from broker
         try:
             holdings = kite.get_holdings()
+            logger.info(f"Kite API holdings response for user {user_id}: {json.dumps(holdings)[:500]}")
             positions_dict = kite.get_positions()
+            logger.info(f"Kite API positions response for user {user_id}: {json.dumps(positions_dict)[:500]}")
             net_positions = positions_dict['net'] if isinstance(positions_dict, dict) and 'net' in positions_dict else []
+            # Validate structure
+            if not isinstance(holdings, list):
+                logger.error(f"Holdings is not a list for user {user_id}: {type(holdings)}")
+                raise ValueError("Holdings data is not a list.")
+            if not isinstance(net_positions, list):
+                logger.error(f"Net positions is not a list for user {user_id}: {type(net_positions)}")
+                raise ValueError("Positions data is not a list.")
             logger.info(f"Successfully fetched holdings and positions for user {user_id} from broker.")
         except Exception as e:
             logger.error(f"Error fetching portfolio from broker for user {user_id}: {e}")
-            raise
+            raise Exception(f"Kite API error: {e}")
             
         # 3. Create a snapshot
         timestamp = datetime.utcnow()
@@ -46,12 +55,16 @@ class PortfolioService:
         holdings_json = json.dumps(holdings)
         positions_json = json.dumps(net_positions) # Store only net positions as a list
         
-        success = store_portfolio_snapshot(
-            user_id=user_id,
-            timestamp=timestamp.isoformat(),
-            holdings=holdings_json,
-            positions=positions_json
-        )
+        try:
+            success = store_portfolio_snapshot(
+                user_id=user_id,
+                timestamp=timestamp.isoformat(),
+                holdings=holdings_json,
+                positions=positions_json
+            )
+        except Exception as db_exc:
+            logger.error(f"DB error storing portfolio snapshot for user {user_id}: {db_exc}")
+            raise Exception(f"DB error: {db_exc}")
         
         if not success:
             logger.error(f"Failed to store portfolio snapshot for user {user_id}")
@@ -81,9 +94,9 @@ class PortfolioService:
             )
             logger.info(f"Successfully retrieved and reconstructed snapshot for user {user_id}")
             return snapshot
-        except (json.JSONDecodeError, KeyError) as e:
+        except (json.JSONDecodeError, KeyError, Exception) as e:
             logger.error(f"Error reconstructing portfolio snapshot for user {user_id}: {e}")
-            return None
+            raise Exception(f"Error reconstructing portfolio snapshot: {e}")
 
 # Instantiate the service
 portfolio_service = PortfolioService()

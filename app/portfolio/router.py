@@ -12,13 +12,18 @@ router = APIRouter(
 @router.post("/fetch-live", response_model=FetchResponse)
 async def fetch_live_portfolio(user_id: str = Depends(get_user_from_headers)):
     """
-    Fetches the latest portfolio from the broker, stores it, and returns it.
+    Fetches the latest portfolio from the broker, stores it, and returns the latest snapshot.
     """
     try:
-        snapshot = portfolio_service.fetch_and_store_portfolio(user_id)
-        return FetchResponse(status="success", message="Portfolio fetched and stored successfully.", snapshot=snapshot)
+        portfolio_service.fetch_and_store_portfolio(user_id)
+        # Always return the latest snapshot after fetch
+        snapshot = portfolio_service.get_latest_portfolio(user_id)
+        if snapshot:
+            return FetchResponse(status="success", message="Portfolio fetched and stored successfully.", snapshot=snapshot)
+        else:
+            return FetchResponse(status="error", message="Portfolio fetch succeeded but no snapshot found.", snapshot=None)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Portfolio fetch error: {str(e)}")
 
 @router.get("/latest", response_model=FetchResponse)
 async def get_latest_snapshot(user_id: str = Depends(get_user_from_headers)):
@@ -42,11 +47,11 @@ async def get_holdings(user_id: str = Depends(get_user_from_headers)):
     try:
         snapshot = portfolio_service.get_latest_portfolio(user_id)
         if snapshot and snapshot.holdings:
-            return {"status": "success", "data": snapshot.holdings}
+            return {"status": "success", "data": snapshot.holdings, "last_updated": snapshot.timestamp.isoformat()}
         else:
-            return {"status": "not_found", "data": [], "message": "No holdings data available for this user."}
+            return {"status": "not_found", "data": [], "message": "No holdings data available for this user.", "last_updated": None}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Holdings retrieval error: {str(e)}")
 
 @router.get("/positions")
 async def get_positions(user_id: str = Depends(get_user_from_headers)):
@@ -56,11 +61,12 @@ async def get_positions(user_id: str = Depends(get_user_from_headers)):
     try:
         snapshot = portfolio_service.get_latest_portfolio(user_id)
         if snapshot and snapshot.positions:
-            return {"status": "success", "data": {"net": snapshot.positions}}
+            # Return a flat array for positions
+            return {"status": "success", "data": snapshot.positions, "last_updated": snapshot.timestamp.isoformat()}
         else:
-            return {"status": "not_found", "data": {"net": []}, "message": "No positions data available for this user."}
+            return {"status": "not_found", "data": [], "message": "No positions data available for this user.", "last_updated": None}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Positions retrieval error: {str(e)}")
 
 @router.post("/holdings")
 async def post_holdings(user_id: str = Depends(get_user_from_headers)):
