@@ -19,15 +19,19 @@ class Settings(BaseSettings):
     app_version: str = "2.0.0"
     debug: bool = False
     
+<<<<<<< HEAD
     # Server Configuration
     host: str = "0.0.0.0"
     port: int = 8000
     
+=======
+>>>>>>> 1dc30303b85cf886c4618fb5b1e5e73642d1324b
     # Database
     database_path: str = "trading_app.db"
     
     # Security
     encryption_key: Optional[str] = None
+<<<<<<< HEAD
     session_secret: str = "a-secure-secret-key-for-oauth-state-management"
     
     # Frontend Configuration
@@ -37,10 +41,20 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     claude_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
+=======
+    
+    # External URLs
+    frontend_url: str = Field(
+        default="http://localhost:5173",
+        env="FRONTEND_URL",
+        description="Frontend application URL for OAuth redirects"
+    )
+>>>>>>> 1dc30303b85cf886c4618fb5b1e5e73642d1324b
     
     # Logging
     log_level: str = "INFO"
     
+<<<<<<< HEAD
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -60,6 +74,19 @@ class Settings(BaseSettings):
         self.claude_api_key = os.getenv("CLAUDE_API_KEY")
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         self.log_level = os.getenv("LOG_LEVEL", self.log_level)
+=======
+    def get_encryption_key(self) -> bytes:
+        """Get encryption key from environment variable"""
+        env_key = os.environ.get("ENCRYPTION_KEY")
+        if not env_key:
+            raise ValueError("ENCRYPTION_KEY environment variable not set.")
+        return env_key.encode()
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
+>>>>>>> 1dc30303b85cf886c4618fb5b1e5e73642d1324b
 
 # Global settings instance
 settings = Settings() 
