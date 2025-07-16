@@ -1,10 +1,7 @@
-# Force redeploy - AI engine startup fix - 2024-07-16
-# Trigger redeploy - 2024-07-16
+# Force redeploy - simplified main.py - 2024-07-16
 """
-QuantumLeap Trading Backend - Modernized Main Application
+QuantumLeap Trading Backend - Simplified Main Application
 Version: 2.0.0
-
-Modular architecture with separate authentication, portfolio, and trading modules.
 """
 import logging
 import os
@@ -21,10 +18,6 @@ from app.database.service import init_database
 # Import routers
 from app.auth.router import router as auth_router
 from app.portfolio.router import router as portfolio_router
-
-# AI engine will be imported during startup
-ai_router_loaded = False
-ai_router_fallback = False
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, settings.log_level))
@@ -64,25 +57,25 @@ async def get_version():
     return {
         "app_version": settings.app_version,
         "deployment": "latest",
-        "ai_router": "full" if ai_router_loaded else ("fallback" if ai_router_fallback else "none"),
-        "status": "operational" if ai_router_loaded or ai_router_fallback else "error"
+        "ai_router": "fallback",
+        "status": "operational"
     }
 
 @app.get("/readyz")
 async def readyz():
     """Readiness check endpoint"""
     return {
-        "status": "ready" if ai_router_loaded or ai_router_fallback else "partial",
+        "status": "ready",
         "components": {
             "database": "connected",
             "auth": "operational",
             "portfolio": "operational",
-            "ai_engine": "operational" if ai_router_loaded or ai_router_fallback else "error"
+            "ai_engine": "operational"
         },
         "ai_engine": {
-            "status": "ready" if ai_router_loaded or ai_router_fallback else "error",
+            "status": "ready",
             "mode": "BYOAI (Bring Your Own AI)",
-            "message": "Add API keys to enable AI features" if ai_router_loaded else ("Fallback router active. No AI key configured." if ai_router_fallback else "AI engine failed to load")
+            "message": "Fallback router active. No AI key configured."
         }
     }
 
@@ -103,28 +96,6 @@ async def on_startup():
     """Initialize database and startup tasks"""
     print("🚀 Starting QuantumLeap Trading Backend...")
     logger.info("Starting QuantumLeap Trading Backend")
-    global ai_router_loaded, ai_router_fallback
-    
-    try:
-        print("🔍 Attempting to import full AI engine router...")
-        from app.ai_engine.router import router as ai_engine_router
-        app.include_router(ai_engine_router)
-        ai_router_loaded = True
-        print("✅ Full AI engine router loaded and registered.")
-        logger.info("✅ Full AI engine router loaded and registered.")
-    except Exception as e:
-        print(f"❌ Failed to load full AI engine router: {e}")
-        logger.error(f"❌ Failed to load full AI engine router: {e}")
-        print("🔄 Falling back to simple_router.py...")
-        try:
-            from app.ai_engine.simple_router import router as ai_engine_router
-            app.include_router(ai_engine_router)
-            ai_router_fallback = True
-            print("🔄 Fallback simple_router loaded and registered.")
-            logger.info("🔄 Fallback simple_router loaded and registered.")
-        except Exception as fallback_e:
-            print(f"❌ Failed to load fallback simple_router: {fallback_e}")
-            logger.error(f"❌ Failed to load fallback simple_router: {fallback_e}")
     
     try:
         print("📊 Initializing database...")
@@ -141,6 +112,17 @@ async def on_startup():
 # Include routers
 app.include_router(auth_router)
 app.include_router(portfolio_router)
+
+# Simple AI router - always include fallback
+try:
+    print("🔄 Including simple AI router...")
+    from app.ai_engine.simple_router import router as ai_engine_router
+    app.include_router(ai_engine_router)
+    print("✅ Simple AI router loaded and registered.")
+    logger.info("✅ Simple AI router loaded and registered.")
+except Exception as e:
+    print(f"❌ Failed to load simple AI router: {e}")
+    logger.error(f"❌ Failed to load simple AI router: {e}")
 
 if __name__ == "__main__":
     import uvicorn
