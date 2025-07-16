@@ -17,7 +17,7 @@ from app.database.service import init_database
 
 # Import routers
 from app.auth.router import router as auth_router
-from app.portfolio.router import router as portfolio_router
+# Portfolio router will be imported during startup with fallback logic
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, settings.log_level))
@@ -59,12 +59,39 @@ async def health_check():
 
 @app.get("/version")
 async def get_version():
-    """Get deployment version and commit info"""
+    """Get deployment version and commit info with debug details"""
+    # Try to read startup checkpoint
+    checkpoint_info = None
+    try:
+        with open("startup_checkpoint.json", "r") as f:
+            import json
+            checkpoint_info = json.load(f)
+    except FileNotFoundError:
+        checkpoint_info = {"error": "No startup checkpoint found - may be running old deployment"}
+    except Exception as e:
+        checkpoint_info = {"error": f"Failed to read checkpoint: {str(e)}"}
+    
     return {
         "app_version": settings.app_version,
         "deployment": "latest",
+        "debug_mode": True,
         "ai_router": "fallback",
-        "status": "operational"
+        "status": "operational",
+        "startup_checkpoint": checkpoint_info,
+        "railway_info": {
+            "commit_sha": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "unknown"),
+            "deployment_id": os.environ.get("RAILWAY_DEPLOYMENT_ID", "unknown"),
+            "service_id": os.environ.get("RAILWAY_SERVICE_ID", "unknown")
+        },
+        "endpoints": {
+            "health": "/health",
+            "version": "/version", 
+            "readyz": "/readyz",
+            "ai_status": "/api/ai/status",
+            "portfolio_status": "/api/portfolio/status",
+            "docs": "/docs",
+            "openapi": "/openapi.json"
+        }
     }
 
 @app.get("/readyz")
@@ -99,10 +126,73 @@ async def root():
 # Initialize database on startup
 @app.on_event("startup")
 async def on_startup():
-    """Initialize database and startup tasks"""
+    """Initialize database and startup tasks with robust fallback system"""
     print("🚀 Starting QuantumLeap Trading Backend...")
     logger.info("Starting QuantumLeap Trading Backend")
     
+    # Create startup checkpoint to verify fresh deployment
+    try:
+        import os
+        from datetime import datetime
+        checkpoint_data = {
+            "startup_time": datetime.now().isoformat(),
+            "commit_hash": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "unknown"),
+            "deployment_id": os.environ.get("RAILWAY_DEPLOYMENT_ID", "unknown"),
+            "service_id": os.environ.get("RAILWAY_SERVICE_ID", "unknown")
+        }
+        
+        with open("startup_checkpoint.json", "w") as f:
+            import json
+            json.dump(checkpoint_data, f, indent=2)
+        
+        print(f"✅ Startup checkpoint created: {checkpoint_data}")
+        logger.info(f"✅ Startup checkpoint created: {checkpoint_data}")
+    except Exception as e:
+        print(f"❌ Failed to create startup checkpoint: {e}")
+        logger.error(f"❌ Failed to create startup checkpoint: {e}")
+    
+    # Load Portfolio Router with robust fallback
+    try:
+        print("🔍 Attempting to load portfolio router...")
+        logger.info("🔍 Attempting to load portfolio router...")
+        
+        from app.portfolio.router import router as portfolio_router
+        app.include_router(portfolio_router)
+        print("✅ Portfolio router loaded and registered.")
+        logger.info("✅ Portfolio router loaded and registered.")
+    except Exception as e:
+        print(f"❌ Portfolio service import failed: {e}")
+        logger.error(f"❌ Portfolio service import failed: {e}")
+        print(f"❌ Portfolio error type: {type(e).__name__}")
+        print(f"❌ Portfolio error details: {str(e)}")
+        
+        print("⚠️ Using fallback portfolio router with /api/portfolio/status returning 503")
+        try:
+            # Create inline fallback portfolio router
+            from fastapi import APIRouter, HTTPException
+            
+            fallback_portfolio_router = APIRouter(prefix="/api/portfolio", tags=["Portfolio - Fallback"])
+            
+            @fallback_portfolio_router.get("/status")
+            async def fallback_portfolio_status():
+                return {
+                    "status": "fallback",
+                    "message": "Portfolio service in fallback mode",
+                    "error": str(e)
+                }
+            
+            @fallback_portfolio_router.get("/{path:path}")
+            async def fallback_portfolio_catchall(path: str):
+                raise HTTPException(status_code=503, detail="Portfolio service unavailable")
+            
+            app.include_router(fallback_portfolio_router)
+            print("🔄 Fallback portfolio router created and registered.")
+            logger.info("🔄 Fallback portfolio router created and registered.")
+        except Exception as fallback_e:
+            print(f"❌ Failed to create fallback portfolio router: {fallback_e}")
+            logger.error(f"❌ Failed to create fallback portfolio router: {fallback_e}")
+    
+    # Initialize database with error handling
     try:
         print("📊 Initializing database...")
         init_database()
@@ -117,7 +207,7 @@ async def on_startup():
 
 # Include routers
 app.include_router(auth_router)
-app.include_router(portfolio_router)
+# Portfolio router will be included during startup with fallback logic
 
 # Simple AI router - always include fallback
 try:

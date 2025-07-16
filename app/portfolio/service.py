@@ -99,3 +99,4 @@ class PortfolioService:
             raise Exception(f"Error reconstructing portfolio snapshot: {e}")
 
 # Instantiate the service
+portfolio_service = PortfolioService()
