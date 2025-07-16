@@ -111,3 +111,71 @@ async def get_ai_strategy(user_id: str = Depends(get_user_id_from_headers)):
         strategy=None,
         message="No AI key configured. Cannot generate strategy."
     )
+
+# ========================================
+# PENDING BACKEND FEATURES (Frontend Support)
+# ========================================
+
+@router.get("/insights/crowd")
+async def get_crowd_insights(user_id: str = Depends(get_user_id_from_headers)):
+    """Get crowd insights - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Crowd intelligence features are planned but not yet implemented",
+        "feature": "crowd_insights",
+        "frontend_expectation": "Collective market sentiment and crowd wisdom",
+        "planned_features": [
+            "Social sentiment analysis",
+            "Crowd wisdom aggregation",
+            "Market mood indicators"
+        ]
+    }
+
+@router.get("/insights/trending")
+async def get_trending_insights(user_id: str = Depends(get_user_id_from_headers)):
+    """Get trending insights - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Trending insights are planned but not yet implemented",
+        "feature": "trending_insights",
+        "frontend_expectation": "Real-time trending market analysis",
+        "planned_features": [
+            "Trend detection",
+            "Momentum indicators",
+            "Viral market movements"
+        ]
+    }
+
+@router.post("/copilot/analyze")
+async def copilot_analysis(
+    analysis_data: dict,
+    user_id: str = Depends(get_user_id_from_headers)
+):
+    """Copilot analysis - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "AI Copilot analysis is planned but not yet implemented",
+        "feature": "copilot_analysis",
+        "frontend_expectation": "Intelligent trading assistant analysis",
+        "planned_features": [
+            "Real-time market analysis",
+            "Trading suggestions",
+            "Risk assessment"
+        ],
+        "received_data": analysis_data
+    }
+
+@router.get("/copilot/recommendations")
+async def get_copilot_recommendations(user_id: str = Depends(get_user_id_from_headers)):
+    """Get copilot recommendations - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Copilot recommendations are planned but not yet implemented",
+        "feature": "copilot_recommendations",
+        "frontend_expectation": "AI-powered trading recommendations",
+        "planned_features": [
+            "Personalized recommendations",
+            "Portfolio optimization",
+            "Risk-adjusted suggestions"
+        ]
+    }
