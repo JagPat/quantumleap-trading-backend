@@ -201,7 +201,7 @@ async def on_startup():
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
         logger.error(f"Database initialization failed: {e}")
-    
+
     print("🎯 FastAPI app startup complete - health checks should work")
     logger.info("FastAPI app startup complete")
 
