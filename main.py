@@ -1,3 +1,4 @@
+# Force redeploy - AI engine startup fix - 2024-07-16
 # Trigger redeploy - 2024-07-16
 """
 QuantumLeap Trading Backend - Modernized Main Application
