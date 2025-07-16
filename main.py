@@ -77,3 +77,4 @@ async def on_startup():
 app.include_router(auth_router)
 #app.include_router(portfolio_router)
 #app.include_router(ai_engine_router)
+# Redeploy: Wed Jul 16 08:56:36 IST 2025
