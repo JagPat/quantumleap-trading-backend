@@ -1,95 +1,70 @@
 from fastapi import APIRouter, Depends, HTTPException
 from .service import portfolio_service
 from .models import FetchResponse
-<<<<<<< HEAD
 from ..auth.router import get_user_from_headers
-=======
-from ..auth.dependencies import get_user_from_headers
->>>>>>> 1dc30303b85cf886c4618fb5b1e5e73642d1324b
 from ..database.service import get_latest_portfolio_snapshot as get_snapshot_from_db
 
-router = APIRouter(
-    prefix="/api/portfolio",
-    tags=["Portfolio"],
-)
+router = APIRouter(prefix="/api/portfolio", tags=["Portfolio"])
 
 @router.post("/fetch-live", response_model=FetchResponse)
 async def fetch_live_portfolio(user_id: str = Depends(get_user_from_headers)):
     """
-<<<<<<< HEAD
     Fetches the latest portfolio from the broker, stores it, and returns it.
     """
     try:
         snapshot = portfolio_service.fetch_and_store_portfolio(user_id)
-        return FetchResponse(status="success", message="Portfolio fetched and stored successfully.", snapshot=snapshot)
+        return FetchResponse(
+            success=True, 
+            message="Portfolio fetched successfully",
+            data=snapshot
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-=======
-    Fetches the latest portfolio from the broker, stores it, and returns the latest snapshot.
-    """
-    try:
-        portfolio_service.fetch_and_store_portfolio(user_id)
-        # Always return the latest snapshot after fetch
-        snapshot = portfolio_service.get_latest_portfolio(user_id)
-        if snapshot:
-            return FetchResponse(status="success", message="Portfolio fetched and stored successfully.", snapshot=snapshot)
-        else:
-            return FetchResponse(status="error", message="Portfolio fetch succeeded but no snapshot found.", snapshot=None)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Portfolio fetch error: {str(e)}")
->>>>>>> 1dc30303b85cf886c4618fb5b1e5e73642d1324b
+        raise HTTPException(status_code=500, detail=f"Failed to fetch portfolio: {str(e)}")
 
-@router.get("/latest", response_model=FetchResponse)
-async def get_latest_snapshot(user_id: str = Depends(get_user_from_headers)):
+@router.get("/latest")
+async def get_latest_portfolio(user_id: str = Depends(get_user_from_headers)):
     """
-    Retrieves the latest stored portfolio snapshot for the user.
+    Returns the latest stored portfolio snapshot from the database.
     """
     try:
-        snapshot = portfolio_service.get_latest_portfolio(user_id)
-        if snapshot:
-            return FetchResponse(status="success", message="Latest snapshot retrieved.", snapshot=snapshot)
-        else:
-            return FetchResponse(status="not_found", message="No snapshot available for this user.")
+        snapshot = get_snapshot_from_db(user_id)
+        if not snapshot:
+            raise HTTPException(status_code=404, detail="No portfolio data found")
+        
+        return {
+            "success": True,
+            "message": "Latest portfolio retrieved",
+            "data": snapshot
+        }
     except Exception as e:
-<<<<<<< HEAD
-        raise HTTPException(status_code=500, detail=str(e)) 
-=======
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve portfolio: {str(e)}")
 
 @router.get("/holdings")
 async def get_holdings(user_id: str = Depends(get_user_from_headers)):
-    """
-    Retrieves holdings from the latest portfolio snapshot for the user.
-    """
+    """Get portfolio holdings"""
     try:
-        snapshot = portfolio_service.get_latest_portfolio(user_id)
-        if snapshot and snapshot.holdings:
-            return {"status": "success", "data": snapshot.holdings, "last_updated": snapshot.timestamp.isoformat()}
-        else:
-            return {"status": "not_found", "data": [], "message": "No holdings data available for this user.", "last_updated": None}
+        snapshot = get_snapshot_from_db(user_id)
+        if not snapshot:
+            return {"holdings": []}
+        
+        return {
+            "success": True,
+            "holdings": snapshot.get("holdings", [])
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Holdings retrieval error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get holdings: {str(e)}")
 
 @router.get("/positions")
 async def get_positions(user_id: str = Depends(get_user_from_headers)):
-    """
-    Retrieves positions from the latest portfolio snapshot for the user.
-    """
+    """Get portfolio positions"""
     try:
-        snapshot = portfolio_service.get_latest_portfolio(user_id)
-        if snapshot and snapshot.positions:
-            # Return a flat array for positions
-            return {"status": "success", "data": snapshot.positions, "last_updated": snapshot.timestamp.isoformat()}
-        else:
-            return {"status": "not_found", "data": [], "message": "No positions data available for this user.", "last_updated": None}
+        snapshot = get_snapshot_from_db(user_id)
+        if not snapshot:
+            return {"positions": []}
+        
+        return {
+            "success": True,
+            "positions": snapshot.get("positions", [])
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Positions retrieval error: {str(e)}")
-
-@router.post("/holdings")
-async def post_holdings(user_id: str = Depends(get_user_from_headers)):
-    return await get_holdings(user_id)
-
-@router.post("/positions")
-async def post_positions(user_id: str = Depends(get_user_from_headers)):
-    return await get_positions(user_id)
->>>>>>> 1dc30303b85cf886c4618fb5b1e5e73642d1324b
+        raise HTTPException(status_code=500, detail=f"Failed to get positions: {str(e)}")

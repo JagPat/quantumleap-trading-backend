@@ -7,7 +7,8 @@ import asyncio
 from typing import Optional, Dict, Any, List
 from cryptography.fernet import Fernet
 from app.core.config import settings
-from app.database.service import get_db_connection
+import sqlite3
+from app.core.config import settings
 from app.ai_engine.models import AIPreferences, AIPreferencesRequest
 import openai
 import anthropic
@@ -39,28 +40,31 @@ class AIEngineService:
     async def get_user_preferences(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user AI preferences from database"""
         try:
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT preferences FROM ai_preferences WHERE user_id = ?",
-                    (user_id,)
-                )
-                result = cursor.fetchone()
-                
-                if result:
-                    preferences = json.loads(result[0])
-                    # Decrypt API keys for display (partial)
-                    if preferences.get('openai_api_key'):
-                        preferences['openai_api_key_preview'] = self.get_key_preview(preferences['openai_api_key'])
-                    if preferences.get('claude_api_key'):
-                        preferences['claude_api_key_preview'] = self.get_key_preview(preferences['claude_api_key'])
-                    if preferences.get('gemini_api_key'):
-                        preferences['gemini_api_key_preview'] = self.get_key_preview(preferences['gemini_api_key'])
-                    return preferences
-                return None
+            conn = sqlite3.connect(settings.database_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT preferences FROM ai_preferences WHERE user_id = ?",
+                (user_id,)
+            )
+            result = cursor.fetchone()
+            
+            if result:
+                preferences = json.loads(result[0])
+                # Decrypt API keys for display (partial)
+                if preferences.get('openai_api_key'):
+                    preferences['openai_api_key_preview'] = self.get_key_preview(preferences['openai_api_key'])
+                if preferences.get('claude_api_key'):
+                    preferences['claude_api_key_preview'] = self.get_key_preview(preferences['claude_api_key'])
+                if preferences.get('gemini_api_key'):
+                    preferences['gemini_api_key_preview'] = self.get_key_preview(preferences['gemini_api_key'])
+                return preferences
+            return None
         except Exception as e:
             print(f"Error getting user preferences: {e}")
             return None
+        finally:
+            if conn:
+                conn.close()
 
     def get_key_preview(self, encrypted_key: str) -> str:
         """Get a preview of the API key (first 8 chars + *****)"""
@@ -86,29 +90,32 @@ class AIEngineService:
             if prefs_dict.get('gemini_api_key'):
                 prefs_dict['gemini_api_key'] = self.encrypt_api_key(prefs_dict['gemini_api_key'])
 
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                # Create table if not exists
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS ai_preferences (
-                        user_id TEXT PRIMARY KEY,
-                        preferences TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                
-                # Insert or update preferences
-                cursor.execute('''
-                    INSERT OR REPLACE INTO ai_preferences (user_id, preferences, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                ''', (user_id, json.dumps(prefs_dict)))
-                
-                conn.commit()
-                return True
+            conn = sqlite3.connect(settings.database_path)
+            cursor = conn.cursor()
+            # Create table if not exists
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS ai_preferences (
+                    user_id TEXT PRIMARY KEY,
+                    preferences TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Insert or update preferences
+            cursor.execute('''
+                INSERT OR REPLACE INTO ai_preferences (user_id, preferences, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+            ''', (user_id, json.dumps(prefs_dict)))
+            
+            conn.commit()
+            return True
         except Exception as e:
             print(f"Error saving user preferences: {e}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     async def validate_api_key(self, provider: str, api_key: str) -> Dict[str, Any]:
         """Validate API key against provider"""
