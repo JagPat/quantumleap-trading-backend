@@ -21,6 +21,26 @@ def get_user_from_headers(
 # PENDING BACKEND FEATURES (Frontend Support)
 # ========================================
 
+@router.get("/status")
+async def get_broker_status():
+    """Get broker service status"""
+    return {
+        "status": "operational",
+        "service": "broker_integration",
+        "message": "Broker service is running",
+        "endpoints": {
+            "holdings": "/api/broker/holdings",
+            "positions": "/api/broker/positions", 
+            "profile": "/api/broker/profile",
+            "margins": "/api/broker/margins"
+        },
+        "features": {
+            "authentication": "planned",
+            "portfolio_sync": "planned",
+            "trading": "planned"
+        }
+    }
+
 @router.get("/holdings")
 async def get_holdings(user_id: str = Depends(get_user_from_headers)):
     """Get broker holdings - PENDING BACKEND IMPLEMENTATION"""
