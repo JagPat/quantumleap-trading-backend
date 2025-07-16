@@ -326,3 +326,14 @@ def format_holdings_data(holdings: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     except Exception as e:
         logger.error(f"Error formatting holdings data: {str(e)}")
         return [] 
+def create_kite_client(api_key: str, access_token: str, api_secret: str = None) -> KiteService:
+    """Create a KiteService instance with the provided credentials"""
+    try:
+        return KiteService(
+            api_key=api_key,
+            api_secret=api_secret or "",  # Use empty string if not provided
+            access_token=access_token
+        )
+    except Exception as e:
+        logger.error(f"Error creating KiteService: {str(e)}")
+        raise
