@@ -112,7 +112,7 @@ async def on_startup():
 # Include routers
 app.include_router(auth_router)
 app.include_router(portfolio_router)
-app.include_router(placeholder_router)
+# app.include_router(placeholder_router)
 
 # Simple AI router - always include fallback
 try:
