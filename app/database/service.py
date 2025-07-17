@@ -26,6 +26,34 @@ def decrypt_data(encrypted_data: str) -> str:
 def init_database():
     """Initialize SQLite database with required tables"""
     conn = sqlite3.connect(settings.database_path)
+        logger.info(f"DB: Database connection established")
+        cursor = conn.cursor()
+        logger.info(f"DB: Cursor created")
+        
+        # Check if portfolio_snapshots table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
+        table_exists = cursor.fetchone()
+        logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
+        
+        if not table_exists:
+            logger.error(f"DB: portfolio_snapshots table does not exist!")
+            logger.info(f"DB: Available tables:")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type="table"")
+            tables = cursor.fetchall()
+            for table in tables:
+                logger.info(f"DB: - {table[0]}")
+            conn.close()
+            return False
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+        columns = cursor.fetchall()
+        logger.info(f"DB: portfolio_snapshots table columns: {[col[1] for col in columns]}")
+        
+        # Check if we can write to the database
+        cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+        count = cursor.fetchone()[0]
+        logger.info(f"DB: Current portfolio_snapshots count: {count}")
     cursor = conn.cursor()
     
     # Create users table for storing broker credentials
@@ -68,6 +96,34 @@ def store_portfolio_snapshot(user_id: str, timestamp: str, holdings: str, positi
     """
     try:
         conn = sqlite3.connect(settings.database_path)
+        logger.info(f"DB: Database connection established")
+        cursor = conn.cursor()
+        logger.info(f"DB: Cursor created")
+        
+        # Check if portfolio_snapshots table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
+        table_exists = cursor.fetchone()
+        logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
+        
+        if not table_exists:
+            logger.error(f"DB: portfolio_snapshots table does not exist!")
+            logger.info(f"DB: Available tables:")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type="table"")
+            tables = cursor.fetchall()
+            for table in tables:
+                logger.info(f"DB: - {table[0]}")
+            conn.close()
+            return False
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+        columns = cursor.fetchall()
+        logger.info(f"DB: portfolio_snapshots table columns: {[col[1] for col in columns]}")
+        
+        # Check if we can write to the database
+        cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+        count = cursor.fetchone()[0]
+        logger.info(f"DB: Current portfolio_snapshots count: {count}")
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO portfolio_snapshots (user_id, timestamp, holdings, positions) VALUES (?, ?, ?, ?)",
@@ -89,6 +145,34 @@ def get_latest_portfolio_snapshot(user_id: str) -> Optional[Dict[str, Any]]:
     """
     try:
         conn = sqlite3.connect(settings.database_path)
+        logger.info(f"DB: Database connection established")
+        cursor = conn.cursor()
+        logger.info(f"DB: Cursor created")
+        
+        # Check if portfolio_snapshots table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
+        table_exists = cursor.fetchone()
+        logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
+        
+        if not table_exists:
+            logger.error(f"DB: portfolio_snapshots table does not exist!")
+            logger.info(f"DB: Available tables:")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type="table"")
+            tables = cursor.fetchall()
+            for table in tables:
+                logger.info(f"DB: - {table[0]}")
+            conn.close()
+            return False
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+        columns = cursor.fetchall()
+        logger.info(f"DB: portfolio_snapshots table columns: {[col[1] for col in columns]}")
+        
+        # Check if we can write to the database
+        cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+        count = cursor.fetchone()[0]
+        logger.info(f"DB: Current portfolio_snapshots count: {count}")
         cursor = conn.cursor()
         cursor.execute(
             "SELECT timestamp, holdings, positions FROM portfolio_snapshots WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1",
@@ -133,6 +217,34 @@ def store_user_credentials(
     """
     try:
         conn = sqlite3.connect(settings.database_path)
+        logger.info(f"DB: Database connection established")
+        cursor = conn.cursor()
+        logger.info(f"DB: Cursor created")
+        
+        # Check if portfolio_snapshots table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
+        table_exists = cursor.fetchone()
+        logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
+        
+        if not table_exists:
+            logger.error(f"DB: portfolio_snapshots table does not exist!")
+            logger.info(f"DB: Available tables:")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type="table"")
+            tables = cursor.fetchall()
+            for table in tables:
+                logger.info(f"DB: - {table[0]}")
+            conn.close()
+            return False
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+        columns = cursor.fetchall()
+        logger.info(f"DB: portfolio_snapshots table columns: {[col[1] for col in columns]}")
+        
+        # Check if we can write to the database
+        cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+        count = cursor.fetchone()[0]
+        logger.info(f"DB: Current portfolio_snapshots count: {count}")
         cursor = conn.cursor()
         
         # Encrypt sensitive data
@@ -169,6 +281,34 @@ def get_user_credentials(user_id: str) -> Optional[Dict[str, Any]]:
     """
     try:
         conn = sqlite3.connect(settings.database_path)
+        logger.info(f"DB: Database connection established")
+        cursor = conn.cursor()
+        logger.info(f"DB: Cursor created")
+        
+        # Check if portfolio_snapshots table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
+        table_exists = cursor.fetchone()
+        logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
+        
+        if not table_exists:
+            logger.error(f"DB: portfolio_snapshots table does not exist!")
+            logger.info(f"DB: Available tables:")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type="table"")
+            tables = cursor.fetchall()
+            for table in tables:
+                logger.info(f"DB: - {table[0]}")
+            conn.close()
+            return False
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+        columns = cursor.fetchall()
+        logger.info(f"DB: portfolio_snapshots table columns: {[col[1] for col in columns]}")
+        
+        # Check if we can write to the database
+        cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+        count = cursor.fetchone()[0]
+        logger.info(f"DB: Current portfolio_snapshots count: {count}")
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -211,6 +351,34 @@ def delete_user_credentials(user_id: str) -> bool:
     """
     try:
         conn = sqlite3.connect(settings.database_path)
+        logger.info(f"DB: Database connection established")
+        cursor = conn.cursor()
+        logger.info(f"DB: Cursor created")
+        
+        # Check if portfolio_snapshots table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
+        table_exists = cursor.fetchone()
+        logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
+        
+        if not table_exists:
+            logger.error(f"DB: portfolio_snapshots table does not exist!")
+            logger.info(f"DB: Available tables:")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type="table"")
+            tables = cursor.fetchall()
+            for table in tables:
+                logger.info(f"DB: - {table[0]}")
+            conn.close()
+            return False
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+        columns = cursor.fetchall()
+        logger.info(f"DB: portfolio_snapshots table columns: {[col[1] for col in columns]}")
+        
+        # Check if we can write to the database
+        cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+        count = cursor.fetchone()[0]
+        logger.info(f"DB: Current portfolio_snapshots count: {count}")
         cursor = conn.cursor()
         
         cursor.execute('DELETE FROM users WHERE user_id = ?', (user_id,))
@@ -243,6 +411,34 @@ def get_user_credentials_by_email(email: str) -> Optional[Dict[str, Any]]:
     """
     try:
         conn = sqlite3.connect(settings.database_path)
+        logger.info(f"DB: Database connection established")
+        cursor = conn.cursor()
+        logger.info(f"DB: Cursor created")
+        
+        # Check if portfolio_snapshots table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
+        table_exists = cursor.fetchone()
+        logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
+        
+        if not table_exists:
+            logger.error(f"DB: portfolio_snapshots table does not exist!")
+            logger.info(f"DB: Available tables:")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type="table"")
+            tables = cursor.fetchall()
+            for table in tables:
+                logger.info(f"DB: - {table[0]}")
+            conn.close()
+            return False
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+        columns = cursor.fetchall()
+        logger.info(f"DB: portfolio_snapshots table columns: {[col[1] for col in columns]}")
+        
+        # Check if we can write to the database
+        cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+        count = cursor.fetchone()[0]
+        logger.info(f"DB: Current portfolio_snapshots count: {count}")
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -282,6 +478,34 @@ def user_exists(user_id: str) -> bool:
     """
     try:
         conn = sqlite3.connect(settings.database_path)
+        logger.info(f"DB: Database connection established")
+        cursor = conn.cursor()
+        logger.info(f"DB: Cursor created")
+        
+        # Check if portfolio_snapshots table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
+        table_exists = cursor.fetchone()
+        logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
+        
+        if not table_exists:
+            logger.error(f"DB: portfolio_snapshots table does not exist!")
+            logger.info(f"DB: Available tables:")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type="table"")
+            tables = cursor.fetchall()
+            for table in tables:
+                logger.info(f"DB: - {table[0]}")
+            conn.close()
+            return False
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+        columns = cursor.fetchall()
+        logger.info(f"DB: portfolio_snapshots table columns: {[col[1] for col in columns]}")
+        
+        # Check if we can write to the database
+        cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+        count = cursor.fetchone()[0]
+        logger.info(f"DB: Current portfolio_snapshots count: {count}")
         cursor = conn.cursor()
         
         cursor.execute('SELECT 1 FROM users WHERE user_id = ?', (user_id,))
@@ -292,3 +516,93 @@ def user_exists(user_id: str) -> bool:
         
     except Exception as e:
         logger.error(f"Error checking if user exists: {str(e)}")
+def check_database_health() -> dict:
+    """
+    Comprehensive database health check
+    """
+    health_status = {
+        "database_path": settings.database_path,
+        "connection": False,
+        "tables": [],
+        "portfolio_snapshots_exists": False,
+        "users_exists": False,
+        "portfolio_snapshots_columns": [],
+        "users_columns": [],
+        "portfolio_snapshots_count": 0,
+        "users_count": 0,
+        "errors": []
+    }
+    
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        logger.info(f"DB: Database connection established")
+        cursor = conn.cursor()
+        logger.info(f"DB: Cursor created")
+        
+        # Check if portfolio_snapshots table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
+        table_exists = cursor.fetchone()
+        logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
+        
+        if not table_exists:
+            logger.error(f"DB: portfolio_snapshots table does not exist!")
+            logger.info(f"DB: Available tables:")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type="table"")
+            tables = cursor.fetchall()
+            for table in tables:
+                logger.info(f"DB: - {table[0]}")
+            conn.close()
+            return False
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+        columns = cursor.fetchall()
+        logger.info(f"DB: portfolio_snapshots table columns: {[col[1] for col in columns]}")
+        
+        # Check if we can write to the database
+        cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+        count = cursor.fetchone()[0]
+        logger.info(f"DB: Current portfolio_snapshots count: {count}")
+        health_status["connection"] = True
+        cursor = conn.cursor()
+        
+        # Check all tables
+        cursor.execute("SELECT name FROM sqlite_master WHERE type=\"table\"")
+        tables = cursor.fetchall()
+        health_status["tables"] = [table[0] for table in tables]
+        
+        # Check portfolio_snapshots table
+        if "portfolio_snapshots" in health_status["tables"]:
+            health_status["portfolio_snapshots_exists"] = True
+            
+            # Get column info
+            cursor.execute("PRAGMA table_info(portfolio_snapshots)")
+            columns = cursor.fetchall()
+            health_status["portfolio_snapshots_columns"] = [col[1] for col in columns]
+            
+            # Get row count
+            cursor.execute("SELECT COUNT(*) FROM portfolio_snapshots")
+            count = cursor.fetchone()[0]
+            health_status["portfolio_snapshots_count"] = count
+        
+        # Check users table
+        if "users" in health_status["tables"]:
+            health_status["users_exists"] = True
+            
+            # Get column info
+            cursor.execute("PRAGMA table_info(users)")
+            columns = cursor.fetchall()
+            health_status["users_columns"] = [col[1] for col in columns]
+            
+            # Get row count
+            cursor.execute("SELECT COUNT(*) FROM users")
+            count = cursor.fetchone()[0]
+            health_status["users_count"] = count
+        
+        conn.close()
+        
+    except Exception as e:
+        health_status["errors"].append(f"Database health check failed: {str(e)}")
+        logger.error(f"Database health check error: {e}")
+    
+    return health_status

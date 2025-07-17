@@ -68,3 +68,22 @@ async def get_positions(user_id: str = Depends(get_user_from_headers)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get positions: {str(e)}")
+
+@router.get("/debug-db")
+async def debug_database():
+    """Debug database connection and tables"""
+    try:
+        # Use the comprehensive database health check
+        health_status = check_database_health()
+        
+        return {
+            "success": True,
+            "database_health": health_status
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "database_path": settings.database_path
+        }
