@@ -5,8 +5,8 @@ Version: 2.0.0
 """
 import logging
 import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI # type: ignore
+from fastapi.middleware.cors import CORSMiddleware # type: ignore
 from starlette.middleware.sessions import SessionMiddleware
 
 # Import configuration
@@ -262,7 +262,7 @@ async def on_startup():
         print("⚠️ Using fallback trading router with /api/trading/status returning 503")
         try:
             # Create inline fallback trading router
-            from fastapi import APIRouter, HTTPException
+            from fastapi import APIRouter, HTTPException # type: ignore
             
             fallback_trading_router = APIRouter(prefix="/api/trading", tags=["Trading - Fallback"])
             

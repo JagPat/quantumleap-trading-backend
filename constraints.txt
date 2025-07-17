@@ -1,5 +1,0 @@
-# Python 3.9 compatibility constraints
-# These are maximum versions that work with Python 3.9
-autobahn<22.0.0
-Twisted<22.0.0
-txaio<22.0.0 
