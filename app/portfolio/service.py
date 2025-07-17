@@ -152,9 +152,33 @@ class PortfolioService:
             return None
         
         try:
-            # Parse holdings and positions
-            holdings = json.loads(snapshot_data['holdings'])
-            positions = json.loads(snapshot_data['positions'])
+            # Handle both JSON strings and already parsed lists
+            holdings_raw = snapshot_data['holdings']
+            positions_raw = snapshot_data['positions']
+            
+            logger.info(f"Raw holdings type: {type(holdings_raw)}, value: {str(holdings_raw)[:100]}")
+            logger.info(f"Raw positions type: {type(positions_raw)}, value: {str(positions_raw)[:100]}")
+            
+            # Parse holdings
+            if isinstance(holdings_raw, str):
+                holdings = json.loads(holdings_raw) if holdings_raw else []
+            elif isinstance(holdings_raw, list):
+                holdings = holdings_raw
+            else:
+                logger.error(f"Unexpected holdings type: {type(holdings_raw)}")
+                holdings = []
+            
+            # Parse positions
+            if isinstance(positions_raw, str):
+                positions = json.loads(positions_raw) if positions_raw else []
+            elif isinstance(positions_raw, list):
+                positions = positions_raw
+            else:
+                logger.error(f"Unexpected positions type: {type(positions_raw)}")
+                positions = []
+            
+            logger.info(f"Parsed holdings type: {type(holdings)}, length: {len(holdings)}")
+            logger.info(f"Parsed positions type: {type(positions)}, length: {len(positions)}")
             
             # Calculate summary values
             summary = self._calculate_portfolio_summary(holdings, positions)
