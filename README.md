@@ -29,34 +29,40 @@ A FastAPI-based backend service that connects to the Zerodha Kite Connect API to
 ### Setup
 
 1. **Clone the repository**:
+
    ```bash
    git clone <repository-url>
    cd backend
    ```
 
 2. **Create virtual environment**:
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies**:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. **Environment Configuration**:
+
    ```bash
    cp env.example .env
    ```
-   
+
    Edit `.env` file and set your configuration:
+
    ```bash
    # Generate encryption key
    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
    ```
 
 5. **Start the server**:
+
    ```bash
    python run.py
    ```
@@ -67,18 +73,20 @@ The API will be available at `http://localhost:8000`
 
 Once the server is running, you can access:
 
-- **Interactive API Documentation**: http://localhost:8000/docs
-- **Alternative API Documentation**: http://localhost:8000/redoc
-- **OpenAPI Schema**: http://localhost:8000/openapi.json
+- **Interactive API Documentation**: <http://localhost:8000/docs>
+- **Alternative API Documentation**: <http://localhost:8000/redoc>
+- **OpenAPI Schema**: <http://localhost:8000/openapi.json>
 
 ## API Endpoints
 
 ### Authentication
 
 #### POST `/api/broker/generate-session`
+
 Exchanges a request_token from the broker's OAuth flow for a valid access_token.
 
 **Request Body**:
+
 ```json
 {
   "request_token": "string",
@@ -89,6 +97,7 @@ Exchanges a request_token from the broker's OAuth flow for a valid access_token.
 ```
 
 **Response**:
+
 ```json
 {
   "status": "success",
@@ -104,12 +113,15 @@ Exchanges a request_token from the broker's OAuth flow for a valid access_token.
 ### Portfolio Data
 
 #### GET `/api/portfolio/summary`
+
 Fetches a high-level summary of the user's portfolio.
 
 **Parameters**:
+
 - `user_id` (query): User ID
 
 **Response**:
+
 ```json
 {
   "status": "success",
@@ -122,12 +134,15 @@ Fetches a high-level summary of the user's portfolio.
 ```
 
 #### GET `/api/portfolio/holdings`
+
 Fetches the user's long-term equity holdings.
 
 **Parameters**:
+
 - `user_id` (query): User ID
 
 **Response**:
+
 ```json
 {
   "status": "success",
@@ -144,12 +159,15 @@ Fetches the user's long-term equity holdings.
 ```
 
 #### GET `/api/portfolio/positions`
+
 Fetches the user's current day positions.
 
 **Parameters**:
+
 - `user_id` (query): User ID
 
 **Response**:
+
 ```json
 {
   "status": "success",
@@ -196,12 +214,14 @@ python run.py
 
 You can test the API endpoints using:
 
-1. **Interactive Documentation**: Visit http://localhost:8000/docs
-2. **cURL**: 
+1. **Interactive Documentation**: Visit <http://localhost:8000/docs>
+2. **cURL**:
+
    ```bash
    curl -X GET "http://localhost:8000/health"
    ```
-3. **Postman**: Import the OpenAPI schema from http://localhost:8000/openapi.json
+
+3. **Postman**: Import the OpenAPI schema from <http://localhost:8000/openapi.json>
 
 ## Deployment
 
@@ -215,6 +235,7 @@ You can test the API endpoints using:
 ### Docker Deployment (Optional)
 
 Create a `Dockerfile`:
+
 ```dockerfile
 FROM python:3.9-slim
 
@@ -265,7 +286,8 @@ This project is licensed under the MIT License.
 ## Support
 
 For issues and questions:
+
 1. Check the troubleshooting section
 2. Review the API documentation
 3. Check the logs for error details
-4. Open an issue in the repository 
+4. Open an issue in the repository

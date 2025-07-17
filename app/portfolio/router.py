@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from .service import portfolio_service
 from .models import FetchResponse
-from ..auth.router import get_user_from_headers
-from ..database.service import get_latest_portfolio_snapshot as get_snapshot_from_db
+from ..auth.dependencies import get_user_from_headers
+from ..database.service import get_latest_portfolio_snapshot as get_snapshot_from_db, init_database, check_database_health
+import sqlite3
+from ..core.config import settings
+from datetime import datetime
+import json
 
 router = APIRouter(prefix="/api/portfolio", tags=["Portfolio"])
 
@@ -13,10 +17,20 @@ async def fetch_live_portfolio(user_id: str = Depends(get_user_from_headers)):
     """
     try:
         snapshot = portfolio_service.fetch_and_store_portfolio(user_id)
+        # Convert snapshot to dict to avoid serialization issues
+        snapshot_dict = {
+            "user_id": snapshot.user_id,
+            "timestamp": snapshot.timestamp,
+            "holdings": snapshot.holdings,
+            "positions": snapshot.positions,
+            "total_value": snapshot.total_value,
+            "day_pnl": snapshot.day_pnl,
+            "total_pnl": snapshot.total_pnl
+        }
         return FetchResponse(
             success=True, 
             message="Portfolio fetched successfully",
-            data=snapshot
+            data=snapshot_dict
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch portfolio: {str(e)}")
@@ -27,17 +41,175 @@ async def get_latest_portfolio(user_id: str = Depends(get_user_from_headers)):
     Returns the latest stored portfolio snapshot from the database.
     """
     try:
-        snapshot = get_snapshot_from_db(user_id)
+        snapshot = portfolio_service.get_latest_portfolio(user_id)
         if not snapshot:
             raise HTTPException(status_code=404, detail="No portfolio data found")
         
+        # Convert snapshot to dict to avoid serialization issues
+        snapshot_dict = {
+            "user_id": snapshot.user_id,
+            "timestamp": snapshot.timestamp,
+            "holdings": snapshot.holdings,
+            "positions": snapshot.positions,
+            "total_value": snapshot.total_value,
+            "day_pnl": snapshot.day_pnl,
+            "total_pnl": snapshot.total_pnl
+        }
+        
         return {
+            "status": "success",
             "success": True,
             "message": "Latest portfolio retrieved",
-            "data": snapshot
+            "data": snapshot_dict
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve portfolio: {str(e)}")
+
+# New endpoints for easier testing without auth headers
+@router.post("/fetch-live-simple")
+async def fetch_live_portfolio_simple(user_id: str = Query(..., description="User ID")):
+    """
+    Simplified version that accepts user_id as query parameter for testing.
+    """
+    try:
+        snapshot = portfolio_service.fetch_and_store_portfolio(user_id)
+        snapshot_dict = {
+            "user_id": snapshot.user_id,
+            "timestamp": snapshot.timestamp,
+            "holdings": snapshot.holdings,
+            "positions": snapshot.positions,
+            "total_value": snapshot.total_value,
+            "day_pnl": snapshot.day_pnl,
+            "total_pnl": snapshot.total_pnl
+        }
+        return {
+            "status": "success",
+            "success": True,
+            "message": "Portfolio fetched successfully",
+            "data": snapshot_dict
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "success": False,
+            "message": f"Failed to fetch portfolio: {str(e)}",
+            "data": None
+        }
+
+@router.get("/latest-simple")
+async def get_latest_portfolio_simple(user_id: str = Query(..., description="User ID")):
+    """
+    Simplified version that accepts user_id as query parameter for testing.
+    """
+    try:
+        snapshot = portfolio_service.get_latest_portfolio(user_id)
+        if not snapshot:
+            return {
+                "status": "error",
+                "success": False,
+                "message": "No portfolio data found",
+                "data": None
+            }
+        
+        # Convert snapshot to dict to avoid serialization issues
+        snapshot_dict = {
+            "user_id": snapshot.user_id,
+            "timestamp": snapshot.timestamp,
+            "holdings": snapshot.holdings,
+            "positions": snapshot.positions,
+            "total_value": snapshot.total_value,
+            "day_pnl": snapshot.day_pnl,
+            "total_pnl": snapshot.total_pnl
+        }
+        
+        return {
+            "status": "success",
+            "success": True,
+            "message": "Latest portfolio retrieved",
+            "data": snapshot_dict
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "success": False,
+            "message": f"Failed to retrieve portfolio: {str(e)}",
+            "data": None
+        }
+
+@router.get("/mock")
+async def get_mock_portfolio(user_id: str = Query("test_user", description="User ID")):
+    """
+    Returns mock portfolio data for testing and development.
+    """
+    mock_data = {
+        "user_id": user_id,
+        "timestamp": datetime.now().isoformat(),
+        "holdings": [
+            {
+                "tradingsymbol": "RELIANCE-EQ",
+                "exchange": "NSE",
+                "isin": "INE002A01018",
+                "quantity": 100,
+                "t1_quantity": 0,
+                "average_price": 2450.50,
+                "last_price": 2480.75,
+                "pnl": 3025.00,
+                "product": "CNC"
+            },
+            {
+                "tradingsymbol": "TCS-EQ",
+                "exchange": "NSE", 
+                "isin": "INE467B01029",
+                "quantity": 50,
+                "t1_quantity": 0,
+                "average_price": 3850.25,
+                "last_price": 3920.50,
+                "pnl": 3512.50,
+                "product": "CNC"
+            }
+        ],
+        "positions": [
+            {
+                "tradingsymbol": "NIFTY25JUL5200CE",
+                "exchange": "NFO",
+                "product": "NRML",
+                "quantity": 1,
+                "average_price": 45.50,
+                "last_price": 52.75,
+                "pnl": 725.00,
+                "net_quantity": 1
+            }
+        ],
+        "total_value": 125000.00,
+        "day_pnl": 7262.50,
+        "total_pnl": 15250.00
+    }
+    
+    return {
+        "status": "success",
+        "success": True,
+        "message": "Mock portfolio data retrieved",
+        "data": mock_data
+    }
+
+@router.get("/status")
+async def portfolio_status():
+    """
+    Portfolio service status endpoint.
+    """
+    return {
+        "status": "operational",
+        "service": "portfolio",
+        "endpoints": {
+            "fetch_live": "/api/portfolio/fetch-live",
+            "latest": "/api/portfolio/latest", 
+            "fetch_live_simple": "/api/portfolio/fetch-live-simple",
+            "latest_simple": "/api/portfolio/latest-simple",
+            "mock": "/api/portfolio/mock",
+            "status": "/api/portfolio/status"
+        },
+        "timestamp": datetime.now().isoformat()
+    }
 
 @router.get("/holdings")
 async def get_holdings(user_id: str = Depends(get_user_from_headers)):
@@ -68,3 +240,22 @@ async def get_positions(user_id: str = Depends(get_user_from_headers)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get positions: {str(e)}")
+
+@router.get("/debug-db")
+async def debug_database():
+    """Debug database connection and tables"""
+    try:
+        # Use the comprehensive database health check
+        health_status = check_database_health()
+        
+        return {
+            "success": True,
+            "database_health": health_status
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "database_path": settings.database_path
+        }

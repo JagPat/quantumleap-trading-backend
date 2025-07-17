@@ -3,6 +3,7 @@
 ## 🚀 **Phase 2.2 BYOAI Deployment Validation**
 
 ### **Pre-Deployment Checks**
+
 - [ ] All code committed to GitHub
 - [ ] `.nixpacks.toml` created with proper configuration
 - [ ] `.dockerignore` excludes unnecessary files
@@ -12,6 +13,7 @@
 ### **Post-Deployment Health Checks**
 
 #### **1. Basic Health Endpoints**
+
 ```bash
 # Test basic health
 curl -s https://web-production-de0bc.up.railway.app/health
@@ -23,6 +25,7 @@ curl -s https://web-production-de0bc.up.railway.app/
 ```
 
 #### **2. AI Engine Endpoints**
+
 ```bash
 # Test AI preferences endpoint
 curl -s https://web-production-de0bc.up.railway.app/api/ai/preferences
@@ -44,6 +47,7 @@ curl -s https://web-production-de0bc.up.railway.app/api/ai/strategy
 ```
 
 #### **3. Auth Endpoints (BYOAI)**
+
 ```bash
 # Test auth AI preferences
 curl -s https://web-production-de0bc.up.railway.app/api/auth/ai/preferences
@@ -57,6 +61,7 @@ curl -s -X POST https://web-production-de0bc.up.railway.app/api/auth/ai/validate
 ```
 
 #### **4. Portfolio Endpoints**
+
 ```bash
 # Test portfolio endpoints
 curl -s https://web-production-de0bc.up.railway.app/api/portfolio/latest
@@ -66,6 +71,7 @@ curl -s https://web-production-de0bc.up.railway.app/api/portfolio/latest
 ### **Frontend Integration Tests**
 
 #### **1. AI Settings Form**
+
 - [ ] Navigate to Settings → AI Settings tab
 - [ ] Test provider selection dropdown (OpenAI, Claude, Gemini)
 - [ ] Test API key input fields with validation
@@ -74,12 +80,14 @@ curl -s https://web-production-de0bc.up.railway.app/api/portfolio/latest
 - [ ] Verify error handling and user feedback
 
 #### **2. Dashboard Integration**
+
 - [ ] Check AI provider status indicators
 - [ ] Test strategy generation workflow
 - [ ] Verify portfolio co-pilot functionality
 - [ ] Test AI settings navigation
 
 ### **Security Validation**
+
 - [ ] API keys are encrypted before storage
 - [ ] No API keys exposed in frontend responses
 - [ ] User isolation of AI preferences
@@ -87,12 +95,14 @@ curl -s https://web-production-de0bc.up.railway.app/api/portfolio/latest
 - [ ] Validation errors handled securely
 
 ### **Performance Tests**
+
 - [ ] Health endpoint responds < 1 second
 - [ ] AI preferences endpoint responds < 2 seconds
 - [ ] Key validation responds < 5 seconds
 - [ ] Strategy generation responds < 10 seconds
 
 ### **Error Handling Tests**
+
 - [ ] Invalid API keys show appropriate errors
 - [ ] Network failures handled gracefully
 - [ ] Missing dependencies don't crash the app
@@ -101,6 +111,7 @@ curl -s https://web-production-de0bc.up.railway.app/api/portfolio/latest
 ## 🎯 **Success Criteria**
 
 ### **Phase 2.2 BYOAI Completion**
+
 - [ ] All AI endpoints accessible via Railway
 - [ ] Frontend AI settings form functional
 - [ ] API key validation working
@@ -108,12 +119,14 @@ curl -s https://web-production-de0bc.up.railway.app/api/portfolio/latest
 - [ ] Dashboard AI integration complete
 
 ### **Deployment Stability**
+
 - [ ] Railway build completes successfully
 - [ ] No import errors in deployment logs
 - [ ] All endpoints respond correctly
 - [ ] Health checks pass consistently
 
 ### **User Experience**
+
 - [ ] Smooth AI provider setup flow
 - [ ] Clear error messages and feedback
 - [ ] Secure API key management
@@ -122,6 +135,7 @@ curl -s https://web-production-de0bc.up.railway.app/api/portfolio/latest
 ## 🚨 **Rollback Plan**
 
 If deployment fails:
+
 1. Check Railway deployment logs
 2. Verify GitHub code is correct
 3. Test locally if possible
@@ -131,7 +145,8 @@ If deployment fails:
 ## 📊 **Monitoring**
 
 After successful deployment:
+
 - [ ] Monitor Railway logs for errors
 - [ ] Track endpoint response times
 - [ ] Monitor user AI settings usage
-- [ ] Check for any security issues 
+- [ ] Check for any security issues

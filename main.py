@@ -159,7 +159,15 @@ async def on_startup():
         print("🔍 Attempting to load portfolio router...")
         logger.info("🔍 Attempting to load portfolio router...")
         
+        # Test import step by step
+        print("🔍 Testing portfolio imports...")
+        from app.portfolio import models
+        print("✅ Portfolio models imported")
+        from app.portfolio import service
+        print("✅ Portfolio service imported")
         from app.portfolio.router import router as portfolio_router
+        print("✅ Portfolio router imported")
+        
         app.include_router(portfolio_router)
         print("✅ Portfolio router loaded and registered.")
         logger.info("✅ Portfolio router loaded and registered.")

@@ -466,7 +466,7 @@ async def test_oauth_flow(request: Request, api_key: str = Query(...), api_secre
             "status": "success",
             "message": "OAuth credentials stored in session",
             "oauth_url": oauth_url,
-            "redirect_url": "https://web-production-de0bc.up.railway.app/api/auth/broker/callback",
+            "redirect_url": "https://web-production-de0bc.up.railway.app/broker/callback",
             "api_key": api_key[:8] + "..."
         }
         

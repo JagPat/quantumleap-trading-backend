@@ -3,6 +3,7 @@
 ## 🎯 **Three-Module Architecture**
 
 ### **Module 1: Authentication Service** (`auth/`)
+
 **Responsibility:** Handle all broker authentication and connection management
 
 ```
@@ -16,12 +17,14 @@ auth/
 ```
 
 **Endpoints:**
+
 - `POST /api/v1/auth/broker/callback` - OAuth callback handling
 - `POST /api/v1/auth/broker/generate-session` - Token exchange
 - `GET /api/v1/auth/broker/status` - Connection status check
 - `DELETE /api/v1/auth/broker/disconnect` - Disconnect broker
 
 ### **Module 2: Portfolio Service** (`portfolio/`)
+
 **Responsibility:** Handle all portfolio data, holdings, positions, analytics
 
 ```
@@ -35,6 +38,7 @@ portfolio/
 ```
 
 **Endpoints:**
+
 - `GET /api/v1/portfolio/summary` - Portfolio summary with P&L
 - `GET /api/v1/portfolio/holdings` - Long-term holdings
 - `GET /api/v1/portfolio/positions` - Current day positions
@@ -42,6 +46,7 @@ portfolio/
 - `POST /api/v1/portfolio/sync` - Force sync with broker
 
 ### **Module 3: Trading Service** (`trading/`)
+
 **Responsibility:** Handle order placement, strategy execution, trade management
 
 ```
@@ -56,6 +61,7 @@ trading/
 ```
 
 **Endpoints:**
+
 - `POST /api/v1/trading/orders` - Place orders
 - `GET /api/v1/trading/orders` - Get order history
 - `POST /api/v1/trading/strategies/execute` - Execute strategy
@@ -120,6 +126,7 @@ quantum-leap-trading-backend/
 ## 🚀 **Implementation Strategy**
 
 ### **Phase 1: Extract Authentication Module** (Week 1)
+
 1. Create `auth/` module structure
 2. Move authentication logic from `main.py` to `auth/service.py`
 3. Create `auth/router.py` with FastAPI router
@@ -127,6 +134,7 @@ quantum-leap-trading-backend/
 5. **Test thoroughly** - ensure connection still works
 
 ### **Phase 2: Extract Portfolio Module** (Week 2)  
+
 1. Create `portfolio/` module structure
 2. Move portfolio logic to `portfolio/service.py`
 3. Add portfolio analytics in `portfolio/analytics.py`
@@ -134,6 +142,7 @@ quantum-leap-trading-backend/
 5. **Test portfolio import** - ensure Base44 integration works
 
 ### **Phase 3: Create Trading Module** (Week 3)
+
 1. Create `trading/` module structure  
 2. Implement order placement logic
 3. Add strategy framework
@@ -143,26 +152,31 @@ quantum-leap-trading-backend/
 ## 🎯 **Benefits of This Architecture**
 
 ### **1. Single Responsibility Principle**
+
 - Each module has one clear purpose
 - Easier to debug and maintain
 - Clear ownership of functionality
 
 ### **2. Scalability**
+
 - Add new features to specific modules
 - Easy to add new trading strategies
 - Microservices-ready if needed later
 
 ### **3. Testing**
+
 - Test each module independently
 - Easier to mock dependencies
 - Better test coverage
 
 ### **4. Team Development**
+
 - Different developers can work on different modules
 - Clear interfaces between modules
 - Reduced merge conflicts
 
 ### **5. API Versioning**
+
 - Clean `/api/v1/` structure
 - Easy to add v2 endpoints later
 - Backward compatibility support
@@ -170,6 +184,7 @@ quantum-leap-trading-backend/
 ## 🔧 **Migration Plan**
 
 ### **Step 1: Create New Structure (Today)**
+
 ```bash
 mkdir -p auth portfolio trading shared tests
 touch auth/__init__.py auth/router.py auth/models.py auth/service.py
@@ -178,12 +193,14 @@ touch shared/__init__.py shared/kite_client.py shared/security.py
 ```
 
 ### **Step 2: Move Existing Code**
+
 - Move `KiteService` → `shared/kite_client.py`
 - Move auth endpoints → `auth/router.py`  
 - Move portfolio endpoints → `portfolio/router.py`
 - Move encryption functions → `shared/security.py`
 
 ### **Step 3: Update main.py**
+
 ```python
 from fastapi import FastAPI
 from auth.router import router as auth_router
@@ -197,6 +214,7 @@ app.include_router(portfolio_router, prefix="/api/v1/portfolio", tags=["Portfoli
 ```
 
 ### **Step 4: Test Each Module**
+
 - Unit tests for each service
 - Integration tests for each router
 - End-to-end tests for complete workflows
@@ -208,4 +226,4 @@ app.include_router(portfolio_router, prefix="/api/v1/portfolio", tags=["Portfoli
 3. **Keep existing endpoints** during transition - Backward compatibility
 4. **Test thoroughly** after each module extraction
 
-Would you like me to start implementing this modular structure, beginning with the authentication module extraction? 
+Would you like me to start implementing this modular structure, beginning with the authentication module extraction?

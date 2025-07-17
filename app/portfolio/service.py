@@ -9,6 +9,51 @@ from .models import PortfolioSnapshot
 logger = logging.getLogger(__name__)
 
 class PortfolioService:
+    def _calculate_portfolio_summary(self, holdings: list, positions: list) -> dict:
+        """
+        Calculate portfolio summary values from holdings and positions
+        """
+        total_value = 0.0
+        total_pnl = 0.0
+        day_pnl = 0.0
+        
+        # Calculate from holdings
+        for holding in holdings:
+            if isinstance(holding, dict):
+                # Current value
+                current_value = holding.get('current_value', 0)
+                if isinstance(current_value, (int, float)):
+                    total_value += current_value
+                
+                # Total P&L
+                pnl = holding.get('pnl', 0)
+                if isinstance(pnl, (int, float)):
+                    total_pnl += pnl
+                
+                # Day P&L (day_change)
+                day_change = holding.get('day_change', 0)
+                if isinstance(day_change, (int, float)):
+                    day_pnl += day_change
+        
+        # Calculate from positions (net positions)
+        for position in positions:
+            if isinstance(position, dict):
+                # For positions, pnl is typically the unrealized P&L
+                pnl = position.get('unrealised', 0)
+                if isinstance(pnl, (int, float)):
+                    total_pnl += pnl
+                
+                # Day P&L from positions
+                day_pnl_pos = position.get('m2m', 0)  # Mark to market
+                if isinstance(day_pnl_pos, (int, float)):
+                    day_pnl += day_pnl_pos
+        
+        return {
+            'total_value': round(total_value, 2),
+            'total_pnl': round(total_pnl, 2),
+            'day_pnl': round(day_pnl, 2)
+        }
+
     def fetch_and_store_portfolio(self, user_id: str) -> PortfolioSnapshot:
         """
         Fetches portfolio from broker, enriches it, and stores it in the database.
@@ -29,7 +74,10 @@ class PortfolioService:
             logger.info(f"Kite API holdings response for user {user_id}: {json.dumps(holdings)[:500]}")
             positions_dict = kite.get_positions()
             logger.info(f"Kite API positions response for user {user_id}: {json.dumps(positions_dict)[:500]}")
-            net_positions = positions_dict['net'] if isinstance(positions_dict, dict) and 'net' in positions_dict else []
+            
+            # Extract net positions (current day positions)
+            net_positions = positions_dict.get('net', []) if isinstance(positions_dict, dict) else []
+            
             # Validate structure
             if not isinstance(holdings, list):
                 logger.error(f"Holdings is not a list for user {user_id}: {type(holdings)}")
@@ -37,23 +85,39 @@ class PortfolioService:
             if not isinstance(net_positions, list):
                 logger.error(f"Net positions is not a list for user {user_id}: {type(net_positions)}")
                 raise ValueError("Positions data is not a list.")
-            logger.info(f"Successfully fetched holdings and positions for user {user_id} from broker.")
+            
+            logger.info(f"Successfully fetched holdings ({len(holdings)} items) and positions ({len(net_positions)} items) for user {user_id} from broker.")
         except Exception as e:
             logger.error(f"Error fetching portfolio from broker for user {user_id}: {e}")
             raise Exception(f"Kite API error: {e}")
             
-        # 3. Create a snapshot
+        # 3. Calculate portfolio summary
+        summary = self._calculate_portfolio_summary(holdings, net_positions)
+        logger.info(f"Portfolio summary calculated for user {user_id}: {summary}")
+        
+        # 4. Create a snapshot
         timestamp = datetime.utcnow()
+        timestamp_str = timestamp.isoformat()
+        logger.info(f"Creating PortfolioSnapshot with timestamp: {timestamp_str} (type: {type(timestamp_str)})")
         snapshot = PortfolioSnapshot(
             user_id=user_id,
-            timestamp=timestamp,
+            timestamp=timestamp_str,
             holdings=holdings,
-            positions=net_positions
+            positions=net_positions,
+            total_value=summary['total_value'],
+            total_pnl=summary['total_pnl'],
+            day_pnl=summary['day_pnl']
         )
+        logger.info(f"PortfolioSnapshot created successfully with timestamp: {snapshot.timestamp} (type: {type(snapshot.timestamp)})")
         
-        # 4. Store the snapshot in the database
+        # 5. Store the snapshot in the database
         holdings_json = json.dumps(holdings)
         positions_json = json.dumps(net_positions) # Store only net positions as a list
+        
+        logger.info(f"Attempting to store portfolio snapshot for user {user_id}")
+        logger.info(f"Timestamp: {timestamp.isoformat()}")
+        logger.info(f"Holdings JSON length: {len(holdings_json)}")
+        logger.info(f"Positions JSON length: {len(positions_json)}")
         
         try:
             success = store_portfolio_snapshot(
@@ -62,8 +126,11 @@ class PortfolioService:
                 holdings=holdings_json,
                 positions=positions_json
             )
+            logger.info(f"Database store operation completed. Success: {success}")
         except Exception as db_exc:
             logger.error(f"DB error storing portfolio snapshot for user {user_id}: {db_exc}")
+            logger.error(f"DB error type: {type(db_exc).__name__}")
+            logger.error(f"DB error details: {str(db_exc)}")
             raise Exception(f"DB error: {db_exc}")
         
         if not success:
@@ -85,12 +152,22 @@ class PortfolioService:
             return None
         
         try:
+            # Parse holdings and positions
+            holdings = json.loads(snapshot_data['holdings'])
+            positions = json.loads(snapshot_data['positions'])
+            
+            # Calculate summary values
+            summary = self._calculate_portfolio_summary(holdings, positions)
+            
             # Reconstruct the PortfolioSnapshot object from stored data
             snapshot = PortfolioSnapshot(
                 user_id=user_id,
-                timestamp=datetime.fromisoformat(snapshot_data['timestamp']),
-                holdings=json.loads(snapshot_data['holdings']),
-                positions=json.loads(snapshot_data['positions'])
+                timestamp=snapshot_data['timestamp'],  # Keep as string from database
+                holdings=holdings,
+                positions=positions,
+                total_value=summary['total_value'],
+                total_pnl=summary['total_pnl'],
+                day_pnl=summary['day_pnl']
             )
             logger.info(f"Successfully retrieved and reconstructed snapshot for user {user_id}")
             return snapshot
