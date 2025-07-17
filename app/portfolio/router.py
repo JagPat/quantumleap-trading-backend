@@ -16,7 +16,15 @@ async def fetch_live_portfolio(user_id: str = Depends(get_user_from_headers)):
         return FetchResponse(
             success=True, 
             message="Portfolio fetched successfully",
-            data=snapshot
+            data={
+            "user_id": snapshot.user_id,
+            "timestamp": snapshot.timestamp,
+            "holdings": snapshot.holdings,
+            "positions": snapshot.positions,
+            "total_value": snapshot.total_value,
+            "day_pnl": snapshot.day_pnl,
+            "total_pnl": snapshot.total_pnl
+        }
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch portfolio: {str(e)}")
