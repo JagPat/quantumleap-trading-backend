@@ -32,11 +32,23 @@ class Settings(BaseSettings):
     )
     
     # Database
-    database_path: str = "trading_app.db"
+    database_path: str = Field(
+        default="/tmp/trading_app.db",
+        env="DATABASE_PATH",
+        description="SQLite database file path (must be writable on Railway)"
+    )
     
     # Security
-    encryption_key: Optional[str] = None
-    session_secret: str = "a-secure-secret-key-for-oauth-state-management"
+    encryption_key: Optional[str] = Field(
+        default=None,
+        env="ENCRYPTION_KEY",
+        description="Encryption key for sensitive data (32-byte base64 encoded)"
+    )
+    session_secret: str = Field(
+        default="a-secure-secret-key-for-oauth-state-management",
+        env="SESSION_SECRET",
+        description="Secret key for OAuth state management"
+    )
     
     # External URLs
     frontend_url: str = Field(
