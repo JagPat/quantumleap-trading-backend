@@ -219,9 +219,13 @@ async def get_holdings(user_id: str = Depends(get_user_from_headers)):
         if not snapshot:
             return {"holdings": []}
         
+        # Parse JSON string to list
+        holdings_json = snapshot.get("holdings", "[]")
+        holdings = json.loads(holdings_json) if holdings_json else []
+        
         return {
             "success": True,
-            "holdings": snapshot.get("holdings", [])
+            "holdings": holdings
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get holdings: {str(e)}")
@@ -234,9 +238,13 @@ async def get_positions(user_id: str = Depends(get_user_from_headers)):
         if not snapshot:
             return {"positions": []}
         
+        # Parse JSON string to list
+        positions_json = snapshot.get("positions", "[]")
+        positions = json.loads(positions_json) if positions_json else []
+        
         return {
             "success": True,
-            "positions": snapshot.get("positions", [])
+            "positions": positions
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get positions: {str(e)}")

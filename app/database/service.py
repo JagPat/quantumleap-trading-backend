@@ -115,6 +115,7 @@ def store_portfolio_snapshot(user_id: str, timestamp: str, holdings: str, positi
 def get_latest_portfolio_snapshot(user_id: str) -> Optional[Dict[str, Any]]:
     """
     Retrieves the most recent portfolio snapshot for a given user.
+    Returns raw JSON strings for holdings and positions to avoid double parsing.
     """
     try:
         conn = sqlite3.connect(settings.database_path)
@@ -125,21 +126,15 @@ def get_latest_portfolio_snapshot(user_id: str) -> Optional[Dict[str, Any]]:
         )
         result = cursor.fetchone()
         if result:
-            # Parse JSON strings into arrays for frontend compatibility
-            holdings = json.loads(result[1]) if result[1] else []
-            positions = json.loads(result[2]) if result[2] else []
-            
+            # Return raw JSON strings - let the calling service handle parsing
             return {
                 "timestamp": result[0], 
-                "holdings": holdings, 
-                "positions": positions
+                "holdings": result[1],  # Raw JSON string
+                "positions": result[2]  # Raw JSON string
             }
         return None
     except sqlite3.Error as e:
         logger.error(f"Database error retrieving latest portfolio snapshot for user {user_id}: {e}")
-        return None
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON decode error for portfolio snapshot for user {user_id}: {e}")
         return None
     finally:
         if conn:
