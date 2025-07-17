@@ -18,7 +18,6 @@ from app.database.service import init_database
 # Import routers
 from app.auth.router import router as auth_router
 from app.portfolio.router import router as portfolio_router
-from app.compat.placeholder_router import router as placeholder_router
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, settings.log_level))
