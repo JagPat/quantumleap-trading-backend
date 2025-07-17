@@ -46,7 +46,7 @@ class PortfolioService:
         timestamp = datetime.utcnow()
         snapshot = PortfolioSnapshot(
             user_id=user_id,
-            timestamp=timestamp,
+            timestamp=timestamp.isoformat(),
             holdings=holdings,
             positions=net_positions
         )
@@ -88,7 +88,7 @@ class PortfolioService:
             # Reconstruct the PortfolioSnapshot object from stored data
             snapshot = PortfolioSnapshot(
                 user_id=user_id,
-                timestamp=datetime.fromisoformat(snapshot_data['timestamp']),
+                timestamp=snapshot_data["timestamp"],
                 holdings=json.loads(snapshot_data['holdings']),
                 positions=json.loads(snapshot_data['positions'])
             )

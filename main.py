@@ -17,8 +17,8 @@ from app.database.service import init_database
 
 # Import routers
 from app.auth.router import router as auth_router
-# Portfolio router will be imported during startup with fallback logic
-# Broker and Trading routers will be imported during startup with fallback logic
+from app.portfolio.router import router as portfolio_router
+from app.compat.placeholder_router import router as placeholder_router
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, settings.log_level))
@@ -50,51 +50,16 @@ app.add_middleware(
 async def health_check():
     """Simple health check endpoint for Railway deployment"""
     print("🏥 Health check requested")
-    return {
-        "status": "ok", 
-        "app": settings.app_name, 
-        "version": settings.app_version,
-        "deployment_time": "2024-07-16T15:30:00Z",
-        "force_redeploy": True
-    }
+    return {"status": "ok", "app": settings.app_name, "version": settings.app_version}
 
 @app.get("/version")
 async def get_version():
-    """Get deployment version and commit info with debug details"""
-    # Try to read startup checkpoint
-    checkpoint_info = None
-    try:
-        with open("startup_checkpoint.json", "r") as f:
-            import json
-            checkpoint_info = json.load(f)
-    except FileNotFoundError:
-        checkpoint_info = {"error": "No startup checkpoint found - may be running old deployment"}
-    except Exception as e:
-        checkpoint_info = {"error": f"Failed to read checkpoint: {str(e)}"}
-    
+    """Get deployment version and commit info"""
     return {
         "app_version": settings.app_version,
         "deployment": "latest",
-        "debug_mode": True,
         "ai_router": "fallback",
-        "status": "operational",
-        "startup_checkpoint": checkpoint_info,
-        "railway_info": {
-            "commit_sha": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "unknown"),
-            "deployment_id": os.environ.get("RAILWAY_DEPLOYMENT_ID", "unknown"),
-            "service_id": os.environ.get("RAILWAY_SERVICE_ID", "unknown")
-        },
-        "endpoints": {
-            "health": "/health",
-            "version": "/version", 
-            "readyz": "/readyz",
-            "ai_status": "/api/ai/status",
-            "portfolio_status": "/api/portfolio/status",
-            "broker_status": "/api/broker/status",
-            "trading_status": "/api/trading/status",
-            "docs": "/docs",
-            "openapi": "/openapi.json"
-        }
+        "status": "operational"
     }
 
 @app.get("/readyz")
@@ -129,155 +94,10 @@ async def root():
 # Initialize database on startup
 @app.on_event("startup")
 async def on_startup():
-    """Initialize database and startup tasks with robust fallback system"""
+    """Initialize database and startup tasks"""
     print("🚀 Starting QuantumLeap Trading Backend...")
     logger.info("Starting QuantumLeap Trading Backend")
     
-    # Create startup checkpoint to verify fresh deployment
-    try:
-        import os
-        from datetime import datetime
-        checkpoint_data = {
-            "startup_time": datetime.now().isoformat(),
-            "commit_hash": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "unknown"),
-            "deployment_id": os.environ.get("RAILWAY_DEPLOYMENT_ID", "unknown"),
-            "service_id": os.environ.get("RAILWAY_SERVICE_ID", "unknown")
-        }
-        
-        with open("startup_checkpoint.json", "w") as f:
-            import json
-            json.dump(checkpoint_data, f, indent=2)
-        
-        print(f"✅ Startup checkpoint created: {checkpoint_data}")
-        logger.info(f"✅ Startup checkpoint created: {checkpoint_data}")
-    except Exception as e:
-        print(f"❌ Failed to create startup checkpoint: {e}")
-        logger.error(f"❌ Failed to create startup checkpoint: {e}")
-    
-    # Load Portfolio Router with robust fallback
-    try:
-        print("🔍 Attempting to load portfolio router...")
-        logger.info("🔍 Attempting to load portfolio router...")
-        
-        from app.portfolio.router import router as portfolio_router
-        app.include_router(portfolio_router)
-        print("✅ Portfolio router loaded and registered.")
-        logger.info("✅ Portfolio router loaded and registered.")
-    except Exception as e:
-        print(f"❌ Portfolio service import failed: {e}")
-        logger.error(f"❌ Portfolio service import failed: {e}")
-        print(f"❌ Portfolio error type: {type(e).__name__}")
-        print(f"❌ Portfolio error details: {str(e)}")
-        
-        print("⚠️ Using fallback portfolio router with /api/portfolio/status returning 503")
-        try:
-            # Create inline fallback portfolio router
-            from fastapi import APIRouter, HTTPException
-            
-            fallback_portfolio_router = APIRouter(prefix="/api/portfolio", tags=["Portfolio - Fallback"])
-            
-            @fallback_portfolio_router.get("/status")
-            async def fallback_portfolio_status():
-                return {
-                    "status": "fallback",
-                    "message": "Portfolio service in fallback mode",
-                    "error": str(e)
-                }
-            
-            @fallback_portfolio_router.get("/{path:path}")
-            async def fallback_portfolio_catchall(path: str):
-                raise HTTPException(status_code=503, detail="Portfolio service unavailable")
-            
-            app.include_router(fallback_portfolio_router)
-            print("🔄 Fallback portfolio router created and registered.")
-            logger.info("🔄 Fallback portfolio router created and registered.")
-        except Exception as fallback_e:
-            print(f"❌ Failed to create fallback portfolio router: {fallback_e}")
-            logger.error(f"❌ Failed to create fallback portfolio router: {fallback_e}")
-    
-    # Load Broker Router with robust fallback
-    try:
-        print("🔍 Attempting to load broker router...")
-        logger.info("🔍 Attempting to load broker router...")
-        
-        from app.broker.router import router as broker_router
-        app.include_router(broker_router)
-        print("✅ Broker router loaded and registered.")
-        logger.info("✅ Broker router loaded and registered.")
-    except Exception as e:
-        print(f"❌ Broker service import failed: {e}")
-        logger.error(f"❌ Broker service import failed: {e}")
-        print(f"❌ Broker error type: {type(e).__name__}")
-        print(f"❌ Broker error details: {str(e)}")
-        
-        print("⚠️ Using fallback broker router with /api/broker/status returning 503")
-        try:
-            # Create inline fallback broker router
-            from fastapi import APIRouter, HTTPException
-            
-            fallback_broker_router = APIRouter(prefix="/api/broker", tags=["Broker - Fallback"])
-            
-            @fallback_broker_router.get("/status")
-            async def fallback_broker_status():
-                return {
-                    "status": "fallback",
-                    "message": "Broker service in fallback mode",
-                    "error": str(e)
-                }
-            
-            @fallback_broker_router.get("/{path:path}")
-            async def fallback_broker_catchall(path: str):
-                raise HTTPException(status_code=503, detail="Broker service unavailable")
-            
-            app.include_router(fallback_broker_router)
-            print("🔄 Fallback broker router created and registered.")
-            logger.info("🔄 Fallback broker router created and registered.")
-        except Exception as fallback_e:
-            print(f"❌ Failed to create fallback broker router: {fallback_e}")
-            logger.error(f"❌ Failed to create fallback broker router: {fallback_e}")
-    
-    # Load Trading Router with robust fallback
-    try:
-        print("🔍 Attempting to load trading router...")
-        logger.info("🔍 Attempting to load trading router...")
-        
-        from app.trading.router import router as trading_router
-        app.include_router(trading_router)
-        print("✅ Trading router loaded and registered.")
-        logger.info("✅ Trading router loaded and registered.")
-    except Exception as e:
-        print(f"❌ Trading service import failed: {e}")
-        logger.error(f"❌ Trading service import failed: {e}")
-        print(f"❌ Trading error type: {type(e).__name__}")
-        print(f"❌ Trading error details: {str(e)}")
-        
-        print("⚠️ Using fallback trading router with /api/trading/status returning 503")
-        try:
-            # Create inline fallback trading router
-            from fastapi import APIRouter, HTTPException
-            
-            fallback_trading_router = APIRouter(prefix="/api/trading", tags=["Trading - Fallback"])
-            
-            @fallback_trading_router.get("/status")
-            async def fallback_trading_status():
-                return {
-                    "status": "fallback",
-                    "message": "Trading service in fallback mode",
-                    "error": str(e)
-                }
-            
-            @fallback_trading_router.get("/{path:path}")
-            async def fallback_trading_catchall(path: str):
-                raise HTTPException(status_code=503, detail="Trading service unavailable")
-            
-            app.include_router(fallback_trading_router)
-            print("🔄 Fallback trading router created and registered.")
-            logger.info("🔄 Fallback trading router created and registered.")
-        except Exception as fallback_e:
-            print(f"❌ Failed to create fallback trading router: {fallback_e}")
-            logger.error(f"❌ Failed to create fallback trading router: {fallback_e}")
-    
-    # Initialize database with error handling
     try:
         print("📊 Initializing database...")
         init_database()
@@ -286,13 +106,14 @@ async def on_startup():
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
         logger.error(f"Database initialization failed: {e}")
-
+    
     print("🎯 FastAPI app startup complete - health checks should work")
     logger.info("FastAPI app startup complete")
 
 # Include routers
 app.include_router(auth_router)
-# Portfolio router will be included during startup with fallback logic
+app.include_router(portfolio_router)
+app.include_router(placeholder_router)
 
 # Simple AI router - always include fallback
 try:
@@ -320,4 +141,3 @@ if __name__ == "__main__":
         reload=settings.debug,
         log_level=settings.log_level.lower()
     )
-# FORCE DEPLOYMENT - Wed Jul 16 15:18:56 IST 2025
