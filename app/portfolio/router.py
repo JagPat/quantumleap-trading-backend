@@ -267,3 +267,51 @@ async def debug_database():
             "error_type": type(e).__name__,
             "database_path": settings.database_path
         }
+
+@router.delete("/cleanup/{user_id}")
+async def cleanup_portfolio_data(user_id: str):
+    """
+    Clean malformed portfolio data for a specific user
+    """
+    try:
+        # Connect to database
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        # First, check what data exists
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM portfolio_snapshots 
+            WHERE user_id = ?
+        """, (user_id,))
+        
+        existing_count = cursor.fetchone()[0]
+        
+        if existing_count == 0:
+            conn.close()
+            return {
+                "status": "success",
+                "message": f"No portfolio data found for user {user_id}",
+                "deleted_count": 0
+            }
+        
+        # Delete all portfolio snapshots for this user
+        cursor.execute("""
+            DELETE FROM portfolio_snapshots 
+            WHERE user_id = ?
+        """, (user_id,))
+        
+        deleted_count = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        return {
+            "status": "success",
+            "message": f"Cleaned {deleted_count} portfolio snapshots for user {user_id}",
+            "deleted_count": deleted_count,
+            "user_id": user_id
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database cleanup failed: {str(e)}")
+
