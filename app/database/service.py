@@ -26,13 +26,41 @@ def decrypt_data(encrypted_data: str) -> str:
 def init_database():
     """Initialize SQLite database with required tables"""
     conn = sqlite3.connect(settings.database_path)
-        logger.info(f"DB: Database connection established")
-        cursor = conn.cursor()
-        logger.info(f"DB: Cursor created")
-        
-        # Check if portfolio_snapshots table exists
-        cursor.execute("SELECT name FROM sqlite_master WHERE type="table" AND name="portfolio_snapshots"")
-        table_exists = cursor.fetchone()
+    cursor = conn.cursor()
+    
+    # Create users table for storing broker credentials
+    cursor.execute('
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT UNIQUE NOT NULL,
+            api_key TEXT NOT NULL,
+            api_secret TEXT NOT NULL,
+            access_token TEXT,
+            user_name TEXT,
+            email TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_successful_connection TIMESTAMP,
+            token_expiry TIMESTAMP,
+            last_error TEXT
+        )
+    ')
+    
+    # Create portfolio_snapshots table
+    cursor.execute('
+        CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            timestamp DATETIME NOT NULL,
+            holdings TEXT NOT NULL,
+            positions TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ')
+    
+    conn.commit()
+    conn.close()
+
         logger.info(f"DB: portfolio_snapshots table exists: {table_exists is not None}")
         
         if not table_exists:
