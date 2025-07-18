@@ -1,2 +1,2 @@
-# FORCE REDEPLOY - BMAD Patch Fix - Fri Jul 18 17:00:00 IST 2025
-# Fixed fallback router to use live AI key validation
+# FORCE REDEPLOY - BMAD Patch Import Fix - Fri Jul 18 17:15:00 IST 2025
+# Enhanced error handling for ai_service import
