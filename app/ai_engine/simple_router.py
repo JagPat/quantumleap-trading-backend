@@ -552,3 +552,39 @@ async def debug_database():
             "error": str(e),
             "error_type": type(e).__name__
         }
+
+@router.get("/debug-db")
+async def debug_database():
+    """Debug endpoint to test database functions"""
+    try:
+        from app.database.service import init_database, store_ai_preferences, get_ai_preferences
+        from app.core.config import settings
+        
+        # Initialize database
+        init_database()
+        
+        # Test storing preferences
+        test_user_id = "DEBUG_USER"
+        success = store_ai_preferences(
+            user_id=test_user_id,
+            openai_api_key="sk-debug-key",
+            preferred_provider="openai"
+        )
+        
+        # Test retrieving preferences
+        preferences = get_ai_preferences(test_user_id)
+        
+        return {
+            "status": "success",
+            "database_path": settings.database_path,
+            "database_initialized": True,
+            "store_success": success,
+            "retrieved_preferences": preferences is not None,
+            "preferences": preferences
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
