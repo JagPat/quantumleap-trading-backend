@@ -267,3 +267,197 @@ async def validate_api_key(request: APIKeyValidationRequest):
             provider=provider,
             message="Unsupported provider. Supported: openai, claude, gemini"
         )
+
+
+# ========================================
+# ADDITIONAL MISSING ENDPOINTS (Frontend Support)
+# ========================================
+
+@router.post("/strategy/generate")
+async def generate_strategy(
+    strategy_data: dict,
+    user_id: str = Depends(get_user_id_from_headers)
+):
+    """Generate trading strategy - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Strategy generation is planned but not yet implemented",
+        "feature": "strategy_generation",
+        "frontend_expectation": "AI-powered trading strategy generation",
+        "planned_features": [
+            "Technical analysis-based strategies",
+            "Risk-adjusted position sizing",
+            "Backtesting capabilities"
+        ],
+        "received_data": strategy_data
+    }
+
+@router.get("/strategy/list")
+async def get_strategies(user_id: str = Depends(get_user_id_from_headers)):
+    """Get user strategies - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Strategy management is planned but not yet implemented",
+        "feature": "strategy_management",
+        "strategies": [],
+        "planned_features": [
+            "Strategy library",
+            "Performance tracking",
+            "Strategy sharing"
+        ]
+    }
+
+@router.get("/strategy/{strategy_id}")
+async def get_strategy(strategy_id: str, user_id: str = Depends(get_user_id_from_headers)):
+    """Get specific strategy - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Strategy details are planned but not yet implemented",
+        "feature": "strategy_details",
+        "strategy_id": strategy_id,
+        "planned_features": [
+            "Strategy parameters",
+            "Performance metrics",
+            "Risk analysis"
+        ]
+    }
+
+@router.post("/analysis/market")
+async def generate_market_analysis(
+    analysis_data: dict,
+    user_id: str = Depends(get_user_id_from_headers)
+):
+    """Generate market analysis - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Market analysis is planned but not yet implemented",
+        "feature": "market_analysis",
+        "frontend_expectation": "Comprehensive market analysis and insights",
+        "planned_features": [
+            "Market trend analysis",
+            "Sector performance",
+            "Economic indicators"
+        ],
+        "received_data": analysis_data
+    }
+
+@router.post("/analysis/technical")
+async def generate_technical_analysis(
+    analysis_data: dict,
+    user_id: str = Depends(get_user_id_from_headers)
+):
+    """Generate technical analysis - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Technical analysis is planned but not yet implemented",
+        "feature": "technical_analysis",
+        "frontend_expectation": "Advanced technical indicators and patterns",
+        "planned_features": [
+            "Chart pattern recognition",
+            "Indicator analysis",
+            "Support/resistance levels"
+        ],
+        "received_data": analysis_data
+    }
+
+@router.post("/analysis/sentiment")
+async def generate_sentiment_analysis(
+    analysis_data: dict,
+    user_id: str = Depends(get_user_id_from_headers)
+):
+    """Generate sentiment analysis - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Sentiment analysis is planned but not yet implemented",
+        "feature": "sentiment_analysis",
+        "frontend_expectation": "Market sentiment and social media analysis",
+        "planned_features": [
+            "News sentiment analysis",
+            "Social media monitoring",
+            "Fear/greed indicators"
+        ],
+        "received_data": analysis_data
+    }
+
+@router.post("/feedback/outcome")
+async def record_trade_outcome(
+    feedback_data: dict,
+    user_id: str = Depends(get_user_id_from_headers)
+):
+    """Record trade outcome for learning - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Trade feedback system is planned but not yet implemented",
+        "feature": "trade_feedback",
+        "frontend_expectation": "Learn from trade outcomes to improve strategies",
+        "planned_features": [
+            "Trade result tracking",
+            "Strategy performance analysis",
+            "Machine learning improvements"
+        ],
+        "received_data": feedback_data
+    }
+
+@router.get("/feedback/learning/{strategy_id}")
+async def get_learning_insights(strategy_id: str, user_id: str = Depends(get_user_id_from_headers)):
+    """Get learning insights for strategy - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Learning insights are planned but not yet implemented",
+        "feature": "learning_insights",
+        "strategy_id": strategy_id,
+        "planned_features": [
+            "Performance analytics",
+            "Improvement suggestions",
+            "Risk assessment"
+        ]
+    }
+
+@router.get("/clustering/strategies")
+async def get_strategy_clustering(user_id: str = Depends(get_user_id_from_headers)):
+    """Get strategy clustering analysis - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Strategy clustering is planned but not yet implemented",
+        "feature": "strategy_clustering",
+        "planned_features": [
+            "Strategy similarity analysis",
+            "Performance clustering",
+            "Risk profile grouping"
+        ]
+    }
+
+@router.get("/analytics/strategy/{strategy_id}")
+async def get_strategy_analytics(strategy_id: str, user_id: str = Depends(get_user_id_from_headers)):
+    """Get strategy analytics - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Strategy analytics are planned but not yet implemented",
+        "feature": "strategy_analytics",
+        "strategy_id": strategy_id,
+        "planned_features": [
+            "Performance metrics",
+            "Risk analysis",
+            "Sharpe ratio calculation"
+        ]
+    }
+
+@router.get("/health")
+async def get_ai_health(user_id: str = Depends(get_user_id_from_headers)):
+    """Get AI engine health status"""
+    return {
+        "status": "healthy",
+        "engine": "BYOAI (Bring Your Own AI)",
+        "providers": {
+            "openai": "available",
+            "claude": "available", 
+            "gemini": "available"
+        },
+        "endpoints": {
+            "preferences": "operational",
+            "validate_key": "operational",
+            "signals": "operational",
+            "strategy": "operational"
+        },
+        "message": "AI engine is operational. Configure your API keys to enable features."
+    }

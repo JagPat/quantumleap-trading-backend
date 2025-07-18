@@ -118,3 +118,40 @@ async def get_portfolio_summary(user_id: str = "debug_user"):
         },
         message="Portfolio service not available - showing zero summary"
     ) 
+# ========================================
+# ADDITIONAL MISSING ENDPOINTS (Frontend Support)
+# ========================================
+
+@router.get("/latest-simple", response_model=PortfolioDataResponse)
+async def get_latest_simple_portfolio(user_id: str = "debug_user"):
+    """Get latest simple portfolio data - fallback placeholder"""
+    return PortfolioDataResponse(
+        status="fallback",
+        data={
+            "user_id": user_id,
+            "timestamp": "2024-07-16T00:00:00Z",
+            "summary": {
+                "total_value": 0.0,
+                "day_pnl": 0.0,
+                "total_pnl": 0.0,
+                "holdings_value": 0.0,
+                "positions_value": 0.0
+            },
+            "holdings": [],
+            "positions": []
+        },
+        message="Portfolio service not available - showing fallback data"
+    )
+
+@router.post("/fetch-live-simple", response_model=FetchResponse)
+async def fetch_live_simple_portfolio(user_id: str = "debug_user"):
+    """Fetch live simple portfolio data - fallback placeholder"""
+    return FetchResponse(
+        status="fallback",
+        message="Portfolio service not available - cannot fetch live data",
+        data={
+            "user_id": user_id,
+            "timestamp": "2024-07-16T00:00:00Z",
+            "status": "not_available"
+        }
+    )
