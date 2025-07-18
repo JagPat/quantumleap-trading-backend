@@ -1,2 +1,2 @@
-# FORCE REDEPLOY - BMAD Patch Simplified Import - Fri Jul 18 17:30:00 IST 2025
-# Removed ai_service dependency to fix import issues
+# FORCE REDEPLOY - BMAD Patch in Main Router - Fri Jul 18 17:45:00 IST 2025
+# Added BMAD patch to main router.py with graceful import handling
