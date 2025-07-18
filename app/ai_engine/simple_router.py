@@ -461,3 +461,4 @@ async def get_ai_health(user_id: str = Depends(get_user_id_from_headers)):
         },
         "message": "AI engine is operational. Configure your API keys to enable features."
     }
+# FORCE REDEPLOY - Fri Jul 18 20:47:55 IST 2025
