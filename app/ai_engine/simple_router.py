@@ -104,6 +104,7 @@ async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
             },
             message=f"Error retrieving preferences: {str(e)}"
         )
+@router.post("/preferences", response_model=AIPreferencesResponse)
 async def save_ai_preferences(
     preferences: AIPreferencesRequest,
     user_id: str = Depends(get_user_id_from_headers)
