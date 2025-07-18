@@ -177,28 +177,13 @@ async def on_startup():
         print(f"❌ Portfolio error type: {type(e).__name__}")
         print(f"❌ Portfolio error details: {str(e)}")
         
-        print("⚠️ Using fallback portfolio router with /api/portfolio/status returning 503")
+        print("⚠️ Using fallback portfolio router with database cleanup endpoints")
         try:
-            # Create inline fallback portfolio router
-            from fastapi import APIRouter, HTTPException
-            
-            fallback_portfolio_router = APIRouter(prefix="/api/portfolio", tags=["Portfolio - Fallback"])
-            
-            @fallback_portfolio_router.get("/status")
-            async def fallback_portfolio_status():
-                return {
-                    "status": "fallback",
-                    "message": "Portfolio service in fallback mode",
-                    "error": str(e)
-                }
-            
-            @fallback_portfolio_router.get("/{path:path}")
-            async def fallback_portfolio_catchall(path: str):
-                raise HTTPException(status_code=503, detail="Portfolio service unavailable")
-            
+            # Import external fallback portfolio router with cleanup endpoints
+            from app.portfolio.fallback_router import router as fallback_portfolio_router
             app.include_router(fallback_portfolio_router)
-            print("🔄 Fallback portfolio router created and registered.")
-            logger.info("🔄 Fallback portfolio router created and registered.")
+            print("🔄 External fallback portfolio router loaded and registered.")
+            logger.info("🔄 External fallback portfolio router loaded and registered.")
         except Exception as fallback_e:
             print(f"❌ Failed to create fallback portfolio router: {fallback_e}")
             logger.error(f"❌ Failed to create fallback portfolio router: {fallback_e}")
@@ -312,6 +297,62 @@ try:
 except Exception as e:
     print(f"❌ Failed to load simple AI router: {e}")
     logger.error(f"❌ Failed to load simple AI router: {e}")
+
+# Alternative AI router for /ai/* endpoints (without /api prefix)
+try:
+    print("🔄 Including alternative AI router for /ai/* endpoints...")
+    from app.ai_engine.router import alt_router as ai_alt_router
+    app.include_router(ai_alt_router)
+    print("✅ Alternative AI router loaded and registered.")
+    logger.info("✅ Alternative AI router loaded and registered.")
+except Exception as e:
+    print(f"❌ Failed to load alternative AI router: {e}")
+    logger.error(f"❌ Failed to load alternative AI router: {e}")
+    
+    # Create fallback alternative AI router
+    try:
+        from fastapi import APIRouter, HTTPException
+        from app.ai_engine.simple_router import (
+            AIPreferencesRequest, AIPreferencesResponse,
+            APIKeyValidationRequest, APIKeyValidationResponse
+        )
+        
+        fallback_ai_alt_router = APIRouter(prefix="/ai", tags=["AI Engine - Fallback Alternative"])
+        
+        @fallback_ai_alt_router.get("/preferences", response_model=AIPreferencesResponse)
+        async def fallback_get_ai_preferences():
+            return AIPreferencesResponse(
+                status="no_key",
+                preferences={
+                    "preferred_ai_provider": "auto",
+                    "openai_api_key": None,
+                    "claude_api_key": None,
+                    "gemini_api_key": None
+                },
+                message="No preferences found. Add your AI key."
+            )
+        
+        @fallback_ai_alt_router.post("/preferences", response_model=AIPreferencesResponse)
+        async def fallback_save_ai_preferences(preferences: AIPreferencesRequest):
+            return AIPreferencesResponse(
+                status="no_key",
+                message="Preferences not saved. No AI key configured."
+            )
+        
+        @fallback_ai_alt_router.post("/validate-key", response_model=APIKeyValidationResponse)
+        async def fallback_validate_api_key(request: APIKeyValidationRequest):
+            return APIKeyValidationResponse(
+                valid=False,
+                provider=request.provider,
+                message="No API key configured. Validation not possible."
+            )
+        
+        app.include_router(fallback_ai_alt_router)
+        print("🔄 Fallback alternative AI router created and registered.")
+        logger.info("🔄 Fallback alternative AI router created and registered.")
+    except Exception as fallback_e:
+        print(f"❌ Failed to create fallback alternative AI router: {fallback_e}")
+        logger.error(f"❌ Failed to create fallback alternative AI router: {fallback_e}")
 
 if __name__ == "__main__":
     import uvicorn
