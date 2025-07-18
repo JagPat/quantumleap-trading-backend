@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     
     # Database
     database_path: str = Field(
-        default="/tmp/trading_app.db",
+        default="trading_app.db",
         env="DATABASE_PATH",
         description="SQLite database file path (must be writable on Railway)"
     )
