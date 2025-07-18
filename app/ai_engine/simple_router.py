@@ -1,6 +1,6 @@
 """
 Simple AI Engine Router - BYOAI (Bring Your Own AI)
-FastAPI router for basic AI-related endpoints without complex dependencies
+DEBUG VERSION: 2024-07-18-3 - Preferences save fix applied
 """
 from fastapi import APIRouter, Depends, Header
 from typing import Optional, Dict, Any, List
@@ -77,6 +77,7 @@ async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
 
 @router.post("/preferences", response_model=AIPreferencesResponse)
 async def save_ai_preferences(
+    print("DEBUG: save_ai_preferences called - using updated code version 2024-07-18-3")
     preferences: AIPreferencesRequest,
     user_id: str = Depends(get_user_id_from_headers)
 ):
