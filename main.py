@@ -288,7 +288,9 @@ async def on_startup():
     # Initialize database with error handling
     try:
         print("📊 Initializing database...")
-        init_database()
+        import asyncio
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, init_database)
         print("✅ Database initialized successfully")
         logger.info("Database initialized.")
     except Exception as e:
