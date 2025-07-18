@@ -8,9 +8,12 @@ from app.ai_engine.models import (
     AIPreferencesRequest, AIPreferencesResponse,
     APIKeyValidationRequest, APIKeyValidationResponse,
     AISignalsRequest, AISignalsResponse,
-    AIStrategyRequest, AIStrategyResponse
+    AIStrategyRequest, AIStrategyResponse,
+    AssistantMessageRequest, AssistantMessageResponse,
+    AssistantStatusResponse
 )
 from app.ai_engine.service import ai_service
+from app.ai_engine.assistants_service import OpenAIAssistantsService
 
 router = APIRouter(prefix="/api/ai", tags=["AI Engine"])
 
@@ -150,3 +153,68 @@ async def save_ai_preferences_alt(
 async def validate_api_key_alt(request: APIKeyValidationRequest):
     """Validate API key (alternative endpoint)"""
     return await validate_api_key(request) 
+
+# OpenAI Assistants API Routes
+@router.post("/message", response_model=AssistantMessageResponse)
+async def send_assistant_message(
+    request: AssistantMessageRequest,
+    user_id: str = Depends(get_user_id_from_headers)
+):
+    """Send message to OpenAI Assistant and get response"""
+    try:
+        # Get OpenAI Assistant service
+        assistant_service = OpenAIAssistantsService(api_key="your-api-key-here")  # TODO: Get from user preferences
+        
+        # Send message to assistant
+        result = await assistant_service.send_message(
+            user_id=user_id,
+            message=request.message,
+            thread_id=request.thread_id,
+            context=request.context
+        )
+        
+        if result["status"] == "success":
+            return AssistantMessageResponse(
+                status="success",
+                reply=result["reply"],
+                thread_id=result["thread_id"],
+                message_id=result.get("message_id"),
+                run_id=result.get("run_id"),
+                metadata=result.get("metadata")
+            )
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Assistant error: {result.get('error', 'Unknown error')}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error sending message to assistant: {str(e)}"
+        )
+
+@router.get("/assistant/status", response_model=AssistantStatusResponse)
+async def get_assistant_status(user_id: str = Depends(get_user_id_from_headers)):
+    """Get OpenAI Assistant status and information"""
+    try:
+        assistant_service = OpenAIAssistantsService(api_key="your-api-key-here")  # TODO: Get from user preferences
+        status = await assistant_service.get_assistant_status()
+        
+        return AssistantStatusResponse(
+            status=status["status"],
+            assistant_id=status["assistant_id"],
+            assistant_name=status["assistant_name"],
+            is_available=status["is_available"],
+            message=status.get("message")
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error getting assistant status: {str(e)}"
+        )

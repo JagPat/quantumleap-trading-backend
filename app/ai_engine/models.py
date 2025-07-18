@@ -62,3 +62,35 @@ class AIStrategyResponse(BaseModel):
     status: str
     strategy: Optional[Dict[str, Any]] = None
     message: Optional[str] = None 
+
+# OpenAI Assistants API Models
+class AssistantMessageRequest(BaseModel):
+    """Request model for sending messages to OpenAI Assistant"""
+    message: str = Field(..., description="User message to send to assistant")
+    thread_id: Optional[str] = Field(None, description="Existing thread ID (optional)")
+    context: Optional[Dict[str, Any]] = Field(None, description="Additional context data")
+
+class AssistantMessageResponse(BaseModel):
+    """Response model for OpenAI Assistant messages"""
+    status: str
+    reply: str = Field(..., description="Assistant's response")
+    thread_id: str = Field(..., description="Thread ID for this conversation")
+    message_id: Optional[str] = Field(None, description="Message ID of the assistant's response")
+    run_id: Optional[str] = Field(None, description="Run ID of the assistant execution")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+class ThreadInfo(BaseModel):
+    """Model for thread information"""
+    thread_id: str
+    user_id: str
+    created_at: datetime
+    last_used: datetime
+    message_count: int = 0
+
+class AssistantStatusResponse(BaseModel):
+    """Response model for assistant status"""
+    status: str
+    assistant_id: str
+    assistant_name: str
+    is_available: bool
+    message: Optional[str] = None
