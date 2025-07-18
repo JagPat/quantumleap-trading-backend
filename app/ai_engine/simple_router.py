@@ -63,36 +63,95 @@ async def ai_engine_status():
     }
 
 @router.get("/preferences", response_model=AIPreferencesResponse)
+@router.get("/preferences", response_model=AIPreferencesResponse)
 async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
-    return AIPreferencesResponse(
-        status="no_key",
-        preferences={
-            "preferred_ai_provider": "auto",
-            "openai_api_key": None,
-            "claude_api_key": None,
-            "gemini_api_key": None
-        },
-        message="No preferences found. Add your AI key."
-    )
-
-@router.post("/preferences", response_model=AIPreferencesResponse)
+    """Get user AI preferences from database"""
+    try:
+        # Import database service
+        from app.database.service import get_ai_preferences as db_get_preferences
+        
+        preferences = db_get_preferences(user_id)
+        if preferences:
+            return AIPreferencesResponse(
+                status="success",
+                preferences={
+                    "preferred_ai_provider": preferences.get("preferred_provider", "auto"),
+                    "openai_api_key": preferences.get("openai_api_key"),
+                    "claude_api_key": preferences.get("claude_api_key"),
+                    "gemini_api_key": preferences.get("gemini_api_key")
+                },
+                message="Preferences retrieved successfully"
+            )
+        else:
+            return AIPreferencesResponse(
+                status="no_key",
+                preferences={
+                    "preferred_ai_provider": "auto",
+                    "openai_api_key": None,
+                    "claude_api_key": None,
+                    "gemini_api_key": None
+                },
+                message="No preferences found. Add your AI key."
+            )
+    except Exception as e:
+        return AIPreferencesResponse(
+            status="error",
+            preferences={
+                "preferred_ai_provider": "auto",
+                "openai_api_key": None,
+                "claude_api_key": None,
+                "gemini_api_key": None
+            },
+            message=f"Error retrieving preferences: {str(e)}"
+        )
 async def save_ai_preferences(
-    print("DEBUG: save_ai_preferences called - using updated code version 2024-07-18-3")
     preferences: AIPreferencesRequest,
     user_id: str = Depends(get_user_id_from_headers)
 ):
-    return AIPreferencesResponse(
-        status="no_key",
-        message="Preferences not saved. No AI key configured."
+    """Save user AI preferences to database"""
+    print("DEBUG: save_ai_preferences called - using database service")
+    
+    # Check if at least one API key is provided
+    has_valid_key = (
+        preferences.openai_api_key and preferences.openai_api_key.strip() or
+        preferences.claude_api_key and preferences.claude_api_key.strip() or
+        preferences.gemini_api_key and preferences.gemini_api_key.strip()
     )
-
-
-@router.get("/signals", response_model=AISignalsResponse)
-async def get_ai_signals(
-    symbols: Optional[str] = None,
-    user_id: str = Depends(get_user_id_from_headers)
-):
-    return AISignalsResponse(
+    
+    if not has_valid_key:
+        return AIPreferencesResponse(
+            status="error",
+            message="Preferences not saved. No AI key configured."
+        )
+    
+    try:
+        # Import database service
+        from app.database.service import store_ai_preferences
+        
+        # Store preferences in database
+        success = store_ai_preferences(
+            user_id=user_id,
+            openai_api_key=preferences.openai_api_key.strip() if preferences.openai_api_key else None,
+            claude_api_key=preferences.claude_api_key.strip() if preferences.claude_api_key else None,
+            gemini_api_key=preferences.gemini_api_key.strip() if preferences.gemini_api_key else None,
+            preferred_provider=preferences.preferred_ai_provider
+        )
+        
+        if success:
+            return AIPreferencesResponse(
+                status="success",
+                message="Preferences saved successfully"
+            )
+        else:
+            return AIPreferencesResponse(
+                status="error",
+                message="Failed to save preferences to database"
+            )
+    except Exception as e:
+        return AIPreferencesResponse(
+            status="error",
+            message=f"Error saving preferences: {str(e)}"
+        )
         status="no_key",
         signals=[],
         message="No AI key configured. Cannot generate signals."
