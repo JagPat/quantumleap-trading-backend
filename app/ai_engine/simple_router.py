@@ -85,7 +85,6 @@ async def save_ai_preferences(
         message="Preferences not saved. No AI key configured."
     )
 
-    )
 
 @router.get("/signals", response_model=AISignalsResponse)
 async def get_ai_signals(
