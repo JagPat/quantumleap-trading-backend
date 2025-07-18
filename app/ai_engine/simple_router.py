@@ -152,11 +152,6 @@ async def save_ai_preferences(
             status="error",
             message=f"Error saving preferences: {str(e)}"
         )
-        status="no_key",
-        signals=[],
-        message="No AI key configured. Cannot generate signals."
-    )
-
 @router.get("/strategy", response_model=AIStrategyResponse)
 async def get_ai_strategy(user_id: str = Depends(get_user_id_from_headers)):
     return AIStrategyResponse(
