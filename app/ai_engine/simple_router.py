@@ -85,12 +85,6 @@ async def save_ai_preferences(
         message="Preferences not saved. No AI key configured."
     )
 
-@router.post("/validate-key", response_model=APIKeyValidationResponse)
-async def validate_api_key(request: APIKeyValidationRequest):
-    return APIKeyValidationResponse(
-        valid=False,
-        provider=request.provider,
-        message="No API key configured. Validation not possible."
     )
 
 @router.get("/signals", response_model=AISignalsResponse)
@@ -179,3 +173,98 @@ async def get_copilot_recommendations(user_id: str = Depends(get_user_id_from_he
             "Risk-adjusted suggestions"
         ]
     }
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ✅ AI Key Validation Endpoint – Supports OpenAI & Claude
+#    - POST /api/ai/validate-key
+#    - Live validation with actual API calls
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@router.post("/validate-key", response_model=APIKeyValidationResponse)
+async def validate_api_key(request: APIKeyValidationRequest):
+    """Validate API key against the actual provider with live API calls"""
+    provider = request.provider.lower()
+    api_key = request.api_key.strip()
+
+    if not api_key:
+        return APIKeyValidationResponse(
+            valid=False,
+            provider=provider,
+            message="API key is required"
+        )
+
+    if provider == "openai":
+        try:
+            import openai
+            client = openai.AsyncOpenAI(api_key=api_key)
+            # Test with a simple completion
+            response = await client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Hello"}],
+                max_tokens=5,
+            )
+            return APIKeyValidationResponse(
+                valid=True,
+                provider=provider,
+                message="OpenAI key is valid"
+            )
+        except Exception as e:
+            return APIKeyValidationResponse(
+                valid=False,
+                provider=provider,
+                message=f"OpenAI validation failed: {str(e)}"
+            )
+
+    elif provider == "claude":
+        try:
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+            # Test with a simple message
+            response = await client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=5,
+                messages=[{"role": "user", "content": "Hello"}],
+            )
+            return APIKeyValidationResponse(
+                valid=True,
+                provider=provider,
+                message="Claude key is valid"
+            )
+        except Exception as e:
+            return APIKeyValidationResponse(
+                valid=False,
+                provider=provider,
+                message=f"Claude validation failed: {str(e)}"
+            )
+
+    elif provider == "gemini":
+        try:
+            import google.generativeai as genai
+            import asyncio
+            
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-pro')
+            # Test with a simple generation
+            response = await asyncio.to_thread(
+                model.generate_content, 
+                "Hello",
+                generation_config=genai.types.GenerationConfig(max_output_tokens=5)
+            )
+            return APIKeyValidationResponse(
+                valid=True,
+                provider=provider,
+                message="Gemini key is valid"
+            )
+        except Exception as e:
+            return APIKeyValidationResponse(
+                valid=False,
+                provider=provider,
+                message=f"Gemini validation failed: {str(e)}"
+            )
+
+    else:
+        return APIKeyValidationResponse(
+            valid=False,
+            provider=provider,
+            message="Unsupported provider. Supported: openai, claude, gemini"
+        )
