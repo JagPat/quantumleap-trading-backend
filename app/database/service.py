@@ -117,6 +117,7 @@ def get_latest_portfolio_snapshot(user_id: str) -> Optional[Dict[str, Any]]:
     Retrieves the most recent portfolio snapshot for a given user.
     Returns raw JSON strings for holdings and positions to avoid double parsing.
     """
+    conn = None
     try:
         conn = sqlite3.connect(settings.database_path)
         cursor = conn.cursor()
@@ -138,6 +139,7 @@ def get_latest_portfolio_snapshot(user_id: str) -> Optional[Dict[str, Any]]:
         return None
     finally:
         if conn:
+            conn.close()
             conn.close()
 
 def store_user_credentials(
