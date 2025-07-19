@@ -63,7 +63,6 @@ async def ai_engine_status():
     }
 
 @router.get("/preferences", response_model=AIPreferencesResponse)
-@router.get("/preferences", response_model=AIPreferencesResponse)
 async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
     """Get user AI preferences from database"""
     try:
@@ -72,13 +71,26 @@ async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
         
         preferences = db_get_preferences(user_id)
         if preferences:
+            # Format response for frontend compatibility
+            openai_key = preferences.get("openai_api_key")
+            claude_key = preferences.get("claude_api_key")
+            gemini_key = preferences.get("gemini_api_key")
+            
+            # Create key previews (first 8 chars + "...")
+            openai_preview = f"{openai_key[:8]}..." if openai_key and len(openai_key) > 8 else "***"
+            claude_preview = f"{claude_key[:8]}..." if claude_key and len(claude_key) > 8 else "***"
+            gemini_preview = f"{gemini_key[:8]}..." if gemini_key and len(gemini_key) > 8 else "***"
+            
             return AIPreferencesResponse(
                 status="success",
                 preferences={
                     "preferred_ai_provider": preferences.get("preferred_provider", "auto"),
-                    "openai_api_key": preferences.get("openai_api_key"),
-                    "claude_api_key": preferences.get("claude_api_key"),
-                    "gemini_api_key": preferences.get("gemini_api_key")
+                    "has_openai_key": bool(openai_key),
+                    "has_claude_key": bool(claude_key),
+                    "has_gemini_key": bool(gemini_key),
+                    "openai_key_preview": openai_preview,
+                    "claude_key_preview": claude_preview,
+                    "gemini_key_preview": gemini_preview
                 },
                 message="Preferences retrieved successfully"
             )
@@ -87,9 +99,12 @@ async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
                 status="no_key",
                 preferences={
                     "preferred_ai_provider": "auto",
-                    "openai_api_key": None,
-                    "claude_api_key": None,
-                    "gemini_api_key": None
+                    "has_openai_key": False,
+                    "has_claude_key": False,
+                    "has_gemini_key": False,
+                    "openai_key_preview": "",
+                    "claude_key_preview": "",
+                    "gemini_key_preview": ""
                 },
                 message="No preferences found. Add your AI key."
             )
@@ -98,9 +113,12 @@ async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
             status="error",
             preferences={
                 "preferred_ai_provider": "auto",
-                "openai_api_key": None,
-                "claude_api_key": None,
-                "gemini_api_key": None
+                "has_openai_key": False,
+                "has_claude_key": False,
+                "has_gemini_key": False,
+                "openai_key_preview": "",
+                "claude_key_preview": "",
+                "gemini_key_preview": ""
             },
             message=f"Error retrieving preferences: {str(e)}"
         )
