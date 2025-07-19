@@ -183,6 +183,26 @@ async def get_ai_strategy(user_id: str = Depends(get_user_id_from_headers)):
 # PENDING BACKEND FEATURES (Frontend Support)
 # ========================================
 
+@router.post("/message")
+async def send_ai_message(
+    message_data: dict,
+    user_id: str = Depends(get_user_id_from_headers)
+):
+    """Send message to AI assistant - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "OpenAI Assistants API integration is planned but not yet implemented",
+        "feature": "ai_message",
+        "frontend_expectation": "Chat with AI trading assistant",
+        "planned_features": [
+            "OpenAI Assistants API integration",
+            "Persistent conversation threads",
+            "Context-aware responses",
+            "Trading-specific assistance"
+        ],
+        "received_data": message_data
+    }
+
 @router.get("/insights/crowd")
 async def get_crowd_insights(user_id: str = Depends(get_user_id_from_headers)):
     """Get crowd insights - PENDING BACKEND IMPLEMENTATION"""
