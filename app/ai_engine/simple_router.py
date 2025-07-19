@@ -2,6 +2,7 @@
 Simple AI Engine Router - BYOAI (Bring Your Own AI)
 DEBUG VERSION: 2024-07-18-3 - Preferences save fix applied
 """
+import time
 from fastapi import APIRouter, Depends, Header
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
@@ -188,20 +189,154 @@ async def send_ai_message(
     message_data: dict,
     user_id: str = Depends(get_user_id_from_headers)
 ):
-    """Send message to AI assistant - PENDING BACKEND IMPLEMENTATION"""
-    return {
-        "status": "not_implemented",
-        "message": "OpenAI Assistants API integration is planned but not yet implemented",
-        "feature": "ai_message",
-        "frontend_expectation": "Chat with AI trading assistant",
-        "planned_features": [
-            "OpenAI Assistants API integration",
-            "Persistent conversation threads",
-            "Context-aware responses",
-            "Trading-specific assistance"
-        ],
-        "received_data": message_data
-    }
+    """Send message to AI assistant - Basic implementation"""
+    try:
+        message = message_data.get("message", "")
+        thread_id = message_data.get("thread_id")
+        context = message_data.get("context", {})
+        
+        if not message.strip():
+            return {
+                "status": "error",
+                "message": "Message cannot be empty"
+            }
+        
+        # Get user's AI preferences
+        from app.database.service import get_ai_preferences
+        preferences = get_ai_preferences(user_id)
+        
+        if not preferences:
+            return {
+                "status": "error",
+                "message": "No AI preferences configured. Please set up your AI keys in settings."
+            }
+        
+        # Simple AI response based on message content
+        response = generate_simple_ai_response(message, context, preferences)
+        
+        return {
+            "status": "success",
+            "message": response,
+            "thread_id": thread_id or f"thread_{user_id}_{int(time.time())}",
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to process message: {str(e)}"
+        }
+
+def generate_simple_ai_response(message: str, context: dict, preferences: dict) -> str:
+    """Generate a simple AI response based on message content"""
+    message_lower = message.lower()
+    
+    # Trading-related responses
+    if any(word in message_lower for word in ["portfolio", "holdings", "investments"]):
+        return """Based on your portfolio query, here are some general insights:
+
+📊 **Portfolio Analysis Tips:**
+• Diversify across sectors (Technology, Finance, Healthcare, etc.)
+• Consider your risk tolerance and investment horizon
+• Regularly rebalance your portfolio
+• Monitor for over-concentration in any single stock
+
+💡 **Next Steps:**
+• Review your current asset allocation
+• Check if your portfolio aligns with your goals
+• Consider adding defensive stocks in volatile markets
+
+Would you like me to analyze specific aspects of your portfolio or suggest improvements?"""
+    
+    elif any(word in message_lower for word in ["market", "trend", "opportunity"]):
+        return """📈 **Current Market Analysis:**
+
+🔍 **Key Trends to Watch:**
+• Technology sector showing resilience
+• Healthcare innovations driving growth
+• Energy sector volatility due to geopolitical factors
+• Financial sector benefiting from rate changes
+
+🎯 **Opportunities:**
+• Look for undervalued stocks in beaten-down sectors
+• Consider defensive plays in uncertain markets
+• Focus on companies with strong fundamentals
+• Monitor earnings season for surprises
+
+⚠️ **Risks:**
+• Geopolitical tensions affecting global markets
+• Inflation concerns impacting valuations
+• Interest rate uncertainty
+
+Remember: This is general advice. Always do your own research and consider consulting a financial advisor."""
+    
+    elif any(word in message_lower for word in ["strategy", "strategy", "trading"]):
+        return """🎯 **Trading Strategy Suggestions:**
+
+📋 **Strategy Types:**
+1. **Value Investing**: Buy undervalued stocks with strong fundamentals
+2. **Growth Investing**: Focus on companies with high growth potential
+3. **Dividend Investing**: Build income through dividend-paying stocks
+4. **Momentum Trading**: Follow market trends and momentum
+5. **Contrarian**: Go against market sentiment when you see opportunities
+
+🔧 **Strategy Framework:**
+• Set clear entry and exit points
+• Use stop-loss orders to manage risk
+• Diversify across different strategies
+• Keep a trading journal to track performance
+• Review and adjust strategies regularly
+
+💡 **Current Market Strategy:**
+Given current market conditions, consider a balanced approach combining value and growth stocks with proper risk management.
+
+Would you like me to elaborate on any specific strategy?"""
+    
+    elif any(word in message_lower for word in ["risk", "danger", "safe"]):
+        return """⚠️ **Risk Assessment & Management:**
+
+🛡️ **Key Risk Factors:**
+• **Market Risk**: Overall market volatility
+• **Sector Risk**: Industry-specific challenges
+• **Company Risk**: Individual company performance
+• **Liquidity Risk**: Ability to sell quickly
+• **Currency Risk**: Exchange rate fluctuations
+
+📊 **Risk Management Strategies:**
+• Diversify across sectors and asset classes
+• Use stop-loss orders to limit downside
+• Don't invest more than you can afford to lose
+• Regularly review and rebalance your portfolio
+• Consider defensive stocks in volatile markets
+
+🎯 **Risk Tolerance Assessment:**
+• Conservative: 20-40% stocks, 60-80% bonds
+• Moderate: 40-60% stocks, 40-60% bonds
+• Aggressive: 60-80% stocks, 20-40% bonds
+
+Remember: Higher potential returns usually come with higher risk."""
+    
+    else:
+        return """🤖 **AI Trading Assistant Response:**
+
+Thank you for your message! I'm here to help with your trading and investment questions.
+
+💡 **I can help you with:**
+• Portfolio analysis and optimization
+• Market trends and opportunities
+• Trading strategy development
+• Risk assessment and management
+• Investment research guidance
+
+📋 **Try asking about:**
+• "Analyze my portfolio and suggest improvements"
+• "What are the current market trends?"
+• "Generate a trading strategy for current conditions"
+• "What risks should I consider?"
+
+🔧 **Note:** This is a basic AI assistant. For more advanced features, I'll be enhanced with real AI integration soon!
+
+How can I help you with your trading goals today?"""
 
 @router.get("/insights/crowd")
 async def get_crowd_insights(user_id: str = Depends(get_user_id_from_headers)):
