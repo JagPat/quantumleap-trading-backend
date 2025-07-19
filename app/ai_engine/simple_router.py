@@ -49,19 +49,63 @@ def get_user_id_from_headers(
     return "default_user"
 
 @router.get("/status")
-async def ai_engine_status():
-    return {
-        "status": "no_key",
-        "engine": "BYOAI (Bring Your Own AI)",
-        "providers": ["openai", "claude", "gemini"],
-        "message": "No API key configured. Add your AI key to enable features.",
-        "endpoints": [
-            "/api/ai/preferences",
-            "/api/ai/validate-key", 
-            "/api/ai/signals",
-            "/api/ai/strategy"
-        ]
-    }
+async def ai_engine_status(user_id: str = Depends(get_user_id_from_headers)):
+    """Get AI engine status based on user's configured preferences"""
+    try:
+        # Import database service
+        from app.database.service import get_ai_preferences
+        
+        preferences = get_ai_preferences(user_id)
+        
+        if preferences and (preferences.get("openai_api_key") or preferences.get("claude_api_key") or preferences.get("gemini_api_key")):
+            # User has configured API keys
+            configured_providers = []
+            if preferences.get("openai_api_key"):
+                configured_providers.append("openai")
+            if preferences.get("claude_api_key"):
+                configured_providers.append("claude")
+            if preferences.get("gemini_api_key"):
+                configured_providers.append("gemini")
+            
+            return {
+                "status": "configured",
+                "engine": "BYOAI (Bring Your Own AI)",
+                "configured_providers": configured_providers,
+                "preferred_provider": preferences.get("preferred_provider", "auto"),
+                "message": f"AI engine configured with {len(configured_providers)} provider(s)",
+                "endpoints": [
+                    "/api/ai/preferences",
+                    "/api/ai/validate-key", 
+                    "/api/ai/signals",
+                    "/api/ai/strategy"
+                ]
+            }
+        else:
+            # No API keys configured
+            return {
+                "status": "no_key",
+                "engine": "BYOAI (Bring Your Own AI)",
+                "providers": ["openai", "claude", "gemini"],
+                "message": "No API key configured. Add your AI key to enable features.",
+                "endpoints": [
+                    "/api/ai/preferences",
+                    "/api/ai/validate-key", 
+                    "/api/ai/signals",
+                    "/api/ai/strategy"
+                ]
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "engine": "BYOAI (Bring Your Own AI)",
+            "message": f"Error checking AI status: {str(e)}",
+            "endpoints": [
+                "/api/ai/preferences",
+                "/api/ai/validate-key", 
+                "/api/ai/signals",
+                "/api/ai/strategy"
+            ]
+        }
 
 @router.get("/preferences", response_model=AIPreferencesResponse)
 async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
@@ -673,23 +717,78 @@ async def get_strategy_analytics(strategy_id: str, user_id: str = Depends(get_us
 
 @router.get("/health")
 async def get_ai_health(user_id: str = Depends(get_user_id_from_headers)):
-    """Get AI engine health status"""
-    return {
-        "status": "healthy",
-        "engine": "BYOAI (Bring Your Own AI)",
-        "providers": {
-            "openai": "available",
-            "claude": "available", 
-            "gemini": "available"
-        },
-        "endpoints": {
-            "preferences": "operational",
-            "validate_key": "operational",
-            "signals": "operational",
-            "strategy": "operational"
-        },
-        "message": "AI engine is operational. Configure your API keys to enable features."
-    }
+    """Get AI engine health status based on user's configuration"""
+    try:
+        # Import database service
+        from app.database.service import get_ai_preferences
+        
+        preferences = get_ai_preferences(user_id)
+        
+        if preferences and (preferences.get("openai_api_key") or preferences.get("claude_api_key") or preferences.get("gemini_api_key")):
+            # User has configured API keys
+            provider_status = {}
+            if preferences.get("openai_api_key"):
+                provider_status["openai"] = "configured"
+            else:
+                provider_status["openai"] = "available"
+                
+            if preferences.get("claude_api_key"):
+                provider_status["claude"] = "configured"
+            else:
+                provider_status["claude"] = "available"
+                
+            if preferences.get("gemini_api_key"):
+                provider_status["gemini"] = "configured"
+            else:
+                provider_status["gemini"] = "available"
+            
+            return {
+                "status": "healthy",
+                "engine": "BYOAI (Bring Your Own AI)",
+                "providers": provider_status,
+                "endpoints": {
+                    "preferences": "operational",
+                    "validate_key": "operational",
+                    "signals": "operational",
+                    "strategy": "operational"
+                },
+                "message": f"AI engine operational with {len([p for p in provider_status.values() if p == 'configured'])} configured provider(s)"
+            }
+        else:
+            # No API keys configured
+            return {
+                "status": "healthy",
+                "engine": "BYOAI (Bring Your Own AI)",
+                "providers": {
+                    "openai": "available",
+                    "claude": "available", 
+                    "gemini": "available"
+                },
+                "endpoints": {
+                    "preferences": "operational",
+                    "validate_key": "operational",
+                    "signals": "operational",
+                    "strategy": "operational"
+                },
+                "message": "AI engine is operational. Configure your API keys to enable features."
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "engine": "BYOAI (Bring Your Own AI)",
+            "providers": {
+                "openai": "error",
+                "claude": "error", 
+                "gemini": "error"
+            },
+            "endpoints": {
+                "preferences": "error",
+                "validate_key": "error",
+                "signals": "error",
+                "strategy": "error"
+            },
+            "message": f"AI engine error: {str(e)}"
+        }
 # FORCE REDEPLOY - Fri Jul 18 20:47:55 IST 2025
 
 @router.get("/debug-db")
