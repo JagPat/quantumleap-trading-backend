@@ -2,8 +2,11 @@
 Broker Router
 FastAPI router for broker-related endpoints
 """
-from fastapi import APIRouter, Header, Depends
+from fastapi import APIRouter, Header, Depends, HTTPException
 from typing import Optional
+import json
+import os
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/api/broker", tags=["Broker Integration"])
 
@@ -17,29 +20,215 @@ def get_user_from_headers(
     # Fallback to a default for testing
     return "default_user"
 
+def get_session_file_path(user_id: str) -> str:
+    """Get session file path for user"""
+    sessions_dir = "sessions"
+    if not os.path.exists(sessions_dir):
+        os.makedirs(sessions_dir)
+    return os.path.join(sessions_dir, f"session_{user_id}.json")
+
+def load_user_session(user_id: str) -> dict:
+    """Load user session from file"""
+    try:
+        session_file = get_session_file_path(user_id)
+        if os.path.exists(session_file):
+            with open(session_file, 'r') as f:
+                session_data = json.load(f)
+                
+            # Check if session is expired (24 hours)
+            last_updated = datetime.fromisoformat(session_data.get('last_updated', '1970-01-01T00:00:00'))
+            if datetime.now() - last_updated < timedelta(hours=24):
+                return session_data
+            else:
+                print(f"Session expired for user {user_id}")
+                return {}
+        return {}
+    except Exception as e:
+        print(f"Error loading session for user {user_id}: {e}")
+        return {}
+
+def save_user_session(user_id: str, session_data: dict) -> bool:
+    """Save user session to file"""
+    try:
+        session_file = get_session_file_path(user_id)
+        session_data['last_updated'] = datetime.now().isoformat()
+        session_data['user_id'] = user_id
+        
+        with open(session_file, 'w') as f:
+            json.dump(session_data, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving session for user {user_id}: {e}")
+        return False
+
+def validate_user_session(user_id: str, access_token: str) -> bool:
+    """Validate user session with stored data"""
+    try:
+        session_data = load_user_session(user_id)
+        if not session_data:
+            return False
+            
+        stored_token = session_data.get('access_token')
+        if not stored_token or stored_token != access_token:
+            return False
+            
+        # Check if session is still valid
+        last_updated = datetime.fromisoformat(session_data.get('last_updated', '1970-01-01T00:00:00'))
+        if datetime.now() - last_updated > timedelta(hours=24):
+            return False
+            
+        return True
+    except Exception as e:
+        print(f"Error validating session for user {user_id}: {e}")
+        return False
+
+@router.get("/status")
+async def get_broker_status(
+    user_id: str = Depends(get_user_from_headers),
+    authorization: Optional[str] = Header(None)
+):
+    """Get broker service status with session validation"""
+    try:
+        # Extract access token from authorization header
+        access_token = None
+        if authorization and authorization.startswith('token '):
+            parts = authorization.split(' ')
+            if len(parts) >= 2:
+                token_part = parts[1]
+                if ':' in token_part:
+                    access_token = token_part.split(':')[1]
+        
+        if not access_token:
+            return {
+                "status": "error",
+                "message": "No access token provided",
+                "is_connected": False,
+                "user_id": user_id
+            }
+        
+        # Validate session
+        is_valid = validate_user_session(user_id, access_token)
+        
+        if is_valid:
+            # Update session timestamp
+            session_data = load_user_session(user_id)
+            save_user_session(user_id, session_data)
+            
+            return {
+                "status": "success",
+                "message": "Session is valid and active",
+                "is_connected": True,
+                "user_id": user_id,
+                "last_validated": datetime.now().isoformat(),
+                "service": "broker_integration"
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Invalid or expired session",
+                "is_connected": False,
+                "user_id": user_id
+            }
+            
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error checking broker status: {str(e)}",
+            "is_connected": False,
+            "user_id": user_id
+        }
+
+@router.post("/session/validate")
+async def validate_session(
+    user_id: str = Depends(get_user_from_headers),
+    authorization: Optional[str] = Header(None)
+):
+    """Validate and refresh user session"""
+    try:
+        # Extract access token from authorization header
+        access_token = None
+        if authorization and authorization.startswith('token '):
+            parts = authorization.split(' ')
+            if len(parts) >= 2:
+                token_part = parts[1]
+                if ':' in token_part:
+                    access_token = token_part.split(':')[1]
+        
+        if not access_token:
+            raise HTTPException(status_code=401, detail="No access token provided")
+        
+        # Validate session
+        is_valid = validate_user_session(user_id, access_token)
+        
+        if is_valid:
+            # Update session timestamp
+            session_data = load_user_session(user_id)
+            save_user_session(user_id, session_data)
+            
+            return {
+                "status": "success",
+                "message": "Session validated and refreshed",
+                "is_valid": True,
+                "user_id": user_id,
+                "last_validated": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Invalid or expired session",
+                "is_valid": False,
+                "user_id": user_id
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error validating session: {str(e)}")
+
+@router.post("/session/create")
+async def create_session(
+    session_data: dict,
+    user_id: str = Depends(get_user_from_headers)
+):
+    """Create or update user session"""
+    try:
+        # Save session data
+        success = save_user_session(user_id, session_data)
+        
+        if success:
+            return {
+                "status": "success",
+                "message": "Session created successfully",
+                "user_id": user_id,
+                "created_at": datetime.now().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create session")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating session: {str(e)}")
+
+@router.delete("/session")
+async def delete_session(user_id: str = Depends(get_user_from_headers)):
+    """Delete user session"""
+    try:
+        session_file = get_session_file_path(user_id)
+        if os.path.exists(session_file):
+            os.remove(session_file)
+            
+        return {
+            "status": "success",
+            "message": "Session deleted successfully",
+            "user_id": user_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting session: {str(e)}")
+
 # ========================================
 # PENDING BACKEND FEATURES (Frontend Support)
 # ========================================
-
-@router.get("/status")
-async def get_broker_status():
-    """Get broker service status"""
-    return {
-        "status": "operational",
-        "service": "broker_integration",
-        "message": "Broker service is running",
-        "endpoints": {
-            "holdings": "/api/broker/holdings",
-            "positions": "/api/broker/positions", 
-            "profile": "/api/broker/profile",
-            "margins": "/api/broker/margins"
-        },
-        "features": {
-            "authentication": "planned",
-            "portfolio_sync": "planned",
-            "trading": "planned"
-        }
-    }
 
 @router.get("/holdings")
 async def get_holdings(user_id: str = Depends(get_user_from_headers)):
