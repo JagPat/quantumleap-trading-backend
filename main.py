@@ -273,7 +273,9 @@ async def on_startup():
     # Initialize database with error handling
     try:
         print("📊 Initializing database...")
-        init_database()
+        import asyncio
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, init_database)
         print("✅ Database initialized successfully")
         logger.info("Database initialized.")
     except Exception as e:
@@ -370,3 +372,6 @@ if __name__ == "__main__":
         log_level=settings.log_level.lower()
     )
 # FORCE DEPLOYMENT - Wed Jul 16 15:18:56 IST 2025
+# FORCE DEPLOYMENT - AI Validation Fix - Fri Jul 18 15:43:05 IST 2025
+# FORCE REDEPLOY - Fri Jul 18 20:44:08 IST 2025
+# FORCE REDEPLOY - Fri Jul 18 20:46:49 IST 2025

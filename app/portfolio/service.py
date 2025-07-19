@@ -66,7 +66,7 @@ class PortfolioService:
             logger.error(f"No credentials found for user_id: {user_id}")
             raise ValueError("User credentials not found.")
             
-        kite = kite_service.create_kite_client(credentials['api_key'], credentials['access_token'])
+        kite = kite_service.create_kite_client(credentials['api_key'], credentials['access_token'], credentials.get('api_secret', ''))
         
         # 2. Fetch holdings and positions from broker
         try:

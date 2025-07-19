@@ -104,3 +104,23 @@ async def get_margins(user_id: str = Depends(get_user_from_headers)):
             "Margin utilization"
         ]
     }
+
+# ========================================
+# ADDITIONAL MISSING ENDPOINTS (Frontend Support)
+# ========================================
+
+@router.get("/orders")
+async def get_orders(user_id: str = Depends(get_user_from_headers)):
+    """Get broker orders - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "Broker orders are planned but not yet implemented",
+        "feature": "broker_orders",
+        "user_id": user_id,
+        "frontend_expectation": "Get order history and status from broker",
+        "planned_features": [
+            "Order history",
+            "Order status tracking",
+            "Order management"
+        ]
+    }

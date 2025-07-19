@@ -62,6 +62,8 @@ async def get_latest_portfolio(user_id: str = Depends(get_user_from_headers)):
             "message": "Latest portfolio retrieved",
             "data": snapshot_dict
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve portfolio: {str(e)}")
 
