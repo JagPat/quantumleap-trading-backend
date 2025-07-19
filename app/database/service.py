@@ -53,6 +53,20 @@ def init_database():
             FOREIGN KEY (user_id) REFERENCES users (user_id)
         )
     ''')
+    # Create ai_user_preferences table for storing AI API keys
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_user_preferences (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT UNIQUE NOT NULL,
+            openai_api_key TEXT,
+            claude_api_key TEXT,
+            gemini_api_key TEXT,
+            preferred_provider TEXT DEFAULT 'auto',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -328,3 +342,146 @@ def check_database_health() -> dict:
             "error_type": type(e).__name__,
             "database_path": settings.database_path
         }
+
+def store_ai_preferences(
+    user_id: str,
+    openai_api_key: Optional[str] = None,
+    claude_api_key: Optional[str] = None,
+    gemini_api_key: Optional[str] = None,
+    preferred_provider: str = "auto"
+) -> bool:
+    """
+    Store AI preferences for a user
+    Args:
+        user_id: User identifier
+        openai_api_key: OpenAI API key (encrypted)
+        claude_api_key: Claude API key (encrypted)
+        gemini_api_key: Gemini API key (encrypted)
+        preferred_provider: Preferred AI provider
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        # Encrypt API keys if provided
+        encrypted_openai = encrypt_data(openai_api_key) if openai_api_key else None
+        encrypted_claude = encrypt_data(claude_api_key) if claude_api_key else None
+        encrypted_gemini = encrypt_data(gemini_api_key) if gemini_api_key else None
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO ai_user_preferences 
+            (user_id, openai_api_key, claude_api_key, gemini_api_key, preferred_provider, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (user_id, encrypted_openai, encrypted_claude, encrypted_gemini, preferred_provider))
+        
+        conn.commit()
+        conn.close()
+        logger.info(f"Successfully stored AI preferences for user: {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error storing AI preferences for user {user_id}: {str(e)}")
+        return False
+
+def get_ai_preferences(user_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve AI preferences for a user
+    Args:
+        user_id: User identifier
+    Returns:
+        Dict with AI preferences or None if not found
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT openai_api_key, claude_api_key, gemini_api_key, preferred_provider, created_at, updated_at
+            FROM ai_user_preferences WHERE user_id = ?
+        ''', (user_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            # Decrypt API keys if they exist
+            openai_key = decrypt_data(result[0]) if result[0] else None
+            claude_key = decrypt_data(result[1]) if result[1] else None
+            gemini_key = decrypt_data(result[2]) if result[2] else None
+            
+            return {
+                "openai_api_key": openai_key,
+                "claude_api_key": claude_key,
+                "gemini_api_key": gemini_key,
+                "preferred_provider": result[3],
+                "created_at": result[4],
+                "updated_at": result[5]
+            }
+        return None
+    except Exception as e:
+        logger.error(f"Error retrieving AI preferences for user {user_id}: {str(e)}")
+        return None
+
+def delete_ai_preferences(user_id: str) -> bool:
+    """
+    Delete AI preferences for a user
+    Args:
+        user_id: User identifier
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM ai_user_preferences WHERE user_id = ?', (user_id,))
+        conn.commit()
+        conn.close()
+        logger.info(f"Successfully deleted AI preferences for user: {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting AI preferences for user {user_id}: {str(e)}")
+        return False
+
+def get_ai_client_for_user(user_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get AI client configuration for AutoBot usage
+    Args:
+        user_id: User identifier
+    Returns:
+        Dict with AI client config or None if no preferences found
+    """
+    preferences = get_ai_preferences(user_id)
+    if not preferences:
+        logger.warning(f"No AI preferences found for user {user_id}")
+        return None
+    
+    # Check which provider has a valid key
+    providers = []
+    if preferences.get("openai_api_key"):
+        providers.append("openai")
+    if preferences.get("claude_api_key"):
+        providers.append("claude")
+    if preferences.get("gemini_api_key"):
+        providers.append("gemini")
+    
+    if not providers:
+        logger.warning(f"No valid AI keys found for user {user_id}")
+        return None
+    
+    # Determine preferred provider
+    preferred = preferences.get("preferred_provider", "auto")
+    if preferred == "auto":
+        # Use first available provider
+        selected_provider = providers[0]
+    elif preferred in providers:
+        selected_provider = preferred
+    else:
+        # Fallback to first available
+        selected_provider = providers[0]
+    
+    return {
+        "user_id": user_id,
+        "selected_provider": selected_provider,
+        "api_key": preferences.get(f"{selected_provider}_api_key"),
+        "available_providers": providers,
+        "preferred_provider": preferred
+    }
