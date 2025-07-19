@@ -565,6 +565,22 @@ async def generate_strategy(
         "received_data": strategy_data
     }
 
+@router.get("/signals")
+async def get_ai_signals(user_id: str = Depends(get_user_id_from_headers)):
+    """Get AI trading signals - PENDING BACKEND IMPLEMENTATION"""
+    return {
+        "status": "not_implemented",
+        "message": "AI trading signals are planned but not yet implemented",
+        "feature": "ai_signals",
+        "signals": [],
+        "planned_features": [
+            "Real-time market signals",
+            "Technical analysis signals",
+            "Sentiment-based signals",
+            "Risk assessment signals"
+        ]
+    }
+
 @router.get("/strategy/list")
 async def get_strategies(user_id: str = Depends(get_user_id_from_headers)):
     """Get user strategies - PENDING BACKEND IMPLEMENTATION"""

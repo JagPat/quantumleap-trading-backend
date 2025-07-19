@@ -25,7 +25,14 @@ async def fetch_live_portfolio(user_id: str = Depends(get_user_from_headers)):
             "positions": snapshot.positions,
             "total_value": snapshot.total_value,
             "day_pnl": snapshot.day_pnl,
-            "total_pnl": snapshot.total_pnl
+            "total_pnl": snapshot.total_pnl,
+            "summary": {
+                "total_value": snapshot.total_value,
+                "day_pnl": snapshot.day_pnl,
+                "total_pnl": snapshot.total_pnl,
+                "holdings_count": len(snapshot.holdings) if snapshot.holdings else 0,
+                "positions_count": len(snapshot.positions) if snapshot.positions else 0
+            }
         }
         return FetchResponse(
             success=True, 
@@ -53,7 +60,14 @@ async def get_latest_portfolio(user_id: str = Depends(get_user_from_headers)):
             "positions": snapshot.positions,
             "total_value": snapshot.total_value,
             "day_pnl": snapshot.day_pnl,
-            "total_pnl": snapshot.total_pnl
+            "total_pnl": snapshot.total_pnl,
+            "summary": {
+                "total_value": snapshot.total_value,
+                "day_pnl": snapshot.day_pnl,
+                "total_pnl": snapshot.total_pnl,
+                "holdings_count": len(snapshot.holdings) if snapshot.holdings else 0,
+                "positions_count": len(snapshot.positions) if snapshot.positions else 0
+            }
         }
         
         return {
@@ -82,7 +96,14 @@ async def fetch_live_portfolio_simple(user_id: str = Query(..., description="Use
             "positions": snapshot.positions,
             "total_value": snapshot.total_value,
             "day_pnl": snapshot.day_pnl,
-            "total_pnl": snapshot.total_pnl
+            "total_pnl": snapshot.total_pnl,
+            "summary": {
+                "total_value": snapshot.total_value,
+                "day_pnl": snapshot.day_pnl,
+                "total_pnl": snapshot.total_pnl,
+                "holdings_count": len(snapshot.holdings) if snapshot.holdings else 0,
+                "positions_count": len(snapshot.positions) if snapshot.positions else 0
+            }
         }
         return {
             "status": "success",
@@ -121,7 +142,14 @@ async def get_latest_portfolio_simple(user_id: str = Query(..., description="Use
             "positions": snapshot.positions,
             "total_value": snapshot.total_value,
             "day_pnl": snapshot.day_pnl,
-            "total_pnl": snapshot.total_pnl
+            "total_pnl": snapshot.total_pnl,
+            "summary": {
+                "total_value": snapshot.total_value,
+                "day_pnl": snapshot.day_pnl,
+                "total_pnl": snapshot.total_pnl,
+                "holdings_count": len(snapshot.holdings) if snapshot.holdings else 0,
+                "positions_count": len(snapshot.positions) if snapshot.positions else 0
+            }
         }
         
         return {
