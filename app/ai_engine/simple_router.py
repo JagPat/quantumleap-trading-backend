@@ -7,15 +7,54 @@ from fastapi import APIRouter, Depends, Header
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 
-# Import enhanced models
-from .models import (
-    AIPreferencesRequest, AIPreferencesResponse,
-    APIKeyValidationRequest, APIKeyValidationResponse,
-    SignalsResponse as AISignalsResponse,
-    StrategyResponse as AIStrategyResponse,
-    ChatRequest, ChatResponse,
-    ErrorResponse
-)
+# Import enhanced models with fallback for missing dependencies
+try:
+    from .models import (
+        AIPreferencesRequest, AIPreferencesResponse,
+        APIKeyValidationRequest, APIKeyValidationResponse,
+        SignalsResponse as AISignalsResponse,
+        StrategyResponse as AIStrategyResponse,
+        ChatRequest, ChatResponse,
+        ErrorResponse
+    )
+    print("✅ Enhanced models imported successfully")
+except ImportError as e:
+    print(f"⚠️ Enhanced models not available, using fallback: {e}")
+    # Fallback to simple models for Railway compatibility
+    class AIPreferencesRequest(BaseModel):
+        preferred_ai_provider: str = "auto"
+        openai_api_key: Optional[str] = None
+        claude_api_key: Optional[str] = None
+        gemini_api_key: Optional[str] = None
+        grok_api_key: Optional[str] = None
+        provider_priorities: Optional[Dict[str, Any]] = None
+        cost_limits: Optional[Dict[str, Any]] = None
+        risk_tolerance: str = "medium"
+        trading_style: str = "balanced"
+
+    class AIPreferencesResponse(BaseModel):
+        status: str
+        preferences: Optional[Dict[str, Any]] = None
+        message: Optional[str] = None
+
+    class APIKeyValidationRequest(BaseModel):
+        provider: str
+        api_key: str
+
+    class APIKeyValidationResponse(BaseModel):
+        valid: bool
+        provider: str
+        message: Optional[str] = None
+
+    class AISignalsResponse(BaseModel):
+        status: str
+        signals: List[Dict[str, Any]] = []
+        message: Optional[str] = None
+
+    class AIStrategyResponse(BaseModel):
+        status: str
+        strategy: Optional[Dict[str, Any]] = None
+        message: Optional[str] = None
 
 router = APIRouter(prefix="/api/ai", tags=["AI Engine - BYOAI"])
 

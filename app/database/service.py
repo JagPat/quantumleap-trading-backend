@@ -4,7 +4,7 @@ Database service - handles all database operations
 import sqlite3
 import logging
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from cryptography.fernet import Fernet
 from app.core.config import settings
 
