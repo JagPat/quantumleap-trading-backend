@@ -184,6 +184,9 @@ class StrategyResponse(BaseModel):
     strategy: Optional[TradingStrategy] = None
     message: Optional[str] = None
 
+# Alias for backward compatibility
+AIStrategyResponse = StrategyResponse
+
 # ========================================
 # Signal Models
 # ========================================
@@ -325,6 +328,33 @@ class AIEngineConfig(BaseModel):
     cost_limit_cents_per_day: int = Field(1000, ge=0)
     enable_caching: bool = True
     cache_ttl_seconds: int = Field(3600, ge=60)
+
+# ========================================
+# Assistant Models
+# ========================================
+
+class AssistantMessageRequest(BaseModel):
+    """OpenAI Assistant message request"""
+    message: str = Field(..., min_length=1, description="Message to send to assistant")
+    thread_id: Optional[str] = Field(None, description="Thread ID for conversation continuity")
+    context: Optional[Dict[str, Any]] = Field(None, description="Additional context")
+
+class AssistantMessageResponse(BaseModel):
+    """OpenAI Assistant message response"""
+    status: str
+    reply: str
+    thread_id: str
+    message_id: Optional[str] = None
+    run_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+class AssistantStatusResponse(BaseModel):
+    """OpenAI Assistant status response"""
+    status: str
+    assistant_id: Optional[str] = None
+    assistant_name: Optional[str] = None
+    is_available: bool = False
+    message: Optional[str] = None
 
 # ========================================
 # Response Wrapper Models
