@@ -62,6 +62,21 @@ class TradingStyle(str, Enum):
 # AI Preferences Models
 # ========================================
 
+class AIPreferences(BaseModel):
+    """AI preferences model for database storage"""
+    user_id: str
+    preferred_ai_provider: AIProvider = AIProvider.AUTO
+    openai_api_key: Optional[str] = None
+    claude_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    grok_api_key: Optional[str] = None
+    provider_priorities: Optional[Dict[str, List[str]]] = None
+    cost_limits: Optional[Dict[str, float]] = None
+    risk_tolerance: RiskTolerance = RiskTolerance.MEDIUM
+    trading_style: TradingStyle = TradingStyle.BALANCED
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
 class AIPreferencesRequest(BaseModel):
     """Enhanced AI preferences request"""
     preferred_ai_provider: AIProvider = AIProvider.AUTO
