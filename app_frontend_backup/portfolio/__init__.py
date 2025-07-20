@@ -1,3 +1,0 @@
-"""
-Portfolio management module
-""" 

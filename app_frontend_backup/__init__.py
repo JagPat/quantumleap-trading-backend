@@ -1,3 +1,0 @@
-"""
-QuantumLeap Trading Backend Application
-""" 
