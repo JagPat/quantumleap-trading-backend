@@ -1,12 +1,19 @@
 """
-AI Engine Providers
-
-Isolated client wrappers for different AI providers.
-Each provider implements a common interface while handling provider-specific logic.
+AI Providers Package
+Contains all AI provider implementations and base classes
 """
+from .base_provider import BaseAIProvider, ValidationResult, UsageStats
+from .openai_provider import OpenAIProvider
+from .claude_provider import ClaudeProvider
+from .gemini_provider import GeminiProvider
+from .grok_provider import GrokProvider
 
-from .openai_client import OpenAIClient
-from .claude_client import ClaudeClient  
-from .gemini_client import GeminiClient
-
-__all__ = ["OpenAIClient", "ClaudeClient", "GeminiClient"] 
+__all__ = [
+    'BaseAIProvider',
+    'ValidationResult', 
+    'UsageStats',
+    'OpenAIProvider',
+    'ClaudeProvider', 
+    'GeminiProvider',
+    'GrokProvider'
+]
