@@ -7,36 +7,15 @@ from fastapi import APIRouter, Depends, Header
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 
-# Simple models for BYOAI
-class AIPreferencesRequest(BaseModel):
-    preferred_ai_provider: str = "auto"
-    openai_api_key: Optional[str] = None
-    claude_api_key: Optional[str] = None
-    gemini_api_key: Optional[str] = None
-
-class AIPreferencesResponse(BaseModel):
-    status: str
-    preferences: Optional[Dict[str, Any]] = None
-    message: Optional[str] = None
-
-class APIKeyValidationRequest(BaseModel):
-    provider: str
-    api_key: str
-
-class APIKeyValidationResponse(BaseModel):
-    valid: bool
-    provider: str
-    message: Optional[str] = None
-
-class AISignalsResponse(BaseModel):
-    status: str
-    signals: List[Dict[str, Any]] = []
-    message: Optional[str] = None
-
-class AIStrategyResponse(BaseModel):
-    status: str
-    strategy: Optional[Dict[str, Any]] = None
-    message: Optional[str] = None
+# Import enhanced models
+from .models import (
+    AIPreferencesRequest, AIPreferencesResponse,
+    APIKeyValidationRequest, APIKeyValidationResponse,
+    SignalsResponse as AISignalsResponse,
+    StrategyResponse as AIStrategyResponse,
+    ChatRequest, ChatResponse,
+    ErrorResponse
+)
 
 router = APIRouter(prefix="/api/ai", tags=["AI Engine - BYOAI"])
 
@@ -120,11 +99,29 @@ async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
             openai_key = preferences.get("openai_api_key")
             claude_key = preferences.get("claude_api_key")
             gemini_key = preferences.get("gemini_api_key")
+            grok_key = preferences.get("grok_api_key")
             
             # Create key previews (first 8 chars + "...")
             openai_preview = f"{openai_key[:8]}..." if openai_key and len(openai_key) > 8 else "***"
             claude_preview = f"{claude_key[:8]}..." if claude_key and len(claude_key) > 8 else "***"
             gemini_preview = f"{gemini_key[:8]}..." if gemini_key and len(gemini_key) > 8 else "***"
+            grok_preview = f"{grok_key[:8]}..." if grok_key and len(grok_key) > 8 else "***"
+            
+            # Parse JSON fields
+            import json
+            provider_priorities = None
+            if preferences.get("provider_priorities"):
+                try:
+                    provider_priorities = json.loads(preferences["provider_priorities"])
+                except json.JSONDecodeError:
+                    provider_priorities = None
+            
+            cost_limits = None
+            if preferences.get("cost_limits"):
+                try:
+                    cost_limits = json.loads(preferences["cost_limits"])
+                except json.JSONDecodeError:
+                    cost_limits = None
             
             return AIPreferencesResponse(
                 status="success",
@@ -133,9 +130,15 @@ async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
                     "has_openai_key": bool(openai_key),
                     "has_claude_key": bool(claude_key),
                     "has_gemini_key": bool(gemini_key),
+                    "has_grok_key": bool(grok_key),
                     "openai_key_preview": openai_preview,
                     "claude_key_preview": claude_preview,
-                    "gemini_key_preview": gemini_preview
+                    "gemini_key_preview": gemini_preview,
+                    "grok_key_preview": grok_preview,
+                    "provider_priorities": provider_priorities,
+                    "cost_limits": cost_limits,
+                    "risk_tolerance": preferences.get("risk_tolerance", "medium"),
+                    "trading_style": preferences.get("trading_style", "balanced")
                 },
                 message="Preferences retrieved successfully"
             )
@@ -147,9 +150,15 @@ async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
                     "has_openai_key": False,
                     "has_claude_key": False,
                     "has_gemini_key": False,
+                    "has_grok_key": False,
                     "openai_key_preview": "",
                     "claude_key_preview": "",
-                    "gemini_key_preview": ""
+                    "gemini_key_preview": "",
+                    "grok_key_preview": "",
+                    "provider_priorities": None,
+                    "cost_limits": None,
+                    "risk_tolerance": "medium",
+                    "trading_style": "balanced"
                 },
                 message="No preferences found. Add your AI key."
             )
@@ -161,9 +170,15 @@ async def get_ai_preferences(user_id: str = Depends(get_user_id_from_headers)):
                 "has_openai_key": False,
                 "has_claude_key": False,
                 "has_gemini_key": False,
+                "has_grok_key": False,
                 "openai_key_preview": "",
                 "claude_key_preview": "",
-                "gemini_key_preview": ""
+                "gemini_key_preview": "",
+                "grok_key_preview": "",
+                "provider_priorities": None,
+                "cost_limits": None,
+                "risk_tolerance": "medium",
+                "trading_style": "balanced"
             },
             message=f"Error retrieving preferences: {str(e)}"
         )
@@ -179,7 +194,8 @@ async def save_ai_preferences(
     has_valid_key = (
         preferences.openai_api_key and preferences.openai_api_key.strip() or
         preferences.claude_api_key and preferences.claude_api_key.strip() or
-        preferences.gemini_api_key and preferences.gemini_api_key.strip()
+        preferences.gemini_api_key and preferences.gemini_api_key.strip() or
+        preferences.grok_api_key and preferences.grok_api_key.strip()
     )
     
     if not has_valid_key:
@@ -191,6 +207,16 @@ async def save_ai_preferences(
     try:
         # Import database service
         from app.database.service import store_ai_preferences
+        import json
+        
+        # Convert provider priorities and cost limits to JSON strings
+        provider_priorities_json = None
+        if preferences.provider_priorities:
+            provider_priorities_json = json.dumps(preferences.provider_priorities)
+        
+        cost_limits_json = None
+        if preferences.cost_limits:
+            cost_limits_json = json.dumps(preferences.cost_limits)
         
         # Store preferences in database
         success = store_ai_preferences(
@@ -198,7 +224,12 @@ async def save_ai_preferences(
             openai_api_key=preferences.openai_api_key.strip() if preferences.openai_api_key else None,
             claude_api_key=preferences.claude_api_key.strip() if preferences.claude_api_key else None,
             gemini_api_key=preferences.gemini_api_key.strip() if preferences.gemini_api_key else None,
-            preferred_provider=preferences.preferred_ai_provider
+            grok_api_key=preferences.grok_api_key.strip() if preferences.grok_api_key else None,
+            preferred_provider=preferences.preferred_ai_provider,
+            provider_priorities=provider_priorities_json,
+            cost_limits=cost_limits_json,
+            risk_tolerance=preferences.risk_tolerance,
+            trading_style=preferences.trading_style
         )
         
         if success:
@@ -534,11 +565,50 @@ async def validate_api_key(request: APIKeyValidationRequest):
                 message=f"Gemini validation failed: {str(e)}"
             )
 
+    elif provider == "grok":
+        try:
+            import httpx
+            # Test Grok API key with xAI API
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.x.ai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "grok-beta",
+                        "messages": [{"role": "user", "content": "Hello"}],
+                        "max_tokens": 5
+                    },
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    return APIKeyValidationResponse(
+                        valid=True,
+                        provider=provider,
+                        message="Grok key is valid"
+                    )
+                else:
+                    error_detail = response.text
+                    return APIKeyValidationResponse(
+                        valid=False,
+                        provider=provider,
+                        message=f"Grok validation failed: HTTP {response.status_code} - {error_detail}"
+                    )
+        except Exception as e:
+            return APIKeyValidationResponse(
+                valid=False,
+                provider=provider,
+                message=f"Grok validation failed: {str(e)}"
+            )
+
     else:
         return APIKeyValidationResponse(
             valid=False,
             provider=provider,
-            message="Unsupported provider. Supported: openai, claude, gemini"
+            message="Unsupported provider. Supported: openai, claude, gemini, grok"
         )
 
 
