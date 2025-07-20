@@ -205,6 +205,9 @@ class SignalsRequest(BaseModel):
     signal_type: Optional[SignalType] = Field(None, description="Type of signals to generate")
     portfolio_data: Optional[Dict[str, Any]] = None
 
+# Alias for backward compatibility
+AISignalsRequest = SignalsRequest
+
 class SignalsResponse(BaseModel):
     """Trading signals response"""
     status: str

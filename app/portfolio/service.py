@@ -2,7 +2,6 @@ import logging
 import json
 from datetime import datetime
 from typing import Optional
-import kite_service
 from ..database.service import get_user_credentials, store_portfolio_snapshot, get_latest_portfolio_snapshot as get_snapshot_from_db
 from .models import PortfolioSnapshot
 
