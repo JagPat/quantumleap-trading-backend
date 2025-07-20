@@ -53,7 +53,7 @@ def init_database():
             FOREIGN KEY (user_id) REFERENCES users (user_id)
         )
     ''')
-    # Create ai_user_preferences table for storing AI API keys
+    # Create enhanced ai_user_preferences table for storing AI API keys
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ai_user_preferences (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,12 +61,125 @@ def init_database():
             openai_api_key TEXT,
             claude_api_key TEXT,
             gemini_api_key TEXT,
+            grok_api_key TEXT,
             preferred_provider TEXT DEFAULT 'auto',
+            provider_priorities TEXT,
+            cost_limits TEXT,
+            risk_tolerance TEXT DEFAULT 'medium',
+            trading_style TEXT DEFAULT 'balanced',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (user_id)
         )
     ''')
+    
+    # Create ai_chat_sessions table for conversation management
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            thread_id TEXT NOT NULL,
+            session_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
+    
+    # Create ai_chat_messages table for message history
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            thread_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            message_type TEXT NOT NULL,
+            content TEXT NOT NULL,
+            metadata TEXT,
+            provider_used TEXT,
+            tokens_used INTEGER,
+            cost_cents INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES ai_chat_sessions (id),
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
+    
+    # Create ai_strategies table for generated trading strategies
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_strategies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            strategy_name TEXT NOT NULL,
+            strategy_type TEXT NOT NULL,
+            parameters TEXT NOT NULL,
+            rules TEXT NOT NULL,
+            risk_management TEXT,
+            backtesting_results TEXT,
+            performance_metrics TEXT,
+            is_active BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
+    
+    # Create ai_trading_signals table for signal management
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_trading_signals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            signal_type TEXT NOT NULL,
+            confidence_score REAL NOT NULL,
+            reasoning TEXT,
+            target_price REAL,
+            stop_loss REAL,
+            take_profit REAL,
+            position_size REAL,
+            market_data TEXT,
+            provider_used TEXT,
+            is_active BOOLEAN DEFAULT TRUE,
+            expires_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
+    
+    # Create ai_usage_tracking table for cost monitoring
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_usage_tracking (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            operation_type TEXT NOT NULL,
+            tokens_used INTEGER,
+            cost_cents INTEGER,
+            response_time_ms INTEGER,
+            success BOOLEAN,
+            error_message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
+    
+    # Create ai_analysis_results table for analysis storage
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_analysis_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            analysis_type TEXT NOT NULL,
+            symbols TEXT,
+            input_data TEXT,
+            analysis_result TEXT NOT NULL,
+            provider_used TEXT,
+            confidence_score REAL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -350,7 +463,12 @@ def store_ai_preferences(
     openai_api_key: Optional[str] = None,
     claude_api_key: Optional[str] = None,
     gemini_api_key: Optional[str] = None,
-    preferred_provider: str = "auto"
+    grok_api_key: Optional[str] = None,
+    preferred_provider: str = "auto",
+    provider_priorities: Optional[str] = None,
+    cost_limits: Optional[str] = None,
+    risk_tolerance: str = "medium",
+    trading_style: str = "balanced"
 ) -> bool:
     """
     Store AI preferences for a user
@@ -359,7 +477,12 @@ def store_ai_preferences(
         openai_api_key: OpenAI API key (encrypted)
         claude_api_key: Claude API key (encrypted)
         gemini_api_key: Gemini API key (encrypted)
+        grok_api_key: Grok API key (encrypted)
         preferred_provider: Preferred AI provider
+        provider_priorities: JSON string of provider priorities by task type
+        cost_limits: JSON string of cost limits per provider
+        risk_tolerance: User's risk tolerance level
+        trading_style: User's trading style preference
     Returns:
         bool: True if successful, False otherwise
     """
@@ -371,12 +494,16 @@ def store_ai_preferences(
         encrypted_openai = encrypt_data(openai_api_key) if openai_api_key else None
         encrypted_claude = encrypt_data(claude_api_key) if claude_api_key else None
         encrypted_gemini = encrypt_data(gemini_api_key) if gemini_api_key else None
+        encrypted_grok = encrypt_data(grok_api_key) if grok_api_key else None
         
         cursor.execute('''
             INSERT OR REPLACE INTO ai_user_preferences 
-            (user_id, openai_api_key, claude_api_key, gemini_api_key, preferred_provider, updated_at)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ''', (user_id, encrypted_openai, encrypted_claude, encrypted_gemini, preferred_provider))
+            (user_id, openai_api_key, claude_api_key, gemini_api_key, grok_api_key, 
+             preferred_provider, provider_priorities, cost_limits, risk_tolerance, 
+             trading_style, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (user_id, encrypted_openai, encrypted_claude, encrypted_gemini, encrypted_grok,
+              preferred_provider, provider_priorities, cost_limits, risk_tolerance, trading_style))
         
         conn.commit()
         conn.close()
@@ -398,7 +525,9 @@ def get_ai_preferences(user_id: str) -> Optional[Dict[str, Any]]:
         conn = sqlite3.connect(settings.database_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT openai_api_key, claude_api_key, gemini_api_key, preferred_provider, created_at, updated_at
+            SELECT openai_api_key, claude_api_key, gemini_api_key, grok_api_key, 
+                   preferred_provider, provider_priorities, cost_limits, 
+                   risk_tolerance, trading_style, created_at, updated_at
             FROM ai_user_preferences WHERE user_id = ?
         ''', (user_id,))
         result = cursor.fetchone()
@@ -409,14 +538,20 @@ def get_ai_preferences(user_id: str) -> Optional[Dict[str, Any]]:
             openai_key = decrypt_data(result[0]) if result[0] else None
             claude_key = decrypt_data(result[1]) if result[1] else None
             gemini_key = decrypt_data(result[2]) if result[2] else None
+            grok_key = decrypt_data(result[3]) if result[3] else None
             
             return {
                 "openai_api_key": openai_key,
                 "claude_api_key": claude_key,
                 "gemini_api_key": gemini_key,
-                "preferred_provider": result[3],
-                "created_at": result[4],
-                "updated_at": result[5]
+                "grok_api_key": grok_key,
+                "preferred_provider": result[4],
+                "provider_priorities": result[5],
+                "cost_limits": result[6],
+                "risk_tolerance": result[7],
+                "trading_style": result[8],
+                "created_at": result[9],
+                "updated_at": result[10]
             }
         return None
     except Exception as e:
@@ -487,3 +622,563 @@ def get_ai_client_for_user(user_id: str) -> Optional[Dict[str, Any]]:
         "available_providers": providers,
         "preferred_provider": preferred
     }
+# ========================================
+# Chat Session Management Functions
+# ========================================
+
+def create_chat_session(user_id: str, thread_id: str, session_name: Optional[str] = None) -> Optional[int]:
+    """
+    Create a new chat session
+    Args:
+        user_id: User identifier
+        thread_id: Thread identifier for the conversation
+        session_name: Optional name for the session
+    Returns:
+        Session ID if successful, None otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO ai_chat_sessions (user_id, thread_id, session_name)
+            VALUES (?, ?, ?)
+        ''', (user_id, thread_id, session_name))
+        session_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        logger.info(f"Created chat session {session_id} for user {user_id}")
+        return session_id
+    except Exception as e:
+        logger.error(f"Error creating chat session for user {user_id}: {str(e)}")
+        return None
+
+def store_chat_message(
+    session_id: int,
+    thread_id: str,
+    user_id: str,
+    message_type: str,
+    content: str,
+    metadata: Optional[str] = None,
+    provider_used: Optional[str] = None,
+    tokens_used: Optional[int] = None,
+    cost_cents: Optional[int] = None
+) -> bool:
+    """
+    Store a chat message
+    Args:
+        session_id: Chat session ID
+        thread_id: Thread identifier
+        user_id: User identifier
+        message_type: 'user' or 'assistant'
+        content: Message content
+        metadata: Optional JSON metadata
+        provider_used: AI provider used for response
+        tokens_used: Number of tokens used
+        cost_cents: Cost in cents
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO ai_chat_messages 
+            (session_id, thread_id, user_id, message_type, content, metadata, 
+             provider_used, tokens_used, cost_cents)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (session_id, thread_id, user_id, message_type, content, metadata,
+              provider_used, tokens_used, cost_cents))
+        conn.commit()
+        conn.close()
+        logger.info(f"Stored {message_type} message for session {session_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error storing chat message: {str(e)}")
+        return False
+
+def get_chat_sessions(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    """
+    Get chat sessions for a user
+    Args:
+        user_id: User identifier
+        limit: Maximum number of sessions to return
+    Returns:
+        List of chat sessions
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, thread_id, session_name, created_at, updated_at, is_active
+            FROM ai_chat_sessions 
+            WHERE user_id = ? AND is_active = TRUE
+            ORDER BY updated_at DESC
+            LIMIT ?
+        ''', (user_id, limit))
+        results = cursor.fetchall()
+        conn.close()
+        
+        sessions = []
+        for result in results:
+            sessions.append({
+                "id": result[0],
+                "thread_id": result[1],
+                "session_name": result[2],
+                "created_at": result[3],
+                "updated_at": result[4],
+                "is_active": bool(result[5])
+            })
+        return sessions
+    except Exception as e:
+        logger.error(f"Error retrieving chat sessions for user {user_id}: {str(e)}")
+        return []
+
+def get_chat_messages(session_id: int, limit: int = 100) -> List[Dict[str, Any]]:
+    """
+    Get chat messages for a session
+    Args:
+        session_id: Chat session ID
+        limit: Maximum number of messages to return
+    Returns:
+        List of chat messages
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, message_type, content, metadata, provider_used, 
+                   tokens_used, cost_cents, created_at
+            FROM ai_chat_messages 
+            WHERE session_id = ?
+            ORDER BY created_at ASC
+            LIMIT ?
+        ''', (session_id, limit))
+        results = cursor.fetchall()
+        conn.close()
+        
+        messages = []
+        for result in results:
+            messages.append({
+                "id": result[0],
+                "message_type": result[1],
+                "content": result[2],
+                "metadata": result[3],
+                "provider_used": result[4],
+                "tokens_used": result[5],
+                "cost_cents": result[6],
+                "created_at": result[7]
+            })
+        return messages
+    except Exception as e:
+        logger.error(f"Error retrieving chat messages for session {session_id}: {str(e)}")
+        return []
+
+# ========================================
+# Strategy Management Functions
+# ========================================
+
+def store_ai_strategy(
+    user_id: str,
+    strategy_name: str,
+    strategy_type: str,
+    parameters: str,
+    rules: str,
+    risk_management: Optional[str] = None,
+    backtesting_results: Optional[str] = None,
+    performance_metrics: Optional[str] = None
+) -> Optional[int]:
+    """
+    Store an AI-generated trading strategy
+    Args:
+        user_id: User identifier
+        strategy_name: Name of the strategy
+        strategy_type: Type of strategy (momentum, mean_reversion, etc.)
+        parameters: JSON string of strategy parameters
+        rules: JSON string of trading rules
+        risk_management: JSON string of risk management rules
+        backtesting_results: JSON string of backtest results
+        performance_metrics: JSON string of performance metrics
+    Returns:
+        Strategy ID if successful, None otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO ai_strategies 
+            (user_id, strategy_name, strategy_type, parameters, rules, 
+             risk_management, backtesting_results, performance_metrics)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, strategy_name, strategy_type, parameters, rules,
+              risk_management, backtesting_results, performance_metrics))
+        strategy_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        logger.info(f"Stored strategy {strategy_id} for user {user_id}")
+        return strategy_id
+    except Exception as e:
+        logger.error(f"Error storing strategy for user {user_id}: {str(e)}")
+        return None
+
+def get_user_strategies(user_id: str, active_only: bool = False) -> List[Dict[str, Any]]:
+    """
+    Get strategies for a user
+    Args:
+        user_id: User identifier
+        active_only: Whether to return only active strategies
+    Returns:
+        List of strategies
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        query = '''
+            SELECT id, strategy_name, strategy_type, parameters, rules,
+                   risk_management, backtesting_results, performance_metrics,
+                   is_active, created_at, updated_at
+            FROM ai_strategies 
+            WHERE user_id = ?
+        '''
+        params = [user_id]
+        
+        if active_only:
+            query += ' AND is_active = TRUE'
+        
+        query += ' ORDER BY created_at DESC'
+        
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        conn.close()
+        
+        strategies = []
+        for result in results:
+            strategies.append({
+                "id": result[0],
+                "strategy_name": result[1],
+                "strategy_type": result[2],
+                "parameters": result[3],
+                "rules": result[4],
+                "risk_management": result[5],
+                "backtesting_results": result[6],
+                "performance_metrics": result[7],
+                "is_active": bool(result[8]),
+                "created_at": result[9],
+                "updated_at": result[10]
+            })
+        return strategies
+    except Exception as e:
+        logger.error(f"Error retrieving strategies for user {user_id}: {str(e)}")
+        return []
+
+# ========================================
+# Trading Signals Functions
+# ========================================
+
+def store_trading_signal(
+    user_id: str,
+    symbol: str,
+    signal_type: str,
+    confidence_score: float,
+    reasoning: str,
+    target_price: Optional[float] = None,
+    stop_loss: Optional[float] = None,
+    take_profit: Optional[float] = None,
+    position_size: Optional[float] = None,
+    market_data: Optional[str] = None,
+    provider_used: Optional[str] = None,
+    expires_at: Optional[str] = None
+) -> Optional[int]:
+    """
+    Store a trading signal
+    Args:
+        user_id: User identifier
+        symbol: Trading symbol
+        signal_type: 'buy', 'sell', or 'hold'
+        confidence_score: Confidence score (0.0 to 1.0)
+        reasoning: Explanation for the signal
+        target_price: Target price for the trade
+        stop_loss: Stop loss price
+        take_profit: Take profit price
+        position_size: Recommended position size
+        market_data: JSON string of market data used
+        provider_used: AI provider that generated the signal
+        expires_at: When the signal expires
+    Returns:
+        Signal ID if successful, None otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO ai_trading_signals 
+            (user_id, symbol, signal_type, confidence_score, reasoning,
+             target_price, stop_loss, take_profit, position_size, 
+             market_data, provider_used, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, symbol, signal_type, confidence_score, reasoning,
+              target_price, stop_loss, take_profit, position_size,
+              market_data, provider_used, expires_at))
+        signal_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        logger.info(f"Stored trading signal {signal_id} for user {user_id}")
+        return signal_id
+    except Exception as e:
+        logger.error(f"Error storing trading signal for user {user_id}: {str(e)}")
+        return None
+
+def get_active_signals(user_id: str, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Get active trading signals for a user
+    Args:
+        user_id: User identifier
+        symbol: Optional symbol filter
+    Returns:
+        List of active trading signals
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        query = '''
+            SELECT id, symbol, signal_type, confidence_score, reasoning,
+                   target_price, stop_loss, take_profit, position_size,
+                   market_data, provider_used, expires_at, created_at
+            FROM ai_trading_signals 
+            WHERE user_id = ? AND is_active = TRUE
+        '''
+        params = [user_id]
+        
+        if symbol:
+            query += ' AND symbol = ?'
+            params.append(symbol)
+        
+        query += ' AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)'
+        query += ' ORDER BY created_at DESC'
+        
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        conn.close()
+        
+        signals = []
+        for result in results:
+            signals.append({
+                "id": result[0],
+                "symbol": result[1],
+                "signal_type": result[2],
+                "confidence_score": result[3],
+                "reasoning": result[4],
+                "target_price": result[5],
+                "stop_loss": result[6],
+                "take_profit": result[7],
+                "position_size": result[8],
+                "market_data": result[9],
+                "provider_used": result[10],
+                "expires_at": result[11],
+                "created_at": result[12]
+            })
+        return signals
+    except Exception as e:
+        logger.error(f"Error retrieving trading signals for user {user_id}: {str(e)}")
+        return []
+
+# ========================================
+# Usage Tracking Functions
+# ========================================
+
+def track_ai_usage(
+    user_id: str,
+    provider: str,
+    operation_type: str,
+    tokens_used: Optional[int] = None,
+    cost_cents: Optional[int] = None,
+    response_time_ms: Optional[int] = None,
+    success: bool = True,
+    error_message: Optional[str] = None
+) -> bool:
+    """
+    Track AI usage for cost monitoring and analytics
+    Args:
+        user_id: User identifier
+        provider: AI provider used
+        operation_type: Type of operation (chat, analysis, strategy, etc.)
+        tokens_used: Number of tokens used
+        cost_cents: Cost in cents
+        response_time_ms: Response time in milliseconds
+        success: Whether the operation was successful
+        error_message: Error message if operation failed
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO ai_usage_tracking 
+            (user_id, provider, operation_type, tokens_used, cost_cents,
+             response_time_ms, success, error_message)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, provider, operation_type, tokens_used, cost_cents,
+              response_time_ms, success, error_message))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error tracking AI usage for user {user_id}: {str(e)}")
+        return False
+
+def get_usage_statistics(user_id: str, days: int = 30) -> Dict[str, Any]:
+    """
+    Get usage statistics for a user
+    Args:
+        user_id: User identifier
+        days: Number of days to look back
+    Returns:
+        Dictionary with usage statistics
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        # Get usage by provider
+        cursor.execute('''
+            SELECT provider, COUNT(*) as requests, SUM(tokens_used) as total_tokens,
+                   SUM(cost_cents) as total_cost_cents, AVG(response_time_ms) as avg_response_time
+            FROM ai_usage_tracking 
+            WHERE user_id = ? AND created_at >= datetime('now', '-{} days')
+            GROUP BY provider
+        '''.format(days), (user_id,))
+        provider_stats = cursor.fetchall()
+        
+        # Get usage by operation type
+        cursor.execute('''
+            SELECT operation_type, COUNT(*) as requests, SUM(cost_cents) as total_cost_cents
+            FROM ai_usage_tracking 
+            WHERE user_id = ? AND created_at >= datetime('now', '-{} days')
+            GROUP BY operation_type
+        '''.format(days), (user_id,))
+        operation_stats = cursor.fetchall()
+        
+        conn.close()
+        
+        return {
+            "user_id": user_id,
+            "period_days": days,
+            "provider_statistics": [
+                {
+                    "provider": stat[0],
+                    "requests": stat[1],
+                    "total_tokens": stat[2] or 0,
+                    "total_cost_cents": stat[3] or 0,
+                    "avg_response_time_ms": stat[4] or 0
+                }
+                for stat in provider_stats
+            ],
+            "operation_statistics": [
+                {
+                    "operation_type": stat[0],
+                    "requests": stat[1],
+                    "total_cost_cents": stat[2] or 0
+                }
+                for stat in operation_stats
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving usage statistics for user {user_id}: {str(e)}")
+        return {"user_id": user_id, "period_days": days, "provider_statistics": [], "operation_statistics": []}
+
+# ========================================
+# Analysis Results Functions
+# ========================================
+
+def store_analysis_result(
+    user_id: str,
+    analysis_type: str,
+    symbols: Optional[str] = None,
+    input_data: Optional[str] = None,
+    analysis_result: str = "",
+    provider_used: Optional[str] = None,
+    confidence_score: Optional[float] = None
+) -> Optional[int]:
+    """
+    Store an analysis result
+    Args:
+        user_id: User identifier
+        analysis_type: Type of analysis (technical, fundamental, sentiment, etc.)
+        symbols: JSON string of symbols analyzed
+        input_data: JSON string of input data
+        analysis_result: JSON string of analysis results
+        provider_used: AI provider used
+        confidence_score: Confidence score for the analysis
+    Returns:
+        Analysis ID if successful, None otherwise
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO ai_analysis_results 
+            (user_id, analysis_type, symbols, input_data, analysis_result,
+             provider_used, confidence_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, analysis_type, symbols, input_data, analysis_result,
+              provider_used, confidence_score))
+        analysis_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        logger.info(f"Stored analysis result {analysis_id} for user {user_id}")
+        return analysis_id
+    except Exception as e:
+        logger.error(f"Error storing analysis result for user {user_id}: {str(e)}")
+        return None
+
+def get_recent_analyses(user_id: str, analysis_type: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Get recent analysis results for a user
+    Args:
+        user_id: User identifier
+        analysis_type: Optional filter by analysis type
+        limit: Maximum number of results to return
+    Returns:
+        List of analysis results
+    """
+    try:
+        conn = sqlite3.connect(settings.database_path)
+        cursor = conn.cursor()
+        
+        query = '''
+            SELECT id, analysis_type, symbols, input_data, analysis_result,
+                   provider_used, confidence_score, created_at
+            FROM ai_analysis_results 
+            WHERE user_id = ?
+        '''
+        params = [user_id]
+        
+        if analysis_type:
+            query += ' AND analysis_type = ?'
+            params.append(analysis_type)
+        
+        query += ' ORDER BY created_at DESC LIMIT ?'
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        conn.close()
+        
+        analyses = []
+        for result in results:
+            analyses.append({
+                "id": result[0],
+                "analysis_type": result[1],
+                "symbols": result[2],
+                "input_data": result[3],
+                "analysis_result": result[4],
+                "provider_used": result[5],
+                "confidence_score": result[6],
+                "created_at": result[7]
+            })
+        return analyses
+    except Exception as e:
+        logger.error(f"Error retrieving analysis results for user {user_id}: {str(e)}")
+        return []
