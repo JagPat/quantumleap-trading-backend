@@ -75,7 +75,7 @@ async def ai_engine_status(user_id: str = Depends(get_user_id_from_headers)):
         
         preferences = get_ai_preferences(user_id)
         
-        if preferences and (preferences.get("openai_api_key") or preferences.get("claude_api_key") or preferences.get("gemini_api_key")):
+        if preferences and (preferences.get("openai_api_key") or preferences.get("claude_api_key") or preferences.get("gemini_api_key") or preferences.get("grok_api_key")):
             # User has configured API keys
             configured_providers = []
             if preferences.get("openai_api_key"):
@@ -84,6 +84,8 @@ async def ai_engine_status(user_id: str = Depends(get_user_id_from_headers)):
                 configured_providers.append("claude")
             if preferences.get("gemini_api_key"):
                 configured_providers.append("gemini")
+            if preferences.get("grok_api_key"):
+                configured_providers.append("grok")
             
             return {
                 "status": "configured",
@@ -103,7 +105,7 @@ async def ai_engine_status(user_id: str = Depends(get_user_id_from_headers)):
             return {
                 "status": "no_key",
                 "engine": "BYOAI (Bring Your Own AI)",
-                "providers": ["openai", "claude", "gemini"],
+                "providers": ["openai", "claude", "gemini", "grok"],
                 "message": "No API key configured. Add your AI key to enable features.",
                 "endpoints": [
                     "/api/ai/preferences",
