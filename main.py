@@ -50,13 +50,22 @@ app.add_middleware(
 async def health_check():
     """Simple health check endpoint for Railway deployment"""
     print("🏥 Health check requested")
-    return {
-        "status": "ok", 
-        "app": settings.app_name, 
-        "version": settings.app_version,
-        "deployment_time": "2024-07-16T15:30:00Z",
-        "force_redeploy": True
-    }
+    try:
+        return {
+            "status": "ok", 
+            "app": settings.app_name, 
+            "version": settings.app_version,
+            "deployment_time": "2025-07-20T09:00:00Z",
+            "timestamp": "2025-07-20T09:00:00Z",
+            "railway_ready": True
+        }
+    except Exception as e:
+        print(f"❌ Health check error: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": "2025-07-20T09:00:00Z"
+        }
 
 @app.get("/version")
 async def get_version():

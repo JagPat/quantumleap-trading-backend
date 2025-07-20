@@ -214,6 +214,9 @@ class SignalsResponse(BaseModel):
     signals: List[TradingSignal] = []
     message: Optional[str] = None
 
+# Alias for backward compatibility
+AISignalsResponse = SignalsResponse
+
 # ========================================
 # Analysis Models
 # ========================================
