@@ -298,6 +298,50 @@ except Exception as e:
     print(f"❌ Failed to load simple AI router: {e}")
     logger.error(f"❌ Failed to load simple AI router: {e}")
 
+# Chat router - Phase 4 implementation
+try:
+    print("🔄 Including chat router...")
+    from app.ai_engine.chat_router import router as chat_router
+    app.include_router(chat_router)
+    print("✅ Chat router loaded and registered.")
+    logger.info("✅ Chat router loaded and registered.")
+except Exception as e:
+    print(f"❌ Failed to load chat router: {e}")
+    logger.error(f"❌ Failed to load chat router: {e}")
+    
+    # Create fallback chat router
+    try:
+        from fastapi import APIRouter
+        
+        fallback_chat_router = APIRouter(prefix="/api/ai/chat", tags=["AI Chat - Fallback"])
+        
+        @fallback_chat_router.get("/health")
+        async def fallback_chat_health():
+            return {
+                "status": "fallback",
+                "message": "Chat service in fallback mode",
+                "error": str(e)
+            }
+        
+        @fallback_chat_router.post("/message")
+        async def fallback_chat_message():
+            return {
+                "status": "error",
+                "reply": "Chat service is currently unavailable. Please try again later.",
+                "thread_id": "fallback",
+                "message_id": "fallback",
+                "provider_used": "none",
+                "tokens_used": 0,
+                "cost_cents": 0
+            }
+        
+        app.include_router(fallback_chat_router)
+        print("🔄 Fallback chat router created and registered.")
+        logger.info("🔄 Fallback chat router created and registered.")
+    except Exception as fallback_e:
+        print(f"❌ Failed to create fallback chat router: {fallback_e}")
+        logger.error(f"❌ Failed to create fallback chat router: {fallback_e}")
+
 # Alternative AI router for /ai/* endpoints (without /api prefix)
 try:
     print("🔄 Including alternative AI router for /ai/* endpoints...")
