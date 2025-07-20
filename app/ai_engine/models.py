@@ -175,6 +175,9 @@ class StrategyRequest(BaseModel):
     parameters: StrategyParameters
     portfolio_data: Optional[Dict[str, Any]] = None
 
+# Alias for backward compatibility
+AIStrategyRequest = StrategyRequest
+
 class StrategyResponse(BaseModel):
     """Strategy generation response"""
     status: str
