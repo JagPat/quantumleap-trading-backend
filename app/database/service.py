@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 # Initialize cipher suite for encryption
 cipher_suite = Fernet(settings.get_encryption_key())
 
+def get_db_connection():
+    """Get a database connection"""
+    return sqlite3.connect(settings.database_path)
+
 def encrypt_data(data: str) -> str:
     """Encrypt sensitive data"""
     return cipher_suite.encrypt(data.encode()).decode()
