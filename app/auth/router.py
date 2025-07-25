@@ -116,6 +116,24 @@ async def broker_callback(
                         'timestamp': datetime.now().isoformat()
                     }
                     
+                    # CRITICAL: Store credentials in database for portfolio service
+                    from ..database.service import store_user_credentials
+                    user_data = session_result.user_data
+                    store_success = store_user_credentials(
+                        user_id=user_id,
+                        api_key=stored_api_key,
+                        api_secret=stored_api_secret,
+                        access_token=access_token,
+                        user_name=user_data.get("user_name"),
+                        email=user_data.get("email"),
+                        last_successful_connection=datetime.now().isoformat()
+                    )
+                    
+                    if store_success:
+                        logger.info(f"✅ Credentials stored in database for user: {user_id}")
+                    else:
+                        logger.error(f"❌ Failed to store credentials in database for user: {user_id}")
+                    
                     logger.info(f"✅ Token exchange successful for user: {user_id}")
                     
                     # Clear OAuth temp data
