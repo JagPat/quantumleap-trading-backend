@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 class PortfolioService:
     def _calculate_portfolio_summary(self, holdings: list, positions: list) -> dict:
         """
-        Calculate portfolio summary values from holdings and positions using Kite Connect API fields
+        Calculate portfolio summary - ONLY aggregate broker-provided values
+        Use broker calculations directly, only sum them up for totals
         """
         total_value = 0.0
         total_pnl = 0.0
@@ -19,10 +20,10 @@ class PortfolioService:
         holdings_value = 0.0
         positions_value = 0.0
         
-        # Calculate from holdings (Kite Connect API fields)
+        # Aggregate holdings data (using broker-calculated values)
         for holding in holdings:
             if isinstance(holding, dict):
-                # Current value = quantity * last_price
+                # Current value = quantity * last_price (only for total calculation)
                 quantity = holding.get('quantity', 0)
                 last_price = holding.get('last_price', 0)
                 if isinstance(quantity, (int, float)) and isinstance(last_price, (int, float)):
@@ -30,35 +31,35 @@ class PortfolioService:
                     total_value += current_value
                     holdings_value += current_value
                 
-                # Total P&L from holdings
-                pnl = holding.get('pnl', 0)
-                if isinstance(pnl, (int, float)):
-                    total_pnl += pnl
+                # Use broker-calculated P&L directly (NO recalculation)
+                broker_pnl = holding.get('pnl', 0)
+                if isinstance(broker_pnl, (int, float)):
+                    total_pnl += broker_pnl
                 
-                # Day P&L from holdings
-                day_change = holding.get('day_change', 0)
-                if isinstance(day_change, (int, float)):
-                    day_pnl += day_change
+                # Use broker-calculated day change directly (NO recalculation)
+                broker_day_change = holding.get('day_change', 0)
+                if isinstance(broker_day_change, (int, float)):
+                    day_pnl += broker_day_change
         
-        # Calculate from positions (net positions)
+        # Aggregate positions data (using broker-calculated values)
         for position in positions:
             if isinstance(position, dict):
-                # Position value = quantity * last_price
+                # Position value = quantity * last_price (only for total calculation)
                 quantity = position.get('quantity', 0)
                 last_price = position.get('last_price', 0)
                 if isinstance(quantity, (int, float)) and isinstance(last_price, (int, float)):
-                    position_value = abs(quantity) * last_price  # Use abs for position value
+                    position_value = abs(quantity) * last_price
                     positions_value += position_value
                 
-                # Unrealized P&L from positions
-                unrealised = position.get('unrealised', 0)
-                if isinstance(unrealised, (int, float)):
-                    total_pnl += unrealised
+                # Use broker-calculated unrealized P&L directly (NO recalculation)
+                broker_unrealised = position.get('unrealised', 0)
+                if isinstance(broker_unrealised, (int, float)):
+                    total_pnl += broker_unrealised
                 
-                # Day P&L from positions (mark to market)
-                m2m = position.get('m2m', 0)
-                if isinstance(m2m, (int, float)):
-                    day_pnl += m2m
+                # Use broker-calculated M2M directly (NO recalculation)
+                broker_m2m = position.get('m2m', 0)
+                if isinstance(broker_m2m, (int, float)):
+                    day_pnl += broker_m2m
         
         return {
             'total_value': round(total_value, 2),
@@ -70,26 +71,22 @@ class PortfolioService:
 
     def _process_holdings_data(self, holdings: list) -> list:
         """
-        Process holdings data to add calculated fields for frontend
+        Process holdings data - MINIMAL processing, use broker data directly
+        Only add current_value for frontend convenience, everything else from broker
         """
         processed_holdings = []
         for holding in holdings:
             if isinstance(holding, dict):
-                # Calculate current value
+                # ONLY calculate current_value for display convenience
+                # Everything else comes directly from broker
                 quantity = holding.get('quantity', 0)
                 last_price = holding.get('last_price', 0)
                 current_value = quantity * last_price if quantity and last_price else 0
                 
-                # Calculate day change percentage
-                day_change = holding.get('day_change', 0)
-                day_change_percentage = holding.get('day_change_percentage', 0)
-                
-                # Add calculated fields
+                # Use ALL broker data directly - no recalculation
                 processed_holding = {
-                    **holding,  # Keep all original fields
-                    'current_value': round(current_value, 2),
-                    'day_change_abs': round(day_change, 2),
-                    'day_change_percentage': round(day_change_percentage, 2)
+                    **holding,  # Keep ALL original broker fields unchanged
+                    'current_value': round(current_value, 2)  # Only add this for frontend
                 }
                 processed_holdings.append(processed_holding)
         
@@ -97,23 +94,22 @@ class PortfolioService:
 
     def _process_positions_data(self, positions: list) -> list:
         """
-        Process positions data to add calculated fields for frontend
+        Process positions data - MINIMAL processing, use broker data directly
+        Only add current_value for frontend convenience, everything else from broker
         """
         processed_positions = []
         for position in positions:
             if isinstance(position, dict):
-                # Calculate current value
+                # ONLY calculate current_value for display convenience
+                # Everything else comes directly from broker
                 quantity = position.get('quantity', 0)
                 last_price = position.get('last_price', 0)
                 current_value = abs(quantity) * last_price if quantity and last_price else 0
                 
-                # Add calculated fields
+                # Use ALL broker data directly - no recalculation of P&L, M2M, etc.
                 processed_position = {
-                    **position,  # Keep all original fields
-                    'current_value': round(current_value, 2),
-                    'unrealised_pnl': round(position.get('unrealised', 0), 2),
-                    'realised_pnl': round(position.get('realised', 0), 2),
-                    'm2m_pnl': round(position.get('m2m', 0), 2)
+                    **position,  # Keep ALL original broker fields unchanged
+                    'current_value': round(current_value, 2)  # Only add this for frontend
                 }
                 processed_positions.append(processed_position)
         
