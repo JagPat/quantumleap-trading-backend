@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "TestSprite": {
+      "command": "npx",
+      "args": [
+        "@testsprite/testsprite-mcp@latest"
+      ],
+      "env": {
+        "API_KEY": "sk-user-k2ZCJgN9A2rN3Qwpw3HWmK3idoE71yBRpjQwvBOL3trXS5FbpIhcNZYpznQgxTd1f6BOb5LUrKxOZlE75A1-NsJKKS-K_w45oE3mX9nx8sIBuglAOk29DX0pggVNc0Bpm7k",
+        "TEST_MODE": "true",
+        "BASE_URL": "http://localhost:5173",
+        "AUTH_BYPASS": "true"
+      }
+    }
+  }
+}

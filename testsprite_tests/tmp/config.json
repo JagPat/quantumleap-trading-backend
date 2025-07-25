@@ -1,0 +1,25 @@
+{
+  "status": "init",
+  "scope": "codebase",
+  "type": "frontend",
+  "localEndpoint": "http://localhost:5173",
+  "serverPort": 55414,
+  "executionArgs": {
+    "projectName": "quantum-leap-frontend",
+    "projectPath": "/Users/jagrutpatel/Kiro_Project/quantum-leap-frontend",
+    "testIds": [
+      "auth_001_001",
+      "auth_001_002",
+      "dashboard_002_001",
+      "portfolio_003_001",
+      "ai_chat_004_001",
+      "responsive_006_001",
+      "accessibility_007_001",
+      "performance_008_001"
+    ],
+    "additionalInstruction": "Generate comprehensive tests for the QuantumLeap Trading Platform using the test plan. The app requires broker authentication (Zerodha/Upstox) to access most features. Use the provided test credentials:\n\nFor Zerodha: username=\"test_user_demo\", password=\"test_password_123\"\nFor Upstox: username=\"upstox_test_user\", password=\"upstox_test_pass\"\n\nFocus on:\n1. Authentication flows with broker integration (Zerodha/Upstox)\n2. Portfolio management and data display\n3. AI chat interface functionality\n4. Trading signals and dashboard\n5. Mobile responsiveness\n6. Accessibility compliance\n7. Error handling and edge cases\n8. Performance testing\n\nThe development server runs on http://localhost:5173.",
+    "envs": {
+      "API_KEY": " sk-user-k2ZCJgN9A2rN3Qwpw3HWmK3idoE71yBRpjQwvBOL3trXS5FbpIhcNZYpznQgxTd1f6BOb5LUrKxOZlE75A1-NsJKKS-K_w45oE3mX9nx8sIBuglAOk29DX0pggVNc0Bpm7k"
+    }
+  }
+}

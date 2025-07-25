@@ -1,0 +1,131 @@
+[
+  {
+    "id": "auth_001_001",
+    "name": "Zerodha OAuth Login",
+    "description": "Test Zerodha broker OAuth authentication",
+    "type": "authentication",
+    "priority": "high",
+    "requiresLogin": true,
+    "credentials": {
+      "username": "test_user_demo",
+      "password": "test_password_123"
+    },
+    "steps": [
+      "Navigate to login page",
+      "Enter Zerodha credentials", 
+      "Complete OAuth flow",
+      "Verify successful authentication"
+    ],
+    "expectedResult": "User successfully authenticated with Zerodha"
+  },
+  {
+    "id": "auth_001_002",
+    "name": "Upstox OAuth Login",
+    "description": "Test Upstox broker OAuth authentication",
+    "type": "authentication", 
+    "priority": "high",
+    "requiresLogin": true,
+    "credentials": {
+      "username": "upstox_test_user",
+      "password": "upstox_test_pass"
+    },
+    "steps": [
+      "Navigate to login page",
+      "Select Upstox broker",
+      "Enter Upstox credentials",
+      "Complete OAuth flow", 
+      "Verify successful authentication"
+    ],
+    "expectedResult": "User successfully authenticated with Upstox"
+  },
+  {
+    "id": "dashboard_002_001",
+    "name": "Dashboard Load Test",
+    "description": "Test dashboard loads with authenticated user",
+    "type": "functional",
+    "priority": "high",
+    "requiresLogin": true,
+    "steps": [
+      "Login as authenticated user",
+      "Navigate to dashboard",
+      "Verify dashboard components load",
+      "Check for portfolio summary"
+    ],
+    "expectedResult": "Dashboard loads successfully with user data"
+  },
+  {
+    "id": "portfolio_003_001", 
+    "name": "Portfolio Page Load",
+    "description": "Test portfolio page loads with holdings",
+    "type": "functional",
+    "priority": "high",
+    "requiresLogin": true,
+    "steps": [
+      "Navigate to portfolio page",
+      "Wait for data to load",
+      "Verify holdings table appears",
+      "Check for summary metrics"
+    ],
+    "expectedResult": "Portfolio page loads with complete data"
+  },
+  {
+    "id": "ai_chat_004_001",
+    "name": "AI Chat Interface Load",
+    "description": "Test AI chat interface loads properly",
+    "type": "functional",
+    "priority": "high", 
+    "requiresLogin": true,
+    "steps": [
+      "Navigate to AI chat page",
+      "Verify chat interface appears",
+      "Check input field is present",
+      "Confirm send button works"
+    ],
+    "expectedResult": "Chat interface loads and is functional"
+  },
+  {
+    "id": "responsive_006_001",
+    "name": "Mobile Layout Test",
+    "description": "Test mobile layout renders correctly",
+    "type": "responsive",
+    "priority": "high",
+    "requiresLogin": false,
+    "steps": [
+      "Set viewport to mobile size (375x667)",
+      "Navigate through main pages",
+      "Verify layout adapts properly",
+      "Test navigation menu"
+    ],
+    "expectedResult": "Mobile layout renders correctly"
+  },
+  {
+    "id": "accessibility_007_001",
+    "name": "Keyboard Navigation Test",
+    "description": "Test all features accessible via keyboard",
+    "type": "accessibility",
+    "priority": "high",
+    "requiresLogin": false,
+    "steps": [
+      "Use only keyboard for navigation",
+      "Tab through all elements",
+      "Test Enter and Space keys",
+      "Verify focus indicators"
+    ],
+    "expectedResult": "All features accessible via keyboard"
+  },
+  {
+    "id": "performance_008_001",
+    "name": "Page Load Performance Test",
+    "description": "Test pages load within acceptable time limits",
+    "type": "performance",
+    "priority": "high",
+    "requiresLogin": false,
+    "steps": [
+      "Measure page load times",
+      "Check Core Web Vitals",
+      "Verify under 3 seconds",
+      "Test on slow connections"
+    ],
+    "expectedResult": "Pages load within acceptable time"
+  }
+]
