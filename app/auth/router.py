@@ -23,6 +23,7 @@ async def broker_callback(
     request: Request, 
     request_token: str = Query(...), 
     action: str = Query(...),
+    state: str = Query(None),
     api_key: str = Query(None),
     api_secret: str = Query(None)
 ):
@@ -54,7 +55,7 @@ async def broker_callback(
             frontend_url_override = "http://localhost:5175"  # Current dev port based on logs
         else:
             # Local development fallback
-            frontend_url_override = "http://localhost:5173"
+            frontend_url_override = "http://localhost:5175"  # Use consistent port
     
     logger.info(f"🔄 Using frontend URL: {frontend_url_override}")
     
@@ -67,18 +68,39 @@ async def broker_callback(
         # Clean and validate the request_token
         clean_token = auth_service.clean_request_token(request_token)
         
-        # Try to get API credentials from query params or session
+        # Try to get API credentials from query params, state file, or session
         stored_api_key = api_key
         stored_api_secret = api_secret
         
-        # If no credentials in query params, try to get from session
+        # If no credentials in query params, try to get from state file first
         if not stored_api_key or not stored_api_secret:
-            session_data = request.session.get('zerodha_oauth', {})
-            stored_api_key = session_data.get('api_key')
-            stored_api_secret = session_data.get('api_secret')
-            logger.info(f"🔍 Retrieved credentials from session: api_key={stored_api_key[:8] if stored_api_key else 'None'}...")
-            logger.info(f"🔍 Full session data keys: {list(request.session.keys())}")
-            logger.info(f"🔍 Session ID: {request.session.get('session_id', 'No session ID')}")
+            if state:
+                try:
+                    import json
+                    import os
+                    temp_file = os.path.join("oauth_temp", f"oauth_{state}.json")
+                    if os.path.exists(temp_file):
+                        with open(temp_file, 'r') as f:
+                            oauth_data = json.load(f)
+                        stored_api_key = oauth_data.get('api_key')
+                        stored_api_secret = oauth_data.get('api_secret')
+                        logger.info(f"🔍 Retrieved credentials from state file: api_key={stored_api_key[:8] if stored_api_key else 'None'}...")
+                        
+                        # Clean up temp file
+                        os.remove(temp_file)
+                    else:
+                        logger.warning(f"🔍 State file not found: {temp_file}")
+                except Exception as e:
+                    logger.error(f"🔍 Error reading state file: {e}")
+            
+            # Fallback to session if state method failed
+            if not stored_api_key or not stored_api_secret:
+                session_data = request.session.get('zerodha_oauth', {})
+                stored_api_key = session_data.get('api_key')
+                stored_api_secret = session_data.get('api_secret')
+                logger.info(f"🔍 Retrieved credentials from session: api_key={stored_api_key[:8] if stored_api_key else 'None'}...")
+                logger.info(f"🔍 Full session data keys: {list(request.session.keys())}")
+                logger.info(f"🔍 Session ID: {request.session.get('session_id', 'No session ID')}")
         
         # If we have credentials, attempt token exchange here
         if stored_api_key and stored_api_secret:
@@ -466,28 +488,49 @@ async def test_oauth_flow(request: Request, api_key: str = Query(...), api_secre
     """
     Test OAuth Flow Setup
     
-    Stores API credentials in session for OAuth testing.
+    Stores API credentials for OAuth callback using stateless approach.
     This endpoint helps test the complete OAuth flow.
     """
     try:
-        # Store credentials in session for OAuth callback
-        request.session['zerodha_oauth'] = {
+        import uuid
+        import json
+        import os
+        
+        # Generate unique state parameter for this OAuth flow
+        state = str(uuid.uuid4())
+        
+        # Store credentials in temporary file (stateless approach)
+        # This survives the OAuth redirect unlike HTTP sessions
+        temp_dir = "oauth_temp"
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+            
+        temp_file = os.path.join(temp_dir, f"oauth_{state}.json")
+        oauth_data = {
             'api_key': api_key,
             'api_secret': api_secret,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'state': state
         }
         
-        # Generate OAuth URL
-        oauth_url = f"https://kite.zerodha.com/connect/login?api_key={api_key}&v=3"
+        with open(temp_file, 'w') as f:
+            json.dump(oauth_data, f)
         
-        logger.info(f"🔄 Test OAuth setup complete for API key: {api_key[:8]}...")
+        # Also store in session as backup (may not work across redirects)
+        request.session['zerodha_oauth'] = oauth_data
+        
+        # Generate OAuth URL with state parameter
+        oauth_url = f"https://kite.zerodha.com/connect/login?api_key={api_key}&v=3&state={state}"
+        
+        logger.info(f"🔄 Test OAuth setup complete for API key: {api_key[:8]}... with state: {state}")
         
         return {
             "status": "success",
-            "message": "OAuth credentials stored in session",
+            "message": "OAuth credentials stored for callback",
             "oauth_url": oauth_url,
             "redirect_url": "https://web-production-de0bc.up.railway.app/broker/callback",
-            "api_key": api_key[:8] + "..."
+            "api_key": api_key[:8] + "...",
+            "state": state
         }
         
     except Exception as e:
