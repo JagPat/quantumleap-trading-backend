@@ -11,26 +11,31 @@ logger = logging.getLogger(__name__)
 class PortfolioService:
     def _calculate_portfolio_summary(self, holdings: list, positions: list) -> dict:
         """
-        Calculate portfolio summary values from holdings and positions
+        Calculate portfolio summary values from holdings and positions using Kite Connect API fields
         """
         total_value = 0.0
         total_pnl = 0.0
         day_pnl = 0.0
+        holdings_value = 0.0
+        positions_value = 0.0
         
-        # Calculate from holdings
+        # Calculate from holdings (Kite Connect API fields)
         for holding in holdings:
             if isinstance(holding, dict):
-                # Current value
-                current_value = holding.get('current_value', 0)
-                if isinstance(current_value, (int, float)):
+                # Current value = quantity * last_price
+                quantity = holding.get('quantity', 0)
+                last_price = holding.get('last_price', 0)
+                if isinstance(quantity, (int, float)) and isinstance(last_price, (int, float)):
+                    current_value = quantity * last_price
                     total_value += current_value
+                    holdings_value += current_value
                 
-                # Total P&L
+                # Total P&L from holdings
                 pnl = holding.get('pnl', 0)
                 if isinstance(pnl, (int, float)):
                     total_pnl += pnl
                 
-                # Day P&L (day_change)
+                # Day P&L from holdings
                 day_change = holding.get('day_change', 0)
                 if isinstance(day_change, (int, float)):
                     day_pnl += day_change
@@ -38,21 +43,81 @@ class PortfolioService:
         # Calculate from positions (net positions)
         for position in positions:
             if isinstance(position, dict):
-                # For positions, pnl is typically the unrealized P&L
-                pnl = position.get('unrealised', 0)
-                if isinstance(pnl, (int, float)):
-                    total_pnl += pnl
+                # Position value = quantity * last_price
+                quantity = position.get('quantity', 0)
+                last_price = position.get('last_price', 0)
+                if isinstance(quantity, (int, float)) and isinstance(last_price, (int, float)):
+                    position_value = abs(quantity) * last_price  # Use abs for position value
+                    positions_value += position_value
                 
-                # Day P&L from positions
-                day_pnl_pos = position.get('m2m', 0)  # Mark to market
-                if isinstance(day_pnl_pos, (int, float)):
-                    day_pnl += day_pnl_pos
+                # Unrealized P&L from positions
+                unrealised = position.get('unrealised', 0)
+                if isinstance(unrealised, (int, float)):
+                    total_pnl += unrealised
+                
+                # Day P&L from positions (mark to market)
+                m2m = position.get('m2m', 0)
+                if isinstance(m2m, (int, float)):
+                    day_pnl += m2m
         
         return {
             'total_value': round(total_value, 2),
             'total_pnl': round(total_pnl, 2),
-            'day_pnl': round(day_pnl, 2)
+            'day_pnl': round(day_pnl, 2),
+            'holdings_value': round(holdings_value, 2),
+            'positions_value': round(positions_value, 2)
         }
+
+    def _process_holdings_data(self, holdings: list) -> list:
+        """
+        Process holdings data to add calculated fields for frontend
+        """
+        processed_holdings = []
+        for holding in holdings:
+            if isinstance(holding, dict):
+                # Calculate current value
+                quantity = holding.get('quantity', 0)
+                last_price = holding.get('last_price', 0)
+                current_value = quantity * last_price if quantity and last_price else 0
+                
+                # Calculate day change percentage
+                day_change = holding.get('day_change', 0)
+                day_change_percentage = holding.get('day_change_percentage', 0)
+                
+                # Add calculated fields
+                processed_holding = {
+                    **holding,  # Keep all original fields
+                    'current_value': round(current_value, 2),
+                    'day_change_abs': round(day_change, 2),
+                    'day_change_percentage': round(day_change_percentage, 2)
+                }
+                processed_holdings.append(processed_holding)
+        
+        return processed_holdings
+
+    def _process_positions_data(self, positions: list) -> list:
+        """
+        Process positions data to add calculated fields for frontend
+        """
+        processed_positions = []
+        for position in positions:
+            if isinstance(position, dict):
+                # Calculate current value
+                quantity = position.get('quantity', 0)
+                last_price = position.get('last_price', 0)
+                current_value = abs(quantity) * last_price if quantity and last_price else 0
+                
+                # Add calculated fields
+                processed_position = {
+                    **position,  # Keep all original fields
+                    'current_value': round(current_value, 2),
+                    'unrealised_pnl': round(position.get('unrealised', 0), 2),
+                    'realised_pnl': round(position.get('realised', 0), 2),
+                    'm2m_pnl': round(position.get('m2m', 0), 2)
+                }
+                processed_positions.append(processed_position)
+        
+        return processed_positions
 
     def fetch_and_store_portfolio(self, user_id: str) -> PortfolioSnapshot:
         """
@@ -91,7 +156,11 @@ class PortfolioService:
             logger.error(f"Error fetching portfolio from broker for user {user_id}: {e}")
             raise Exception(f"Kite API error: {e}")
             
-        # 3. Calculate portfolio summary
+        # 3. Process and enrich the data
+        processed_holdings = self._process_holdings_data(holdings)
+        processed_positions = self._process_positions_data(net_positions)
+        
+        # 4. Calculate portfolio summary
         summary = self._calculate_portfolio_summary(holdings, net_positions)
         logger.info(f"Portfolio summary calculated for user {user_id}: {summary}")
         
@@ -102,8 +171,8 @@ class PortfolioService:
         snapshot = PortfolioSnapshot(
             user_id=user_id,
             timestamp=timestamp_str,
-            holdings=holdings,
-            positions=net_positions,
+            holdings=processed_holdings,  # Use processed data
+            positions=processed_positions,  # Use processed data
             total_value=summary['total_value'],
             total_pnl=summary['total_pnl'],
             day_pnl=summary['day_pnl']
@@ -111,8 +180,8 @@ class PortfolioService:
         logger.info(f"PortfolioSnapshot created successfully with timestamp: {snapshot.timestamp} (type: {type(snapshot.timestamp)})")
         
         # 5. Store the snapshot in the database
-        holdings_json = json.dumps(holdings)
-        positions_json = json.dumps(net_positions) # Store only net positions as a list
+        holdings_json = json.dumps(processed_holdings)  # Store processed data
+        positions_json = json.dumps(processed_positions)  # Store processed data
         
         logger.info(f"Attempting to store portfolio snapshot for user {user_id}")
         logger.info(f"Timestamp: {timestamp.isoformat()}")
