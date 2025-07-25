@@ -37,27 +37,14 @@ async def broker_callback(
     3. Stores session data
     4. Redirects to frontend with success/error status
     """
-    # CRITICAL FIX: Use environment-based frontend URL detection
+    # CRITICAL FIX: Use config-based frontend URL detection
     # When Kite Connect redirects to our backend, there's no referer header
-    # So we need to determine the frontend URL based on environment
+    # So we use the configured frontend URL
     
-    # Check if we're in development or production
-    import os
-    frontend_url_override = os.getenv('FRONTEND_URL')
+    from app.core.config import settings
+    frontend_url_override = settings.frontend_url
     
-    if not frontend_url_override:
-        # Auto-detect based on common patterns
-        # In development, try common local ports
-        # In production, use the deployed frontend URL
-        if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('PORT'):
-            # Production environment - detect the correct frontend URL
-            # Try to determine from common development ports
-            frontend_url_override = "http://localhost:5175"  # Current dev port based on logs
-        else:
-            # Local development fallback
-            frontend_url_override = "http://localhost:5175"  # Use consistent port
-    
-    logger.info(f"🔄 Using frontend URL: {frontend_url_override}")
+    logger.info(f"🔄 Using configured frontend URL: {frontend_url_override}")
     
     try:
         # Log the full request for debugging

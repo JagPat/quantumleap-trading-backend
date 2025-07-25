@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     
     # External URLs
     frontend_url: str = Field(
-        default="http://localhost:5173",
+        default="http://localhost:5175",
         env="FRONTEND_URL",
         description="Frontend application URL for OAuth redirects"
     )
