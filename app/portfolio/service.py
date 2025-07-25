@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 from ..database.service import get_user_credentials, store_portfolio_snapshot, get_latest_portfolio_snapshot as get_snapshot_from_db
 from .models import PortfolioSnapshot
+from ..broker.kite_service import kite_service
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +70,9 @@ class PortfolioService:
         
         # 2. Fetch holdings and positions from broker
         try:
-            holdings = kite.get_holdings()
+            holdings = kite_service.get_holdings(kite)
             logger.info(f"Kite API holdings response for user {user_id}: {json.dumps(holdings)[:500]}")
-            positions_dict = kite.get_positions()
+            positions_dict = kite_service.get_positions(kite)
             logger.info(f"Kite API positions response for user {user_id}: {json.dumps(positions_dict)[:500]}")
             
             # Extract net positions (current day positions)
