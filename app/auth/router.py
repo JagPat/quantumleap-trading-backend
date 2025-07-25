@@ -36,21 +36,25 @@ async def broker_callback(
     3. Stores session data
     4. Redirects to frontend with success/error status
     """
-    # CRITICAL FIX: Dynamic frontend URL detection for multi-environment support
-    # Support both local development and production deployment
-    frontend_url_override = request.headers.get('referer', 'http://localhost:5173')
-    if frontend_url_override.endswith('/'):
-        frontend_url_override = frontend_url_override[:-1]
+    # CRITICAL FIX: Use environment-based frontend URL detection
+    # When Kite Connect redirects to our backend, there's no referer header
+    # So we need to determine the frontend URL based on environment
     
-    # Extract base URL from referer
-    if '://' in frontend_url_override:
-        parts = frontend_url_override.split('/')
-        frontend_url_override = f"{parts[0]}//{parts[2]}"
+    # Check if we're in development or production
+    import os
+    frontend_url_override = os.getenv('FRONTEND_URL')
     
-    # Fallback for common development ports
-    if 'localhost' not in frontend_url_override and '127.0.0.1' not in frontend_url_override:
-        # Production - use the actual frontend URL
-        frontend_url_override = frontend_url_override or "https://quantum-leap-frontend.vercel.app"
+    if not frontend_url_override:
+        # Auto-detect based on common patterns
+        # In development, try common local ports
+        # In production, use the deployed frontend URL
+        if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('PORT'):
+            # Production environment - detect the correct frontend URL
+            # Try to determine from common development ports
+            frontend_url_override = "http://localhost:5175"  # Current dev port based on logs
+        else:
+            # Local development fallback
+            frontend_url_override = "http://localhost:5173"
     
     logger.info(f"🔄 Using frontend URL: {frontend_url_override}")
     
@@ -73,6 +77,8 @@ async def broker_callback(
             stored_api_key = session_data.get('api_key')
             stored_api_secret = session_data.get('api_secret')
             logger.info(f"🔍 Retrieved credentials from session: api_key={stored_api_key[:8] if stored_api_key else 'None'}...")
+            logger.info(f"🔍 Full session data keys: {list(request.session.keys())}")
+            logger.info(f"🔍 Session ID: {request.session.get('session_id', 'No session ID')}")
         
         # If we have credentials, attempt token exchange here
         if stored_api_key and stored_api_secret:
