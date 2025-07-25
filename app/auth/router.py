@@ -36,9 +36,23 @@ async def broker_callback(
     3. Stores session data
     4. Redirects to frontend with success/error status
     """
-    # CRITICAL FIX: Override Railway environment variable until manually updated
-    # Railway still has old Base44 URL in FRONTEND_URL environment variable
-    frontend_url_override = "http://localhost:5173"
+    # CRITICAL FIX: Dynamic frontend URL detection for multi-environment support
+    # Support both local development and production deployment
+    frontend_url_override = request.headers.get('referer', 'http://localhost:5173')
+    if frontend_url_override.endswith('/'):
+        frontend_url_override = frontend_url_override[:-1]
+    
+    # Extract base URL from referer
+    if '://' in frontend_url_override:
+        parts = frontend_url_override.split('/')
+        frontend_url_override = f"{parts[0]}//{parts[2]}"
+    
+    # Fallback for common development ports
+    if 'localhost' not in frontend_url_override and '127.0.0.1' not in frontend_url_override:
+        # Production - use the actual frontend URL
+        frontend_url_override = frontend_url_override or "https://quantum-leap-frontend.vercel.app"
+    
+    logger.info(f"🔄 Using frontend URL: {frontend_url_override}")
     
     try:
         # Log the full request for debugging
@@ -93,7 +107,7 @@ async def broker_callback(
                     if 'zerodha_oauth' in request.session:
                         del request.session['zerodha_oauth']
                     
-                    # CRITICAL FIX: Use correct frontend callback URL with hyphen
+                    # CRITICAL FIX: Use correct frontend broker callback URL
                     redirect_url = f"{frontend_url_override}/broker-callback?status=success&user_id={user_id}&action={action}"
                     
                 else:
