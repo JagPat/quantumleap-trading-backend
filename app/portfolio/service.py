@@ -45,14 +45,17 @@ class PortfolioService:
         for position in positions:
             if isinstance(position, dict):
                 # Position value = quantity * last_price (only for total calculation)
-                quantity = position.get('quantity', 0)
+                # Use net_quantity if available, otherwise use quantity
+                quantity = position.get('net_quantity', position.get('quantity', 0))
                 last_price = position.get('last_price', 0)
                 if isinstance(quantity, (int, float)) and isinstance(last_price, (int, float)):
                     position_value = abs(quantity) * last_price
+                    total_value += position_value
                     positions_value += position_value
                 
                 # Use broker-calculated unrealized P&L directly (NO recalculation)
-                broker_unrealised = position.get('unrealised', 0)
+                # Check multiple possible field names for unrealized P&L
+                broker_unrealised = position.get('unrealised', position.get('pnl', 0))
                 if isinstance(broker_unrealised, (int, float)):
                     total_pnl += broker_unrealised
                 
@@ -102,7 +105,8 @@ class PortfolioService:
             if isinstance(position, dict):
                 # ONLY calculate current_value for display convenience
                 # Everything else comes directly from broker
-                quantity = position.get('quantity', 0)
+                # Use net_quantity if available (for positions), otherwise use quantity
+                quantity = position.get('net_quantity', position.get('quantity', 0))
                 last_price = position.get('last_price', 0)
                 current_value = abs(quantity) * last_price if quantity and last_price else 0
                 
