@@ -64,10 +64,33 @@ class PortfolioService:
                 if isinstance(broker_m2m, (int, float)):
                     day_pnl += broker_m2m
         
+        # Calculate total investment for percentage calculations
+        total_investment = 0.0
+        for holding in holdings:
+            if isinstance(holding, dict):
+                avg_price = holding.get('average_price', 0)
+                quantity = holding.get('quantity', 0)
+                if isinstance(avg_price, (int, float)) and isinstance(quantity, (int, float)):
+                    total_investment += avg_price * quantity
+        
+        for position in positions:
+            if isinstance(position, dict):
+                avg_price = position.get('average_price', 0)
+                quantity = position.get('quantity', 0)
+                if isinstance(avg_price, (int, float)) and isinstance(quantity, (int, float)):
+                    total_investment += avg_price * abs(quantity)
+        
+        # Calculate percentages
+        total_pnl_percentage = (total_pnl / total_investment * 100) if total_investment > 0 else 0
+        day_pnl_percentage = (day_pnl / total_investment * 100) if total_investment > 0 else 0
+        
         return {
             'total_value': round(total_value, 2),
             'total_pnl': round(total_pnl, 2),
             'day_pnl': round(day_pnl, 2),
+            'total_investment': round(total_investment, 2),
+            'total_pnl_percentage': round(total_pnl_percentage, 2),
+            'day_pnl_percentage': round(day_pnl_percentage, 2),
             'holdings_value': round(holdings_value, 2),
             'positions_value': round(positions_value, 2)
         }
@@ -86,10 +109,17 @@ class PortfolioService:
                 last_price = holding.get('last_price', 0)
                 current_value = quantity * last_price if quantity and last_price else 0
                 
+                # Calculate P&L percentage for frontend convenience
+                pnl_percentage = 0
+                investment = quantity * holding.get('average_price', 0)
+                if investment > 0:
+                    pnl_percentage = (holding.get('pnl', 0) / investment) * 100
+                
                 # Use ALL broker data directly - no recalculation
                 processed_holding = {
                     **holding,  # Keep ALL original broker fields unchanged
-                    'current_value': round(current_value, 2)  # Only add this for frontend
+                    'current_value': round(current_value, 2),  # Only add this for frontend
+                    'pnl_percentage': round(pnl_percentage, 2)  # Add percentage for frontend
                 }
                 processed_holdings.append(processed_holding)
         
@@ -110,10 +140,18 @@ class PortfolioService:
                 last_price = position.get('last_price', 0)
                 current_value = abs(quantity) * last_price if quantity and last_price else 0
                 
+                # Calculate P&L percentage for frontend convenience
+                pnl_percentage = 0
+                investment = abs(quantity) * position.get('average_price', 0)
+                if investment > 0:
+                    unrealised_pnl = position.get('unrealised', position.get('pnl', 0))
+                    pnl_percentage = (unrealised_pnl / investment) * 100
+                
                 # Use ALL broker data directly - no recalculation of P&L, M2M, etc.
                 processed_position = {
                     **position,  # Keep ALL original broker fields unchanged
-                    'current_value': round(current_value, 2)  # Only add this for frontend
+                    'current_value': round(current_value, 2),  # Only add this for frontend
+                    'pnl_percentage': round(pnl_percentage, 2)  # Add percentage for frontend
                 }
                 processed_positions.append(processed_position)
         
