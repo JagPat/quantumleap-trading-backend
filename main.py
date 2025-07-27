@@ -369,6 +369,9 @@ except Exception as e:
         try:
             from fastapi import APIRouter
             
+            # Capture the error message for use in fallback functions
+            error_message = str(e)
+            
             fallback_trading_engine_router = APIRouter(prefix="/api/trading-engine", tags=["Trading Engine - Fallback"])
             
             @fallback_trading_engine_router.get("/health")
@@ -376,7 +379,8 @@ except Exception as e:
                 return {
                     "status": "fallback",
                     "message": "Trading engine service in minimal fallback mode",
-                    "error": str(e)
+                    "error": error_message,
+                    "timestamp": datetime.now().isoformat()
                 }
             
             @fallback_trading_engine_router.get("/metrics")
