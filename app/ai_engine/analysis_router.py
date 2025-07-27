@@ -175,8 +175,8 @@ async def analysis_health_check():
             "status": "unhealthy",
             "error": str(e)
         }
-@rou
-ter.post("/sentiment", response_model=AnalysisResponse)
+
+@router.post("/sentiment", response_model=AnalysisResponse)
 async def analyze_market_sentiment(
     symbols: List[str],
     timeframe: str = "1d",
