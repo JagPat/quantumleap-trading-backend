@@ -82,20 +82,20 @@
     - Add position performance metrics and analytics
     - _Requirements: 6.5, 8.3, 7.2_
 
-- [ ] 6. Build Event Management System
-  - [ ] 6.1 Create Event Bus infrastructure
+- [x] 6. Build Event Management System
+  - [x] 6.1 Create Event Bus infrastructure
     - Implement EventManager class with publish/subscribe pattern
     - Create event queuing and processing with priority handling
     - Add event persistence for audit trails and replay capability
     - _Requirements: 8.1, 8.2, 8.3_
 
-  - [ ] 6.2 Implement event types and handlers
+  - [x] 6.2 Implement event types and handlers
     - Create SignalEvent, OrderEvent, RiskEvent, and MarketEvent classes
     - Implement event routing and handler registration
     - Add event filtering and subscription management
     - _Requirements: 7.1, 7.2, 1.1_
 
-  - [ ] 6.3 Add event processing and coordination
+  - [x] 6.3 Add event processing and coordination
     - Implement asynchronous event processing with worker queues
     - Create event-driven state management across components
     - Add event replay functionality for testing and debugging

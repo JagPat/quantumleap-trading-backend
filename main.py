@@ -389,25 +389,36 @@ except Exception as e:
 
 # Trading Engine Router - New automatic trading functionality
 try:
-    print("🔄 Including trading engine router...")
-    from app.trading_engine.router import router as trading_engine_router
-    app.include_router(trading_engine_router)
-    print("✅ Trading engine router loaded and registered.")
-    logger.info("✅ Trading engine router loaded and registered.")
+    print("🔄 Including production trading engine router...")
+    from app.trading_engine.production_router import router as production_trading_engine_router
+    app.include_router(production_trading_engine_router)
+    print("✅ Production trading engine router loaded and registered.")
+    logger.info("✅ Production trading engine router loaded and registered.")
 except Exception as e:
-    print(f"❌ Failed to load full trading engine router: {e}")
-    logger.error(f"❌ Failed to load full trading engine router: {e}")
+    print(f"❌ Failed to load production trading engine router: {e}")
+    logger.error(f"❌ Failed to load production trading engine router: {e}")
     
-    # Try to load simplified trading engine router
+    # Try to load full trading engine router
     try:
-        print("🔄 Loading simplified trading engine router...")
-        from app.trading_engine.simple_router import router as simple_trading_engine_router
-        app.include_router(simple_trading_engine_router)
-        print("✅ Simplified trading engine router loaded and registered.")
-        logger.info("✅ Simplified trading engine router loaded and registered.")
-    except Exception as simple_e:
-        print(f"❌ Failed to load simplified trading engine router: {simple_e}")
-        logger.error(f"❌ Failed to load simplified trading engine router: {simple_e}")
+        print("🔄 Including full trading engine router...")
+        from app.trading_engine.router import router as trading_engine_router
+        app.include_router(trading_engine_router)
+        print("✅ Full trading engine router loaded and registered.")
+        logger.info("✅ Full trading engine router loaded and registered.")
+    except Exception as full_e:
+        print(f"❌ Failed to load full trading engine router: {full_e}")
+        logger.error(f"❌ Failed to load full trading engine router: {full_e}")
+        
+        # Try to load simplified trading engine router
+        try:
+            print("🔄 Loading simplified trading engine router...")
+            from app.trading_engine.simple_router import router as simple_trading_engine_router
+            app.include_router(simple_trading_engine_router)
+            print("✅ Simplified trading engine router loaded and registered.")
+            logger.info("✅ Simplified trading engine router loaded and registered.")
+        except Exception as simple_e:
+            print(f"❌ Failed to load simplified trading engine router: {simple_e}")
+            logger.error(f"❌ Failed to load simplified trading engine router: {simple_e}")
         
         # Create minimal fallback trading engine router
         try:
