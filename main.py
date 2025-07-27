@@ -309,6 +309,50 @@ try:
 except Exception as e:
     print(f"❌ Failed to load chat router: {e}")
     logger.error(f"❌ Failed to load chat router: {e}")
+
+# Analysis router - Portfolio AI analysis endpoints
+try:
+    print("🔄 Including analysis router...")
+    from app.ai_engine.analysis_router import router as analysis_router
+    app.include_router(analysis_router)
+    print("✅ Analysis router loaded and registered.")
+    logger.info("✅ Analysis router loaded and registered.")
+except Exception as e:
+    print(f"❌ Failed to load analysis router: {e}")
+    logger.error(f"❌ Failed to load analysis router: {e}")
+    
+    # Create fallback analysis router for portfolio endpoint
+    try:
+        from fastapi import APIRouter
+        
+        fallback_analysis_router = APIRouter(prefix="/api/ai/analysis", tags=["AI Analysis - Fallback"])
+        
+        @fallback_analysis_router.post("/portfolio")
+        async def fallback_portfolio_analysis(portfolio_data: dict):
+            return {
+                "status": "fallback",
+                "analysis": {
+                    "health_score": 75.0,
+                    "risk_level": "MODERATE",
+                    "recommendations": [
+                        {
+                            "type": "DIVERSIFICATION",
+                            "title": "Consider diversifying across sectors",
+                            "description": "Portfolio analysis service temporarily unavailable",
+                            "priority": "MEDIUM"
+                        }
+                    ]
+                },
+                "message": "Portfolio analysis service in fallback mode",
+                "error": str(e)
+            }
+        
+        app.include_router(fallback_analysis_router)
+        print("🔄 Fallback analysis router created and registered.")
+        logger.info("🔄 Fallback analysis router created and registered.")
+    except Exception as fallback_e:
+        print(f"❌ Failed to create fallback analysis router: {fallback_e}")
+        logger.error(f"❌ Failed to create fallback analysis router: {fallback_e}")
     
     # Create fallback chat router
     try:
