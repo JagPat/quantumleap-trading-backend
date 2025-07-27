@@ -9,9 +9,15 @@ from datetime import datetime, timedelta
 import sqlite3
 import asyncio
 from .orchestrator import AIOrchestrator
+from .portfolio_analyzer import PortfolioAnalyzer
+from .recommendation_engine import RecommendationEngine
 from .models import (
     AnalysisRequest, AnalysisResponse, AnalysisType,
     TradingSignal, SignalType, AIPreferences
+)
+from .portfolio_models import (
+    PortfolioAnalysisResult, PortfolioAnalysisResponse,
+    MarketContext
 )
 from ..core.config import settings
 from ..database.service import get_db_connection
@@ -25,63 +31,181 @@ class AnalysisEngine:
     
     def __init__(self):
         self.orchestrator = AIOrchestrator()
+        self.portfolio_analyzer = PortfolioAnalyzer()
+        self.recommendation_engine = RecommendationEngine()
         
     async def generate_portfolio_analysis(
         self, 
         user_id: str, 
         portfolio_data: Dict[str, Any]
     ) -> AnalysisResponse:
-        """Generate comprehensive portfolio analysis with diversification metrics"""
+        """Generate comprehensive portfolio analysis with AI-powered insights"""
+        
+        start_time = datetime.now()
+        analysis_id = f"analysis_{user_id}_{int(start_time.timestamp())}"
         
         try:
-            logger.info(f"Starting portfolio analysis for user {user_id}")
+            logger.info(f"Starting comprehensive portfolio analysis for user {user_id}")
             
-            # Get user preferences for provider selection
-            user_preferences = await self.get_user_preferences(user_id)
+            # Step 1: Validate portfolio data
+            validation_result = self.portfolio_analyzer.validate_portfolio_data(portfolio_data)
+            if not validation_result.is_valid:
+                return AnalysisResponse(
+                    status="error",
+                    analysis_type=AnalysisType.PORTFOLIO,
+                    symbols=[],
+                    results={
+                        "error": "Portfolio data validation failed",
+                        "validation_errors": validation_result.errors,
+                        "warnings": validation_result.warnings
+                    },
+                    confidence_score=0.0,
+                    provider_used="none",
+                    created_at=datetime.now()
+                )
             
-            # Build analysis context
-            analysis_context = await self.build_portfolio_analysis_context(portfolio_data)
+            # Step 2: Calculate portfolio health score
+            health_result = self.portfolio_analyzer.calculate_portfolio_health(portfolio_data)
+            if not health_result.success:
+                logger.error(f"Health calculation failed: {health_result.error_message}")
+                health_score = None
+            else:
+                health_score = health_result.result
             
-            # Create analysis prompt
-            analysis_prompt = self.build_portfolio_analysis_prompt(portfolio_data, analysis_context)
+            # Step 3: Calculate diversification metrics
+            diversification_result = self.portfolio_analyzer.calculate_diversification_metrics(portfolio_data)
+            if not diversification_result.success:
+                logger.error(f"Diversification calculation failed: {diversification_result.error_message}")
+                diversification_metrics = None
+            else:
+                diversification_metrics = diversification_result.result
             
-            # Select optimal provider for portfolio analysis
-            provider = await self.orchestrator.select_optimal_provider("portfolio_analysis", user_preferences)
+            # Step 4: Calculate risk analysis
+            market_context = await self.get_market_context()
+            risk_result = self.portfolio_analyzer.calculate_risk_analysis(portfolio_data, market_context)
+            if not risk_result.success:
+                logger.error(f"Risk analysis failed: {risk_result.error_message}")
+                risk_analysis = None
+            else:
+                risk_analysis = risk_result.result
             
-            # Generate analysis using AI
-            ai_response = await provider.generate_analysis(analysis_prompt, portfolio_data)
+            # Step 5: Calculate performance metrics
+            performance_result = self.portfolio_analyzer.calculate_performance_metrics(portfolio_data)
+            if not performance_result.success:
+                logger.error(f"Performance calculation failed: {performance_result.error_message}")
+                performance_metrics = None
+            else:
+                performance_metrics = performance_result.result
             
-            # Process and structure the analysis results
-            analysis_results = await self.process_portfolio_analysis_results(ai_response, portfolio_data)
+            # Step 6: Generate AI-powered recommendations
+            ai_recommendations = []
+            provider_used = "rule_based"
             
-            # Store analysis results
+            try:
+                user_preferences = await self.get_user_preferences(user_id)
+                if user_preferences:
+                    await self.orchestrator.initialize_providers(
+                        self._convert_to_ai_preferences(user_id, user_preferences)
+                    )
+                    
+                    provider = await self.orchestrator.select_optimal_provider("portfolio_optimization", user_preferences)
+                    if provider:
+                        ai_recommendations = await self._generate_ai_recommendations(
+                            provider, portfolio_data, health_score, risk_analysis, diversification_metrics
+                        )
+                        provider_used = provider.provider_name
+                        logger.info(f"Generated AI recommendations using {provider_used}")
+            except Exception as e:
+                logger.warning(f"AI recommendation generation failed, using rule-based only: {e}")
+            
+            # Step 7: Generate comprehensive recommendations
+            if health_score and risk_analysis and diversification_metrics and performance_metrics:
+                rec_result = self.recommendation_engine.generate_recommendations(
+                    portfolio_data, health_score, risk_analysis, 
+                    diversification_metrics, performance_metrics, ai_recommendations
+                )
+                
+                if rec_result.success:
+                    recommendations = rec_result.result
+                else:
+                    logger.error(f"Recommendation generation failed: {rec_result.error_message}")
+                    recommendations = []
+            else:
+                recommendations = []
+            
+            # Step 8: Generate key insights
+            key_insights = self._generate_key_insights(
+                health_score, risk_analysis, diversification_metrics, performance_metrics
+            )
+            
+            # Step 9: Calculate processing time and confidence
+            processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
+            confidence_score = self._calculate_overall_confidence(
+                health_score, risk_analysis, diversification_metrics, performance_metrics
+            )
+            
+            # Step 10: Create comprehensive analysis result
+            analysis_result = {
+                "analysis_id": analysis_id,
+                "portfolio_health": health_score.dict() if health_score else None,
+                "risk_analysis": risk_analysis.dict() if risk_analysis else None,
+                "diversification_analysis": diversification_metrics.dict() if diversification_metrics else None,
+                "performance_metrics": performance_metrics.dict() if performance_metrics else None,
+                "recommendations": [rec.dict() for rec in recommendations],
+                "key_insights": key_insights,
+                "market_context": market_context,
+                "analysis_metadata": {
+                    "validation_warnings": validation_result.warnings,
+                    "processing_time_ms": processing_time,
+                    "components_calculated": {
+                        "health_score": health_score is not None,
+                        "risk_analysis": risk_analysis is not None,
+                        "diversification": diversification_metrics is not None,
+                        "performance": performance_metrics is not None,
+                        "recommendations": len(recommendations) > 0
+                    }
+                },
+                "confidence_score": confidence_score,
+                "generated_at": datetime.now().isoformat()
+            }
+            
+            # Step 11: Store analysis results
             await self.store_analysis_result(
                 user_id, 
                 AnalysisType.PORTFOLIO, 
                 [], 
                 portfolio_data, 
-                analysis_results, 
-                provider.provider_name,
-                analysis_results.get("confidence_score", 0.8)
+                analysis_result, 
+                provider_used,
+                confidence_score
             )
+            
+            logger.info(f"Portfolio analysis completed for user {user_id} in {processing_time}ms")
             
             return AnalysisResponse(
                 status="success",
                 analysis_type=AnalysisType.PORTFOLIO,
                 symbols=[],
-                results=analysis_results,
-                confidence_score=analysis_results.get("confidence_score", 0.8),
-                provider_used=provider.provider_name,
+                results=analysis_result,
+                confidence_score=confidence_score,
+                provider_used=provider_used,
                 created_at=datetime.now()
             )
             
         except Exception as e:
-            logger.error(f"Portfolio analysis failed for user {user_id}: {e}")
+            processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
+            logger.error(f"Portfolio analysis failed for user {user_id} after {processing_time}ms: {e}")
+            
             return AnalysisResponse(
                 status="error",
                 analysis_type=AnalysisType.PORTFOLIO,
                 symbols=[],
-                results={"error": str(e), "message": "Portfolio analysis failed"},
+                results={
+                    "error": str(e), 
+                    "message": "Portfolio analysis failed",
+                    "analysis_id": analysis_id,
+                    "processing_time_ms": processing_time
+                },
                 confidence_score=0.0,
                 provider_used="none",
                 created_at=datetime.now()
@@ -190,7 +314,8 @@ class AnalysisEngine:
         """
         
         return prompt 
-   async def process_portfolio_analysis_results(self, ai_response: str, portfolio_data: Dict[str, Any]) -> Dict[str, Any]:
+    
+    async def process_portfolio_analysis_results(self, ai_response: str, portfolio_data: Dict[str, Any]) -> Dict[str, Any]:
         """Process and structure AI analysis results"""
         
         try:
@@ -521,3 +646,322 @@ class AnalysisEngine:
         except Exception as e:
             logger.error(f"Failed to initialize orchestrator for user {user_id}: {e}")
             return False
+    
+    async def get_market_context(self) -> Dict[str, Any]:
+        """Get current market context for analysis"""
+        try:
+            # This would integrate with real market data APIs
+            # For now, return reasonable default context
+            return {
+                "market_sentiment": "neutral",
+                "volatility_index": 0.45,
+                "market_trend": "sideways",
+                "nifty50_change": 0.2,
+                "sector_performance": {
+                    "Technology": 1.2,
+                    "Banking": -0.5,
+                    "Energy": 0.8,
+                    "Consumer Goods": 0.3,
+                    "Pharma": -0.2
+                },
+                "last_updated": datetime.now().isoformat()
+            }
+        except Exception as e:
+            logger.warning(f"Failed to get market context: {e}")
+            return {"market_sentiment": "neutral", "volatility_index": 0.5}
+    
+    async def _generate_ai_recommendations(
+        self, 
+        provider, 
+        portfolio_data: Dict[str, Any],
+        health_score,
+        risk_analysis,
+        diversification_metrics
+    ) -> List[Dict[str, Any]]:
+        """Generate AI-powered portfolio recommendations"""
+        try:
+            # Create comprehensive prompt for AI analysis
+            prompt = self._create_ai_recommendation_prompt(
+                portfolio_data, health_score, risk_analysis, diversification_metrics
+            )
+            
+            # Generate AI response
+            response = await provider.generate_analysis(prompt, portfolio_data)
+            
+            if response and hasattr(response, 'analysis'):
+                # Parse AI recommendations
+                return self._parse_ai_recommendations(response.analysis)
+            
+            return []
+            
+        except Exception as e:
+            logger.error(f"AI recommendation generation failed: {e}")
+            return []
+    
+    def _create_ai_recommendation_prompt(
+        self, 
+        portfolio_data: Dict[str, Any],
+        health_score,
+        risk_analysis,
+        diversification_metrics
+    ) -> str:
+        """Create comprehensive prompt for AI portfolio recommendations"""
+        
+        holdings = portfolio_data.get('holdings', [])
+        total_value = sum(abs(float(h.get('current_value', 0))) for h in holdings)
+        
+        prompt = f"""
+PORTFOLIO OPTIMIZATION ANALYSIS
+
+You are an expert portfolio manager analyzing a client's investment portfolio.
+Provide specific, actionable recommendations for optimization.
+
+PORTFOLIO OVERVIEW:
+- Total Holdings: {len(holdings)}
+- Total Value: ₹{total_value:,.2f}
+- Health Score: {health_score.overall_score:.1f}/100 (Grade: {health_score.grade.value}) if health_score else "N/A"
+
+CURRENT ANALYSIS:
+"""
+        
+        if health_score:
+            prompt += f"""
+HEALTH BREAKDOWN:
+- Performance: {health_score.performance_score:.1f}/100
+- Diversification: {health_score.diversification_score:.1f}/100
+- Risk Management: {health_score.risk_score:.1f}/100
+- Liquidity: {health_score.liquidity_score:.1f}/100
+
+IMPROVEMENT AREAS: {', '.join(health_score.improvement_areas)}
+STRENGTHS: {', '.join(health_score.strengths)}
+"""
+        
+        if risk_analysis:
+            prompt += f"""
+RISK ANALYSIS:
+- Overall Risk Level: {risk_analysis.overall_risk_level.value}
+- Concentration Risk: {risk_analysis.concentration_risk:.2f}
+- Overexposed Sectors: {', '.join(risk_analysis.overexposed_sectors.keys())}
+"""
+        
+        if diversification_metrics:
+            prompt += f"""
+DIVERSIFICATION:
+- Sector Count: {diversification_metrics.sector_count}
+- Largest Position: {diversification_metrics.largest_position_pct:.1f}%
+- Top 5 Concentration: {diversification_metrics.top5_concentration:.1f}%
+"""
+        
+        # Add top holdings
+        prompt += "\nTOP HOLDINGS:\n"
+        sorted_holdings = sorted(holdings, key=lambda x: abs(float(x.get('current_value', 0))), reverse=True)
+        for i, holding in enumerate(sorted_holdings[:8]):
+            symbol = holding.get('symbol', 'Unknown')
+            value = abs(float(holding.get('current_value', 0)))
+            allocation = (value / total_value) * 100 if total_value > 0 else 0
+            pnl = float(holding.get('pnl', 0))
+            pnl_pct = (pnl / abs(float(holding.get('investment_value', 1)))) * 100
+            
+            prompt += f"{i+1}. {symbol}: {allocation:.1f}% (P&L: {pnl_pct:+.1f}%)\n"
+        
+        prompt += """
+
+ANALYSIS REQUIRED:
+Provide 3-5 specific, actionable recommendations in JSON format:
+
+{
+  "recommendations": [
+    {
+      "title": "Clear, actionable title",
+      "description": "Detailed description of the recommendation",
+      "rationale": "Why this recommendation is important",
+      "implementation_steps": ["Step 1", "Step 2", "Step 3"],
+      "expected_impact": "Expected outcome",
+      "confidence_score": 0.8,
+      "priority": "high/medium/low",
+      "timeframe": "1-3 months"
+    }
+  ]
+}
+
+Focus on:
+1. Risk reduction opportunities
+2. Diversification improvements  
+3. Performance optimization
+4. Rebalancing suggestions
+5. Specific actionable steps
+
+Provide practical advice that can be executed immediately.
+"""
+        
+        return prompt
+    
+    def _parse_ai_recommendations(self, ai_response: str) -> List[Dict[str, Any]]:
+        """Parse AI recommendations from response"""
+        try:
+            # Try to parse JSON response
+            if '{' in ai_response and '}' in ai_response:
+                # Extract JSON part
+                start = ai_response.find('{')
+                end = ai_response.rfind('}') + 1
+                json_str = ai_response[start:end]
+                
+                parsed = json.loads(json_str)
+                return parsed.get('recommendations', [])
+            
+            # Fallback: parse text recommendations
+            return self._parse_text_recommendations(ai_response)
+            
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse AI recommendations as JSON: {e}")
+            return self._parse_text_recommendations(ai_response)
+        except Exception as e:
+            logger.error(f"Failed to parse AI recommendations: {e}")
+            return []
+    
+    def _parse_text_recommendations(self, text: str) -> List[Dict[str, Any]]:
+        """Parse text-based AI recommendations"""
+        recommendations = []
+        
+        try:
+            lines = text.split('\n')
+            current_rec = None
+            
+            for line in lines:
+                line = line.strip()
+                
+                # Look for recommendation headers
+                if any(line.startswith(prefix) for prefix in ['1.', '2.', '3.', '4.', '5.', '-', '•']):
+                    if current_rec:
+                        recommendations.append(current_rec)
+                    
+                    # Extract title
+                    title = line
+                    for prefix in ['1.', '2.', '3.', '4.', '5.', '-', '•']:
+                        title = title.replace(prefix, '').strip()
+                    
+                    current_rec = {
+                        "title": title[:100],
+                        "description": title,
+                        "rationale": "AI-generated recommendation",
+                        "implementation_steps": [],
+                        "expected_impact": "Improve portfolio performance",
+                        "confidence_score": 0.7,
+                        "priority": "medium",
+                        "timeframe": "1-3 months"
+                    }
+                
+                elif current_rec and line:
+                    # Add content to current recommendation
+                    if len(current_rec["description"]) < 500:
+                        current_rec["description"] += f" {line}"
+                    
+                    if 'step' in line.lower() or 'action' in line.lower():
+                        current_rec["implementation_steps"].append(line)
+            
+            # Add final recommendation
+            if current_rec:
+                recommendations.append(current_rec)
+                
+        except Exception as e:
+            logger.error(f"Failed to parse text recommendations: {e}")
+        
+        return recommendations
+    
+    def _generate_key_insights(self, health_score, risk_analysis, diversification_metrics, performance_metrics) -> List[str]:
+        """Generate key insights from analysis results"""
+        insights = []
+        
+        try:
+            if health_score:
+                if health_score.overall_score >= 80:
+                    insights.append(f"Portfolio demonstrates strong fundamentals with {health_score.grade.value} grade health score")
+                elif health_score.overall_score >= 60:
+                    insights.append(f"Portfolio shows moderate health ({health_score.grade.value} grade) with room for optimization")
+                else:
+                    insights.append(f"Portfolio health needs attention ({health_score.grade.value} grade) - focus on improvement areas")
+            
+            if risk_analysis:
+                if risk_analysis.overall_risk_level.value == "low":
+                    insights.append("Risk profile is well-managed with low overall risk exposure")
+                elif risk_analysis.overall_risk_level.value == "high":
+                    insights.append("High risk exposure detected - consider risk reduction strategies")
+                
+                if risk_analysis.concentration_risk > 0.7:
+                    insights.append("Portfolio shows high concentration risk - diversification recommended")
+            
+            if diversification_metrics:
+                if diversification_metrics.diversification_score > 0.8:
+                    insights.append("Excellent portfolio diversification across sectors and holdings")
+                elif diversification_metrics.diversification_score < 0.5:
+                    insights.append("Limited diversification - consider expanding across sectors")
+                
+                if diversification_metrics.largest_position_pct > 25:
+                    insights.append(f"Largest position represents {diversification_metrics.largest_position_pct:.1f}% - consider rebalancing")
+            
+            if performance_metrics:
+                if performance_metrics.total_return_percentage > 10:
+                    insights.append(f"Strong portfolio performance with {performance_metrics.total_return_percentage:.1f}% returns")
+                elif performance_metrics.total_return_percentage < -5:
+                    insights.append("Portfolio performance needs attention - review underperforming positions")
+            
+            # Add general insights
+            insights.append("Regular portfolio review and rebalancing helps maintain optimal allocation")
+            insights.append("Consider market conditions and personal risk tolerance when making changes")
+            
+        except Exception as e:
+            logger.error(f"Failed to generate insights: {e}")
+            insights.append("Portfolio analysis completed - review recommendations for optimization opportunities")
+        
+        return insights[:5]  # Limit to 5 key insights
+    
+    def _calculate_overall_confidence(self, health_score, risk_analysis, diversification_metrics, performance_metrics) -> float:
+        """Calculate overall confidence score for the analysis"""
+        try:
+            confidence_factors = []
+            
+            # Data completeness factor
+            components_available = sum([
+                health_score is not None,
+                risk_analysis is not None,
+                diversification_metrics is not None,
+                performance_metrics is not None
+            ])
+            data_completeness = components_available / 4.0
+            confidence_factors.append(data_completeness * 0.3)
+            
+            # Analysis quality factor
+            if health_score and health_score.overall_score > 0:
+                confidence_factors.append(0.25)
+            
+            if risk_analysis and risk_analysis.overall_risk_score >= 0:
+                confidence_factors.append(0.25)
+            
+            if diversification_metrics and diversification_metrics.diversification_score >= 0:
+                confidence_factors.append(0.2)
+            
+            return min(1.0, sum(confidence_factors))
+            
+        except Exception:
+            return 0.75  # Default confidence
+    
+    def _convert_to_ai_preferences(self, user_id: str, preferences_dict: Dict[str, Any]):
+        """Convert preferences dict to AIPreferences model"""
+        try:
+            from .models import AIPreferences, RiskTolerance, TradingStyle
+            
+            return AIPreferences(
+                user_id=user_id,
+                preferred_ai_provider=preferences_dict.get("preferred_ai_provider", "auto"),
+                openai_api_key=preferences_dict.get("openai_api_key"),
+                claude_api_key=preferences_dict.get("claude_api_key"),
+                gemini_api_key=preferences_dict.get("gemini_api_key"),
+                grok_api_key=preferences_dict.get("grok_api_key"),
+                provider_priorities=preferences_dict.get("provider_priorities"),
+                cost_limits=preferences_dict.get("cost_limits"),
+                risk_tolerance=preferences_dict.get("risk_tolerance", "medium"),
+                trading_style=preferences_dict.get("trading_style", "balanced")
+            )
+        except Exception as e:
+            logger.error(f"Failed to convert preferences: {e}")
+            return None

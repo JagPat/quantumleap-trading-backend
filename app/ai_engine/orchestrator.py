@@ -31,6 +31,7 @@ class AIOrchestrator:
         "fundamental_analysis": ["openai", "claude", "grok", "gemini"],
         "strategy_generation": ["openai", "claude", "grok", "gemini"],
         "sentiment_analysis": ["grok", "claude", "gemini", "openai"],
+        "portfolio_analysis": ["claude", "openai", "grok", "gemini"],
         "portfolio_optimization": ["claude", "openai", "grok", "gemini"],
         "structured_output": ["openai", "claude", "grok", "gemini"],
         "cost_effective": ["gemini", "grok", "claude", "openai"]

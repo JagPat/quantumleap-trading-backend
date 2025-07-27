@@ -1,0 +1,243 @@
+{
+  "project_name": "QuantumLeap Trading Platform",
+  "project_description": "A comprehensive trading platform with portfolio management, broker integration, AI-powered insights, and real-time trading capabilities",
+  "tech_stack": {
+    "frontend": {
+      "framework": "React 18.2.0",
+      "build_tool": "Vite 6.1.0",
+      "ui_library": "Radix UI components with Tailwind CSS",
+      "routing": "React Router DOM 7.6.3",
+      "state_management": "React Context API with custom providers",
+      "charts": "Recharts 2.15.1",
+      "animations": "Framer Motion 12.4.7",
+      "forms": "React Hook Form 7.54.2 with Zod validation",
+      "http_client": "Axios 1.11.0",
+      "testing": "Playwright 1.53.2, Jest with jsdom",
+      "styling": "Tailwind CSS with custom themes"
+    },
+    "backend": {
+      "framework": "FastAPI 0.116.1",
+      "server": "Uvicorn 0.35.0",
+      "database": "SQLite with custom service layer",
+      "authentication": "JWT with OAuth2 flow",
+      "broker_integration": "Kite Connect API",
+      "ai_providers": "OpenAI, Anthropic Claude, Google Gemini",
+      "security": "bcrypt, cryptography, passlib",
+      "validation": "Pydantic 2.11.7",
+      "async": "FastAPI async/await with httpx"
+    },
+    "deployment": {
+      "platform": "Railway",
+      "containerization": "Docker",
+      "environment": "Production with Railway environment variables"
+    }
+  },
+  "main_features": [
+    {
+      "name": "Authentication & Authorization",
+      "description": "OAuth2-based authentication with JWT tokens, broker OAuth integration",
+      "components": ["Login/Register", "OAuth callbacks", "Session management"]
+    },
+    {
+      "name": "Portfolio Management",
+      "description": "Real-time portfolio tracking with P&L calculations, holdings management",
+      "components": ["Portfolio dashboard", "Holdings view", "P&L analytics", "Performance metrics"]
+    },
+    {
+      "name": "Broker Integration",
+      "description": "Integration with Kite Connect for live trading data and order execution",
+      "components": ["Broker authentication", "Live data feeds", "Order management", "Account sync"]
+    },
+    {
+      "name": "AI-Powered Insights",
+      "description": "Multi-provider AI engine for trading insights and market analysis",
+      "components": ["AI chat interface", "Market analysis", "Trading recommendations", "Strategy suggestions"]
+    },
+    {
+      "name": "Trading Signals",
+      "description": "Real-time trading signals with mobile-optimized dashboard",
+      "components": ["Signal dashboard", "Mobile signal cards", "Alert system", "Signal analytics"]
+    },
+    {
+      "name": "Mobile Optimization",
+      "description": "Responsive design with mobile-first approach and PWA capabilities",
+      "components": ["Mobile navigation", "Touch-optimized UI", "Offline support", "Service worker"]
+    },
+    {
+      "name": "Accessibility Features",
+      "description": "WCAG-compliant accessibility with keyboard navigation and screen reader support",
+      "components": ["Accessibility audit", "Keyboard navigation", "Color contrast", "Screen reader support"]
+    },
+    {
+      "name": "Error Handling & Testing",
+      "description": "Comprehensive error handling with user testing interface and reporting",
+      "components": ["Global error boundary", "Error reporting", "User testing interface", "Feedback system"]
+    },
+    {
+      "name": "Performance Analytics",
+      "description": "Performance monitoring and analytics dashboard",
+      "components": ["Performance metrics", "Analytics dashboard", "Resource monitoring", "Optimization tools"]
+    },
+    {
+      "name": "Chat Interface",
+      "description": "AI-powered chat interface for trading assistance and market insights",
+      "components": ["Chat page", "Message handling", "AI integration", "Conversation history"]
+    }
+  ],
+  "api_endpoints": [
+    {
+      "path": "/health",
+      "method": "GET",
+      "description": "Health check endpoint"
+    },
+    {
+      "path": "/api/auth/*",
+      "method": "GET/POST",
+      "description": "Authentication endpoints including OAuth callbacks"
+    },
+    {
+      "path": "/api/portfolio/*",
+      "method": "GET/POST",
+      "description": "Portfolio management endpoints"
+    },
+    {
+      "path": "/api/broker/*",
+      "method": "GET/POST",
+      "description": "Broker integration endpoints"
+    },
+    {
+      "path": "/api/trading/*",
+      "method": "GET/POST",
+      "description": "Trading operations endpoints"
+    },
+    {
+      "path": "/api/ai/*",
+      "method": "GET/POST",
+      "description": "AI engine endpoints for insights and chat"
+    }
+  ],
+  "frontend_pages": [
+    {
+      "path": "/",
+      "component": "Dashboard",
+      "description": "Main dashboard with portfolio overview"
+    },
+    {
+      "path": "/portfolio",
+      "component": "Portfolio",
+      "description": "Detailed portfolio management page"
+    },
+    {
+      "path": "/signals",
+      "component": "SignalDashboard",
+      "description": "Trading signals dashboard"
+    },
+    {
+      "path": "/chat",
+      "component": "ChatPage",
+      "description": "AI-powered chat interface"
+    },
+    {
+      "path": "/broker-integration",
+      "component": "BrokerIntegration",
+      "description": "Broker connection and authentication"
+    },
+    {
+      "path": "/testing",
+      "component": "TestingPage",
+      "description": "User testing interface and feedback"
+    },
+    {
+      "path": "/analytics",
+      "component": "PerformanceAnalyticsPage",
+      "description": "Performance analytics and monitoring"
+    },
+    {
+      "path": "/error-reporting",
+      "component": "ErrorReportingDashboard",
+      "description": "Error reporting and debugging dashboard"
+    }
+  ],
+  "database_models": [
+    {
+      "name": "User",
+      "description": "User authentication and profile data"
+    },
+    {
+      "name": "Portfolio",
+      "description": "Portfolio holdings and performance data"
+    },
+    {
+      "name": "BrokerCredentials",
+      "description": "Encrypted broker authentication credentials"
+    },
+    {
+      "name": "TradingSignal",
+      "description": "Trading signals and recommendations"
+    },
+    {
+      "name": "AIPreferences",
+      "description": "User AI provider preferences and API keys"
+    }
+  ],
+  "key_integrations": [
+    {
+      "name": "Kite Connect",
+      "type": "Broker API",
+      "description": "Zerodha's trading API for live data and order execution"
+    },
+    {
+      "name": "OpenAI",
+      "type": "AI Provider",
+      "description": "GPT models for trading insights and chat"
+    },
+    {
+      "name": "Anthropic Claude",
+      "type": "AI Provider",
+      "description": "Claude models for market analysis"
+    },
+    {
+      "name": "Google Gemini",
+      "type": "AI Provider",
+      "description": "Gemini models for AI-powered features"
+    },
+    {
+      "name": "Railway",
+      "type": "Deployment Platform",
+      "description": "Cloud deployment with CI/CD integration"
+    }
+  ],
+  "testing_setup": {
+    "frontend_testing": {
+      "unit_tests": "Jest with React Testing Library",
+      "e2e_tests": "Playwright",
+      "user_testing": "Custom testing interface with feedback collection"
+    },
+    "backend_testing": {
+      "api_tests": "FastAPI TestClient",
+      "integration_tests": "Custom test suite for broker integration"
+    },
+    "testsprite_integration": {
+      "test_files": ["server-health.spec.js", "basic-functionality.spec.js", "main-features.spec.js", "auth-flow.spec.js"],
+      "test_helpers": "test-helpers.js",
+      "setup_guide": "TESTSPRITE_SETUP.md"
+    }
+  },
+  "security_features": [
+    "JWT-based authentication",
+    "OAuth2 flow with state validation",
+    "Encrypted credential storage",
+    "CORS configuration",
+    "Session middleware",
+    "API key validation",
+    "Secure environment variable handling"
+  ],
+  "performance_features": [
+    "Virtualized lists for large datasets",
+    "Asset optimization and lazy loading",
+    "Service worker for offline support",
+    "Mobile-optimized components",
+    "Error boundaries for graceful degradation",
+    "Performance monitoring and analytics"
+  ]
+}

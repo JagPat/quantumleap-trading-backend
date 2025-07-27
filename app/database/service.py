@@ -186,6 +186,14 @@ def init_database():
     
     conn.commit()
     conn.close()
+    
+    # Initialize trading engine tables
+    try:
+        from app.trading_engine.database_schema import create_trading_engine_tables
+        create_trading_engine_tables()
+        logger.info("Trading engine database tables initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize trading engine tables: {e}")
 
 def store_portfolio_snapshot(user_id: str, timestamp: str, holdings: str, positions: str) -> bool:
     """

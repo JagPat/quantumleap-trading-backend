@@ -5,6 +5,7 @@ Version: 2.0.0
 """
 import logging
 import os
+from datetime import datetime
 from fastapi import FastAPI # type: ignore
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 from starlette.middleware.sessions import SessionMiddleware
@@ -341,6 +342,72 @@ except Exception as e:
     except Exception as fallback_e:
         print(f"❌ Failed to create fallback chat router: {fallback_e}")
         logger.error(f"❌ Failed to create fallback chat router: {fallback_e}")
+
+# Trading Engine Router - New automatic trading functionality
+try:
+    print("🔄 Including trading engine router...")
+    from app.trading_engine.router import router as trading_engine_router
+    app.include_router(trading_engine_router)
+    print("✅ Trading engine router loaded and registered.")
+    logger.info("✅ Trading engine router loaded and registered.")
+except Exception as e:
+    print(f"❌ Failed to load full trading engine router: {e}")
+    logger.error(f"❌ Failed to load full trading engine router: {e}")
+    
+    # Try to load simplified trading engine router
+    try:
+        print("🔄 Loading simplified trading engine router...")
+        from app.trading_engine.simple_router import router as simple_trading_engine_router
+        app.include_router(simple_trading_engine_router)
+        print("✅ Simplified trading engine router loaded and registered.")
+        logger.info("✅ Simplified trading engine router loaded and registered.")
+    except Exception as simple_e:
+        print(f"❌ Failed to load simplified trading engine router: {simple_e}")
+        logger.error(f"❌ Failed to load simplified trading engine router: {simple_e}")
+        
+        # Create minimal fallback trading engine router
+        try:
+            from fastapi import APIRouter
+            
+            fallback_trading_engine_router = APIRouter(prefix="/api/trading-engine", tags=["Trading Engine - Fallback"])
+            
+            @fallback_trading_engine_router.get("/health")
+            async def fallback_trading_engine_health():
+                return {
+                    "status": "fallback",
+                    "message": "Trading engine service in minimal fallback mode",
+                    "error": str(e)
+                }
+            
+            @fallback_trading_engine_router.get("/metrics")
+            async def fallback_trading_engine_metrics():
+                return {
+                    "status": "fallback",
+                    "metrics": {
+                        "orders_processed": 0,
+                        "signals_processed": 0,
+                        "active_strategies": 0,
+                        "error": "Metrics service unavailable"
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            @fallback_trading_engine_router.get("/alerts")
+            async def fallback_trading_engine_alerts():
+                return {
+                    "status": "fallback",
+                    "alerts": [],
+                    "alert_count": 0,
+                    "error": "Alerts service unavailable",
+                    "last_updated": datetime.now().isoformat()
+                }
+            
+            app.include_router(fallback_trading_engine_router)
+            print("🔄 Minimal fallback trading engine router created and registered.")
+            logger.info("🔄 Minimal fallback trading engine router created and registered.")
+        except Exception as fallback_e:
+            print(f"❌ Failed to create minimal fallback trading engine router: {fallback_e}")
+            logger.error(f"❌ Failed to create minimal fallback trading engine router: {fallback_e}")
 
 # Alternative AI router for /ai/* endpoints (without /api prefix)
 try:
