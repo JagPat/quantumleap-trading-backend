@@ -672,6 +672,17 @@ try:
 except Exception as e:
     print(f"❌ Failed to load analysis router: {e}")
     logger.error(f"❌ Failed to load analysis router: {e}")
+
+# Include simple analysis router as backup
+try:
+    print("🔄 Including simple analysis router...")
+    from app.ai_engine.simple_analysis_router import router as simple_analysis_router
+    app.include_router(simple_analysis_router)
+    print("✅ Simple analysis router loaded and registered.")
+    logger.info("✅ Simple analysis router loaded and registered.")
+except Exception as e:
+    print(f"❌ Failed to load simple analysis router: {e}")
+    logger.error(f"❌ Failed to load simple analysis router: {e}")
     
     # Create fallback analysis router for portfolio endpoint
     try:
