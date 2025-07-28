@@ -49,8 +49,49 @@ app.add_middleware(
 # Health check endpoints
 @app.get("/health")
 async def health_check():
-    """Simple health check endpoint for Railway deployment"""
-    return {"status": "ok", "timestamp": "2025-07-20T09:30:00Z"}
+    """Enhanced health check endpoint with component status"""
+    try:
+        # Try to get component status if startup monitor is available
+        component_status = {}
+        fallback_components = []
+        
+        # This will be populated during startup
+        if hasattr(app.state, 'startup_monitor'):
+            startup_monitor = app.state.startup_monitor
+            component_statuses = startup_monitor.get_component_statuses()
+            
+            for name, status in component_statuses.items():
+                component_status[name] = {
+                    "status": status.status.value,
+                    "healthy": status.status.value == "loaded",
+                    "load_duration": status.load_duration
+                }
+                
+                if status.status.value == "fallback":
+                    fallback_components.append(name)
+        
+        overall_status = "ok"
+        if len(fallback_components) > len(component_status) / 2:
+            overall_status = "degraded"
+        elif len(fallback_components) > 0:
+            overall_status = "partial"
+        
+        return {
+            "status": overall_status,
+            "timestamp": datetime.now().isoformat(),
+            "components": component_status,
+            "fallback_active": len(fallback_components) > 0,
+            "fallback_components": fallback_components,
+            "message": f"System operational with {len(fallback_components)} components in fallback mode" if fallback_components else "All systems operational"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "message": "Health check failed"
+        }
 
 @app.get("/ping")
 async def ping():
@@ -98,31 +139,147 @@ async def get_version():
 
 @app.get("/readyz")
 async def readyz():
-    """Readiness check endpoint"""
-    return {
-        "status": "ready",
-        "components": {
-            "database": "connected",
-            "auth": "operational",
-            "portfolio": "operational",
-            "ai_engine": "operational"
-        },
-        "ai_engine": {
-            "status": "ready",
-            "mode": "BYOAI (Bring Your Own AI)",
-            "message": "Fallback router active. No AI key configured."
+    """Enhanced readiness check endpoint"""
+    try:
+        ready = True
+        components = {}
+        
+        # Check component readiness if startup monitor is available
+        if hasattr(app.state, 'startup_monitor'):
+            startup_monitor = app.state.startup_monitor
+            component_statuses = startup_monitor.get_component_statuses()
+            
+            for name, status in component_statuses.items():
+                is_ready = status.status.value in ["loaded", "fallback"]
+                components[name] = {
+                    "status": "ready" if is_ready else "not_ready",
+                    "mode": "production" if status.status.value == "loaded" else "fallback",
+                    "load_duration": status.load_duration
+                }
+                
+                if not is_ready:
+                    ready = False
+        else:
+            # Fallback component status
+            components = {
+                "database": {"status": "ready", "mode": "production"},
+                "auth": {"status": "ready", "mode": "production"},
+                "portfolio": {"status": "ready", "mode": "unknown"},
+                "ai_engine": {"status": "ready", "mode": "fallback"}
+            }
+        
+        return {
+            "status": "ready" if ready else "not_ready",
+            "timestamp": datetime.now().isoformat(),
+            "components": components,
+            "message": "All components ready" if ready else "Some components not ready"
         }
-    }
+        
+    except Exception as e:
+        return {
+            "status": "not_ready",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "message": "Readiness check failed"
+        }
+
+@app.get("/component-status")
+async def get_component_status():
+    """Get detailed component status information"""
+    try:
+        if hasattr(app.state, 'startup_monitor'):
+            startup_monitor = app.state.startup_monitor
+            component_statuses = startup_monitor.get_component_statuses()
+            
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "components": {
+                    name: {
+                        "status": status.status.value,
+                        "error_message": status.error_message,
+                        "load_time": status.load_time.isoformat(),
+                        "fallback_reason": status.fallback_reason,
+                        "load_duration": status.load_duration,
+                        "healthy": status.status.value == "loaded",
+                        "real_data": status.status.value == "loaded"
+                    }
+                    for name, status in component_statuses.items()
+                },
+                "summary": {
+                    "total": len(component_statuses),
+                    "loaded": sum(1 for s in component_statuses.values() if s.status.value == "loaded"),
+                    "fallback": sum(1 for s in component_statuses.values() if s.status.value == "fallback"),
+                    "failed": sum(1 for s in component_statuses.values() if s.status.value == "failed")
+                }
+            }
+        else:
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "error": "Startup monitor not available",
+                "components": {},
+                "summary": {"total": 0, "loaded": 0, "fallback": 0, "failed": 0}
+            }
+    except Exception as e:
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "components": {},
+            "summary": {"total": 0, "loaded": 0, "fallback": 0, "failed": 0}
+        }
+
+@app.get("/fallback-status")
+async def get_fallback_status():
+    """Get information about components in fallback mode"""
+    try:
+        if hasattr(app.state, 'startup_monitor'):
+            startup_monitor = app.state.startup_monitor
+            fallback_info = startup_monitor.get_fallback_components_info()
+            
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "fallback_active": len(fallback_info) > 0,
+                "fallback_count": len(fallback_info),
+                "components": fallback_info,
+                "message": "Some components are running in fallback mode with limited functionality" 
+                          if fallback_info else "All components running normally"
+            }
+        else:
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "fallback_active": False,
+                "fallback_count": 0,
+                "components": {},
+                "message": "Startup monitor not available"
+            }
+    except Exception as e:
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "fallback_active": True,
+            "fallback_count": 0,
+            "components": {},
+            "message": "Fallback status check failed"
+        }
 
 @app.get("/")
 async def root():
-    """Root endpoint with basic app info"""
+    """Root endpoint with basic app info and health links"""
     return {
         "message": "QuantumLeap Trading Backend API",
         "version": settings.app_version,
         "docs": "/docs",
         "health": "/health",
-        "deployment": "latest"
+        "deployment": "latest",
+        "monitoring": {
+            "health": "/health",
+            "readiness": "/readyz",
+            "component_status": "/component-status",
+            "fallback_status": "/fallback-status",
+            "startup_summary": "/health/startup-summary",
+            "startup_events": "/health/startup-events",
+            "performance_metrics": "/health/performance-metrics",
+            "memory_usage": "/health/memory-usage"
+        }
     }
 
 # Initialize database on startup
@@ -131,6 +288,28 @@ async def on_startup():
     """Initialize database and startup tasks with robust fallback system"""
     print("🚀 Starting QuantumLeap Trading Backend...")
     logger.info("Starting QuantumLeap Trading Backend")
+    
+    # Initialize infrastructure validator
+    try:
+        from app.core.infrastructure_validator import InfrastructureValidator
+        validator = InfrastructureValidator()
+        
+        print("🏗️ Validating infrastructure...")
+        validation_results = validator.validate_all()
+        
+        # Log validation results
+        for category, result in validation_results.items():
+            if result.success:
+                print(f"✅ Infrastructure {category}: {result.message}")
+            else:
+                print(f"❌ Infrastructure {category}: {result.message}")
+                for error in result.errors:
+                    print(f"   - {error}")
+        
+        logger.info("Infrastructure validation completed")
+    except Exception as e:
+        print(f"❌ Infrastructure validation failed: {e}")
+        logger.error(f"Infrastructure validation failed: {e}")
     
     # Create startup checkpoint to verify fresh deployment
     try:
@@ -153,68 +332,137 @@ async def on_startup():
         print(f"❌ Failed to create startup checkpoint: {e}")
         logger.error(f"❌ Failed to create startup checkpoint: {e}")
     
-    # Load Portfolio Router with robust fallback
+    # Initialize startup monitor and component loader
     try:
-        print("🔍 Attempting to load portfolio router...")
-        logger.info("🔍 Attempting to load portfolio router...")
+        from app.core.startup_monitor import StartupMonitor
+        from app.core.component_loader import ComponentLoader
         
-        # Test import step by step
-        print("🔍 Testing portfolio imports...")
-        from app.portfolio import models
-        print("✅ Portfolio models imported")
-        from app.portfolio import service
-        print("✅ Portfolio service imported")
-        from app.portfolio.router import router as portfolio_router
-        print("✅ Portfolio router imported")
+        startup_monitor = StartupMonitor()
+        component_loader = ComponentLoader()
         
-        app.include_router(portfolio_router)
-        print("✅ Portfolio router loaded and registered.")
-        logger.info("✅ Portfolio router loaded and registered.")
-    except Exception as e:
-        print(f"❌ Portfolio service import failed: {e}")
-        logger.error(f"❌ Portfolio service import failed: {e}")
-        print(f"❌ Portfolio error type: {type(e).__name__}")
-        print(f"❌ Portfolio error details: {str(e)}")
+        startup_monitor.log_startup_progress("system", "loading", "Initializing component loader")
         
-        print("⚠️ Using fallback portfolio router with database cleanup endpoints")
-        try:
-            # Import external fallback portfolio router with cleanup endpoints
-            from app.portfolio.fallback_router import router as fallback_portfolio_router
-            app.include_router(fallback_portfolio_router)
-            print("🔄 External fallback portfolio router loaded and registered.")
-            logger.info("🔄 External fallback portfolio router loaded and registered.")
-        except Exception as fallback_e:
-            print(f"❌ Failed to create fallback portfolio router: {fallback_e}")
-            logger.error(f"❌ Failed to create fallback portfolio router: {fallback_e}")
-    
-    # Load Broker Router with robust fallback
-    try:
-        print("🔍 Attempting to load broker router...")
-        logger.info("🔍 Attempting to load broker router...")
+        # Load Portfolio Router with component loader
+        startup_monitor.log_startup_progress("portfolio", "loading", "Loading portfolio router")
         
-        from app.broker.router import router as broker_router
-        app.include_router(broker_router)
-        print("✅ Broker router loaded and registered.")
-        logger.info("✅ Broker router loaded and registered.")
-    except Exception as e:
-        print(f"❌ Broker service import failed: {e}")
-        logger.error(f"❌ Broker service import failed: {e}")
-        print(f"❌ Broker error type: {type(e).__name__}")
-        print(f"❌ Broker error details: {str(e)}")
+        portfolio_result = component_loader.load_router_with_fallback(
+            "portfolio",
+            "app.portfolio.router.router",
+            "/api/portfolio",
+            validate_syntax=True
+        )
         
-        print("⚠️ Using fallback broker router with /api/broker/status returning 503")
-        try:
-            # Create inline fallback broker router
-            from fastapi import APIRouter, HTTPException
+        if portfolio_result.router:
+            app.include_router(portfolio_result.router)
+            if portfolio_result.success:
+                startup_monitor.log_startup_progress("portfolio", "success", "Portfolio router loaded", portfolio_result.load_duration)
+            else:
+                startup_monitor.log_startup_progress("portfolio", "fallback", "Portfolio router in fallback mode", portfolio_result.load_duration)
+        else:
+            startup_monitor.log_startup_progress("portfolio", "failed", "Portfolio router failed completely")
             
-            fallback_broker_router = APIRouter(prefix="/api/broker", tags=["Broker - Fallback"])
+        # Update startup monitor with component status
+        if hasattr(component_loader, 'get_component_status'):
+            portfolio_status = component_loader.get_component_status("portfolio")
+            if portfolio_status:
+                startup_monitor.update_component_status(portfolio_status)
+            
+    except Exception as e:
+        print(f"❌ Component loader initialization failed: {e}")
+        logger.error(f"Component loader initialization failed: {e}")
+        
+        # Fallback to original loading logic
+        try:
+            print("🔍 Attempting to load portfolio router...")
+            logger.info("🔍 Attempting to load portfolio router...")
+            
+            # Test import step by step
+            print("🔍 Testing portfolio imports...")
+            from app.portfolio import models
+            print("✅ Portfolio models imported")
+            from app.portfolio import service
+            print("✅ Portfolio service imported")
+            from app.portfolio.router import router as portfolio_router
+            print("✅ Portfolio router imported")
+            
+            app.include_router(portfolio_router)
+            print("✅ Portfolio router loaded and registered.")
+            logger.info("✅ Portfolio router loaded and registered.")
+        except Exception as fallback_e:
+            print(f"❌ Portfolio service import failed: {fallback_e}")
+            logger.error(f"❌ Portfolio service import failed: {fallback_e}")
+            print(f"❌ Portfolio error type: {type(fallback_e).__name__}")
+            print(f"❌ Portfolio error details: {str(fallback_e)}")
+            
+            print("⚠️ Using fallback portfolio router with database cleanup endpoints")
+            try:
+                # Import external fallback portfolio router with cleanup endpoints
+    
+    # Load Broker Router with component loader
+    try:
+        if 'component_loader' in locals() and 'startup_monitor' in locals():
+            startup_monitor.log_startup_progress("broker", "loading", "Loading broker router")
+            
+            broker_result = component_loader.load_router_with_fallback(
+                "broker",
+                "app.broker.router.router",
+                "/api/broker",
+                validate_syntax=True
+            )
+            
+            if broker_result.router:
+                app.include_router(broker_result.router)
+                if broker_result.success:
+                    startup_monitor.log_startup_progress("broker", "success", "Broker router loaded", broker_result.load_duration)
+                else:
+                    startup_monitor.log_startup_progress("broker", "fallback", "Broker router in fallback mode", broker_result.load_duration)
+            else:
+                startup_monitor.log_startup_progress("broker", "failed", "Broker router failed completely")
+                
+            # Update startup monitor with component status
+            broker_status = component_loader.get_component_status("broker")
+            if broker_status:
+                startup_monitor.update_component_status(broker_status)
+        else:
+            raise Exception("Component loader not available")
+            
+    except Exception as e:
+        print(f"❌ Broker component loading failed: {e}")
+        logger.error(f"❌ Broker component loading failed: {e}")
+        
+        # Fallback to original loading logic
+        try:
+            print("🔍 Attempting to load broker router...")
+            logger.info("🔍 Attempting to load broker router...")
+            
+            from app.broker.router import router as broker_router
+            app.include_router(broker_router)
+            print("✅ Broker router loaded and registered.")
+            logger.info("✅ Broker router loaded and registered.")
+        except Exception as fallback_e:
+            print(f"❌ Broker service import failed: {fallback_e}")
+            logger.error(f"❌ Broker service import failed: {fallback_e}")
+            print(f"❌ Broker error type: {type(fallback_e).__name__}")
+            print(f"❌ Broker error details: {str(fallback_e)}")
+            
+            print("⚠️ Using fallback broker router with /api/broker/status returning 503")
+            try:
+                # Create inline fallback broker router
+                from fastapi import APIRouter, HTTPException
+                
+                fallback_broker_router = APIRouter(prefix="/api/broker", tags=["Broker - Fallback"])
             
             @fallback_broker_router.get("/status")
             async def fallback_broker_status():
                 return {
                     "status": "fallback",
                     "message": "Broker service in fallback mode",
-                    "error": str(e)
+                    "error": str(e),
+                    "fallback_active": True,
+                    "real_data": False,
+                    "component": "broker",
+                    "timestamp": datetime.now().isoformat(),
+                    "warning": "⚠️ This is fallback data - broker service is temporarily unavailable"
                 }
             
             @fallback_broker_router.get("/{path:path}")
@@ -228,34 +476,71 @@ async def on_startup():
             print(f"❌ Failed to create fallback broker router: {fallback_e}")
             logger.error(f"❌ Failed to create fallback broker router: {fallback_e}")
     
-    # Load Trading Router with robust fallback
+    # Load Trading Router with component loader
     try:
-        print("🔍 Attempting to load trading router...")
-        logger.info("🔍 Attempting to load trading router...")
-        
-        from app.trading.router import router as trading_router
-        app.include_router(trading_router)
-        print("✅ Trading router loaded and registered.")
-        logger.info("✅ Trading router loaded and registered.")
-    except Exception as e:
-        print(f"❌ Trading service import failed: {e}")
-        logger.error(f"❌ Trading service import failed: {e}")
-        print(f"❌ Trading error type: {type(e).__name__}")
-        print(f"❌ Trading error details: {str(e)}")
-        
-        print("⚠️ Using fallback trading router with /api/trading/status returning 503")
-        try:
-            # Create inline fallback trading router
-            from fastapi import APIRouter, HTTPException # type: ignore
+        if 'component_loader' in locals() and 'startup_monitor' in locals():
+            startup_monitor.log_startup_progress("trading", "loading", "Loading trading router")
             
-            fallback_trading_router = APIRouter(prefix="/api/trading", tags=["Trading - Fallback"])
+            trading_result = component_loader.load_router_with_fallback(
+                "trading",
+                "app.trading.router.router",
+                "/api/trading",
+                validate_syntax=True
+            )
+            
+            if trading_result.router:
+                app.include_router(trading_result.router)
+                if trading_result.success:
+                    startup_monitor.log_startup_progress("trading", "success", "Trading router loaded", trading_result.load_duration)
+                else:
+                    startup_monitor.log_startup_progress("trading", "fallback", "Trading router in fallback mode", trading_result.load_duration)
+            else:
+                startup_monitor.log_startup_progress("trading", "failed", "Trading router failed completely")
+                
+            # Update startup monitor with component status
+            trading_status = component_loader.get_component_status("trading")
+            if trading_status:
+                startup_monitor.update_component_status(trading_status)
+        else:
+            raise Exception("Component loader not available")
+            
+    except Exception as e:
+        print(f"❌ Trading component loading failed: {e}")
+        logger.error(f"❌ Trading component loading failed: {e}")
+        
+        # Fallback to original loading logic
+        try:
+            print("🔍 Attempting to load trading router...")
+            logger.info("🔍 Attempting to load trading router...")
+            
+            from app.trading.router import router as trading_router
+            app.include_router(trading_router)
+            print("✅ Trading router loaded and registered.")
+            logger.info("✅ Trading router loaded and registered.")
+        except Exception as fallback_e:
+            print(f"❌ Trading service import failed: {fallback_e}")
+            logger.error(f"❌ Trading service import failed: {fallback_e}")
+            print(f"❌ Trading error type: {type(fallback_e).__name__}")
+            print(f"❌ Trading error details: {str(fallback_e)}")
+            
+            print("⚠️ Using fallback trading router with /api/trading/status returning 503")
+            try:
+                # Create inline fallback trading router
+                from fastapi import APIRouter, HTTPException # type: ignore
+                
+                fallback_trading_router = APIRouter(prefix="/api/trading", tags=["Trading - Fallback"])
             
             @fallback_trading_router.get("/status")
             async def fallback_trading_status():
                 return {
                     "status": "fallback",
                     "message": "Trading service in fallback mode",
-                    "error": str(e)
+                    "error": str(e),
+                    "fallback_active": True,
+                    "real_data": False,
+                    "component": "trading",
+                    "timestamp": datetime.now().isoformat(),
+                    "warning": "⚠️ This is fallback data - trading service is temporarily unavailable"
                 }
             
             @fallback_trading_router.get("/{path:path}")
@@ -280,6 +565,32 @@ async def on_startup():
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
         logger.error(f"Database initialization failed: {e}")
+
+    # Generate startup summary
+    try:
+        if 'startup_monitor' in locals():
+            startup_monitor.log_startup_progress("database", "success", "Database initialized")
+            
+            # Set infrastructure results if available
+            if 'validation_results' in locals():
+                startup_monitor.set_infrastructure_results(validation_results)
+            
+            # Generate and display startup summary
+            startup_summary = startup_monitor.generate_startup_summary()
+            
+            # Create health endpoints
+            health_router = startup_monitor.create_health_endpoints()
+            app.include_router(health_router)
+            
+            # Store startup monitor in app state for health endpoints
+            app.state.startup_monitor = startup_monitor
+            
+            print("✅ Startup monitoring completed")
+        else:
+            print("⚠️ Startup monitor not available")
+    except Exception as e:
+        print(f"❌ Startup summary generation failed: {e}")
+        logger.error(f"Startup summary generation failed: {e}")
 
     print("🎯 FastAPI app startup complete - health checks should work")
     logger.info("FastAPI app startup complete")

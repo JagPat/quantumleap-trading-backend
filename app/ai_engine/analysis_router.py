@@ -270,8 +270,8 @@ async def test_sentiment_analysis(
             "error": str(e),
             "status": "failed"
         }
-@
-router.post("/technical", response_model=AnalysisResponse)
+
+@router.post("/technical", response_model=AnalysisResponse)
 async def analyze_technical(
     symbol: str,
     timeframe: str = "1d",
