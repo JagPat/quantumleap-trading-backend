@@ -58,11 +58,13 @@ app.add_middleware(
         "Content-Type",
         "Authorization",
         "X-Requested-With",
+        "X-User-ID",
         "Origin",
         "Access-Control-Request-Method",
         "Access-Control-Request-Headers",
     ],
     expose_headers=["*"],
+    max_age=600,
 )
 
 # Health check endpoints
