@@ -458,30 +458,30 @@ async def on_startup():
                 from fastapi import APIRouter, HTTPException
                 
                 fallback_broker_router = APIRouter(prefix="/api/broker", tags=["Broker - Fallback"])
-            
-            @fallback_broker_router.get("/status")
-            async def fallback_broker_status():
-                return {
-                    "status": "fallback",
-                    "message": "Broker service in fallback mode",
-                    "error": str(e),
-                    "fallback_active": True,
-                    "real_data": False,
-                    "component": "broker",
-                    "timestamp": datetime.now().isoformat(),
-                    "warning": "⚠️ This is fallback data - broker service is temporarily unavailable"
-                }
-            
-            @fallback_broker_router.get("/{path:path}")
-            async def fallback_broker_catchall(path: str):
-                raise HTTPException(status_code=503, detail="Broker service unavailable")
-            
-            app.include_router(fallback_broker_router)
-            print("🔄 Fallback broker router created and registered.")
-            logger.info("🔄 Fallback broker router created and registered.")
-        except Exception as fallback_e:
-            print(f"❌ Failed to create fallback broker router: {fallback_e}")
-            logger.error(f"❌ Failed to create fallback broker router: {fallback_e}")
+                
+                @fallback_broker_router.get("/status")
+                async def fallback_broker_status():
+                    return {
+                        "status": "fallback",
+                        "message": "Broker service in fallback mode",
+                        "error": str(fallback_e),
+                        "fallback_active": True,
+                        "real_data": False,
+                        "component": "broker",
+                        "timestamp": datetime.now().isoformat(),
+                        "warning": "⚠️ This is fallback data - broker service is temporarily unavailable"
+                    }
+                
+                @fallback_broker_router.get("/{path:path}")
+                async def fallback_broker_catchall(path: str):
+                    raise HTTPException(status_code=503, detail="Broker service unavailable")
+                
+                app.include_router(fallback_broker_router)
+                print("🔄 Fallback broker router created and registered.")
+                logger.info("🔄 Fallback broker router created and registered.")
+            except Exception as final_fallback_e:
+                print(f"❌ Failed to create fallback broker router: {final_fallback_e}")
+                logger.error(f"❌ Failed to create fallback broker router: {final_fallback_e}")
     
     # Load Trading Router with component loader
     try:
@@ -536,30 +536,30 @@ async def on_startup():
                 from fastapi import APIRouter, HTTPException # type: ignore
                 
                 fallback_trading_router = APIRouter(prefix="/api/trading", tags=["Trading - Fallback"])
-            
-            @fallback_trading_router.get("/status")
-            async def fallback_trading_status():
-                return {
-                    "status": "fallback",
-                    "message": "Trading service in fallback mode",
-                    "error": str(e),
-                    "fallback_active": True,
-                    "real_data": False,
-                    "component": "trading",
-                    "timestamp": datetime.now().isoformat(),
-                    "warning": "⚠️ This is fallback data - trading service is temporarily unavailable"
-                }
-            
-            @fallback_trading_router.get("/{path:path}")
-            async def fallback_trading_catchall(path: str):
-                raise HTTPException(status_code=503, detail="Trading service unavailable")
-            
-            app.include_router(fallback_trading_router)
-            print("🔄 Fallback trading router created and registered.")
-            logger.info("🔄 Fallback trading router created and registered.")
-        except Exception as fallback_e:
-            print(f"❌ Failed to create fallback trading router: {fallback_e}")
-            logger.error(f"❌ Failed to create fallback trading router: {fallback_e}")
+                
+                @fallback_trading_router.get("/status")
+                async def fallback_trading_status():
+                    return {
+                        "status": "fallback",
+                        "message": "Trading service in fallback mode",
+                        "error": str(fallback_e),
+                        "fallback_active": True,
+                        "real_data": False,
+                        "component": "trading",
+                        "timestamp": datetime.now().isoformat(),
+                        "warning": "⚠️ This is fallback data - trading service is temporarily unavailable"
+                    }
+                
+                @fallback_trading_router.get("/{path:path}")
+                async def fallback_trading_catchall(path: str):
+                    raise HTTPException(status_code=503, detail="Trading service unavailable")
+                
+                app.include_router(fallback_trading_router)
+                print("🔄 Fallback trading router created and registered.")
+                logger.info("🔄 Fallback trading router created and registered.")
+            except Exception as final_fallback_e:
+                print(f"❌ Failed to create fallback trading router: {final_fallback_e}")
+                logger.error(f"❌ Failed to create fallback trading router: {final_fallback_e}")
     
     # Initialize database with error handling
     try:
