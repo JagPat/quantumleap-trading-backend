@@ -82,6 +82,27 @@ def validate_user_session(user_id: str, access_token: str) -> bool:
         print(f"Error validating session for user {user_id}: {e}")
         return False
 
+@router.get("/status-header")
+async def get_broker_status_header():
+    """Get broker service status for header display (no auth required)"""
+    try:
+        return {
+            "status": "operational",
+            "service": "broker",
+            "is_connected": False,
+            "message": "Broker service available",
+            "timestamp": datetime.now().isoformat(),
+            "auth_required": True
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "service": "broker",
+            "is_connected": False,
+            "message": f"Broker service error: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
 @router.get("/status")
 async def get_broker_status(
     user_id: str = Depends(get_user_from_headers),

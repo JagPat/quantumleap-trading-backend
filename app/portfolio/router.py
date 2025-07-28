@@ -82,7 +82,7 @@ async def get_latest_portfolio(user_id: str = Depends(get_user_from_headers)):
         raise HTTPException(status_code=500, detail=f"Failed to retrieve portfolio: {str(e)}")
 
 # New endpoints for easier testing without auth headers
-@router.post("/fetch-live-simple")
+@router.get("/fetch-live-simple")
 async def fetch_live_portfolio_simple(user_id: str = Query(..., description="User ID")):
     """
     Simplified version that accepts user_id as query parameter for testing.
