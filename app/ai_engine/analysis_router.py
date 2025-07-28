@@ -54,62 +54,101 @@ async def analyze_portfolio(
 ):
     """Generate comprehensive portfolio analysis"""
     try:
-        if FALLBACK_MODE or not analysis_engine:
-            # Fallback portfolio analysis
-            total_value = portfolio_data.get("total_value", 0)
-            holdings = portfolio_data.get("holdings", [])
+        # Check if user has valid AI providers configured
+        try:
+            from .service import AIService
+            ai_service = AIService()
+            user_preferences = await ai_service.get_user_preferences(user_id)
             
-            # Calculate basic metrics
-            num_holdings = len(holdings)
-            avg_allocation = 100 / num_holdings if num_holdings > 0 else 0
+            # Check if user has any valid API keys
+            has_valid_providers = (
+                user_preferences and (
+                    user_preferences.get('has_openai_key') or
+                    user_preferences.get('has_claude_key') or
+                    user_preferences.get('has_gemini_key') or
+                    user_preferences.get('has_grok_key')
+                )
+            )
             
-            # Generate fallback analysis
-            return {
-                "status": "success",
-                "analysis_id": f"fallback_{user_id}_{int(datetime.now().timestamp())}",
-                "timestamp": datetime.now().isoformat(),
-                "analysis": {
-                    "health_score": min(85.0, max(60.0, 75.0 + (num_holdings - 5) * 2)),
-                    "risk_level": "MODERATE" if num_holdings >= 5 else "HIGH",
-                    "diversification_score": min(90.0, num_holdings * 15),
-                    "total_value": total_value,
-                    "holdings_count": num_holdings,
-                    "recommendations": [
-                        {
-                            "type": "DIVERSIFICATION",
-                            "title": "Portfolio Diversification",
-                            "description": f"Your portfolio has {num_holdings} holdings. Consider {'maintaining' if num_holdings >= 8 else 'adding more'} diversification.",
-                            "priority": "MEDIUM" if num_holdings >= 5 else "HIGH",
-                            "impact": "Reduces overall portfolio risk"
-                        },
-                        {
-                            "type": "REBALANCING",
-                            "title": "Regular Rebalancing",
-                            "description": "Review and rebalance your portfolio quarterly to maintain target allocations.",
-                            "priority": "MEDIUM",
-                            "impact": "Maintains risk-return profile"
-                        },
-                        {
-                            "type": "MONITORING",
-                            "title": "Performance Monitoring",
-                            "description": "Monitor portfolio performance against benchmarks regularly.",
-                            "priority": "LOW",
-                            "impact": "Helps track investment goals"
-                        }
-                    ],
-                    "sectors": {
-                        "analysis": "Sector analysis temporarily unavailable",
-                        "recommendations": ["Ensure sector diversification", "Avoid concentration in single sector"]
+            if has_valid_providers and not FALLBACK_MODE and analysis_engine:
+                logger.info(f"Using real AI analysis for user {user_id}")
+                # Try to use real AI analysis
+                try:
+                    # Initialize orchestrator for user if needed
+                    await analysis_engine.initialize_orchestrator(user_id)
+                    
+                    # Generate real portfolio analysis
+                    analysis_result = await analysis_engine.generate_portfolio_analysis(
+                        user_id=user_id,
+                        portfolio_data=portfolio_data
+                    )
+                    
+                    return analysis_result
+                    
+                except Exception as ai_error:
+                    logger.warning(f"Real AI analysis failed, falling back: {ai_error}")
+                    # Fall through to fallback mode
+            else:
+                logger.info(f"No valid AI providers for user {user_id}, using fallback")
+                
+        except Exception as e:
+            logger.warning(f"Error checking AI providers, using fallback: {e}")
+        
+        # Fallback portfolio analysis
+        total_value = portfolio_data.get("total_value", 0)
+        holdings = portfolio_data.get("holdings", [])
+        
+        # Calculate basic metrics
+        num_holdings = len(holdings)
+        avg_allocation = 100 / num_holdings if num_holdings > 0 else 0
+        
+        # Generate fallback analysis
+        return {
+            "status": "success",
+            "analysis_id": f"fallback_{user_id}_{int(datetime.now().timestamp())}",
+            "timestamp": datetime.now().isoformat(),
+            "analysis": {
+                "health_score": min(85.0, max(60.0, 75.0 + (num_holdings - 5) * 2)),
+                "risk_level": "MODERATE" if num_holdings >= 5 else "HIGH",
+                "diversification_score": min(90.0, num_holdings * 15),
+                "total_value": total_value,
+                "holdings_count": num_holdings,
+                "recommendations": [
+                    {
+                        "type": "DIVERSIFICATION",
+                        "title": "Portfolio Diversification",
+                        "description": f"Your portfolio has {num_holdings} holdings. Consider {'maintaining' if num_holdings >= 8 else 'adding more'} diversification.",
+                        "priority": "MEDIUM" if num_holdings >= 5 else "HIGH",
+                        "impact": "Reduces overall portfolio risk"
                     },
-                    "risk_metrics": {
-                        "volatility": "Moderate",
-                        "beta": "Market-aligned",
-                        "sharpe_ratio": "Acceptable"
+                    {
+                        "type": "REBALANCING",
+                        "title": "Regular Rebalancing",
+                        "description": "Review and rebalance your portfolio quarterly to maintain target allocations.",
+                        "priority": "MEDIUM",
+                        "impact": "Maintains risk-return profile"
+                    },
+                    {
+                        "type": "MONITORING",
+                        "title": "Performance Monitoring",
+                        "description": "Monitor portfolio performance against benchmarks regularly.",
+                        "priority": "LOW",
+                        "impact": "Helps track investment goals"
                     }
+                ],
+                "sectors": {
+                    "analysis": "Sector analysis temporarily unavailable",
+                    "recommendations": ["Ensure sector diversification", "Avoid concentration in single sector"]
                 },
-                "fallback_mode": True,
-                "message": "Analysis generated in fallback mode - limited functionality"
-            }
+                "risk_metrics": {
+                    "volatility": "Moderate",
+                    "beta": "Market-aligned",
+                    "sharpe_ratio": "Acceptable"
+                }
+            },
+            "fallback_mode": True,
+            "message": "Analysis generated in fallback mode - limited functionality"
+        }
         
         # Initialize orchestrator for user if needed
         await analysis_engine.initialize_orchestrator(user_id)
