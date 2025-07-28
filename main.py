@@ -397,6 +397,13 @@ async def on_startup():
             print("⚠️ Using fallback portfolio router with database cleanup endpoints")
             try:
                 # Import external fallback portfolio router with cleanup endpoints
+                from app.portfolio.fallback_router import router as fallback_portfolio_router
+                app.include_router(fallback_portfolio_router)
+                print("🔄 External fallback portfolio router loaded and registered.")
+                logger.info("🔄 External fallback portfolio router loaded and registered.")
+            except Exception as final_fallback_e:
+                print(f"❌ Failed to create fallback portfolio router: {final_fallback_e}")
+                logger.error(f"❌ Failed to create fallback portfolio router: {final_fallback_e}")
     
     # Load Broker Router with component loader
     try:
