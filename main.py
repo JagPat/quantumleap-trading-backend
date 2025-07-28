@@ -38,12 +38,31 @@ app.add_middleware(
     secret_key=os.environ.get("SESSION_SECRET", "a-secure-secret-key"),
 )
 
+# Enhanced CORS configuration for frontend development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3000",  # React dev server
+        "http://127.0.0.1:5173",  # Alternative localhost
+        "http://127.0.0.1:3000",  # Alternative localhost
+        "https://web-production-de0bc.up.railway.app",  # Production backend
+        "*"  # Fallback for all origins
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
+    expose_headers=["*"],
 )
 
 # Health check endpoints
@@ -261,6 +280,12 @@ async def get_fallback_status():
             "message": "Fallback status check failed"
         }
 
+# CORS preflight handler
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    """Handle CORS preflight requests"""
+    return {"message": "OK"}
+
 @app.get("/")
 async def root():
     """Root endpoint with basic app info and health links"""
@@ -270,6 +295,13 @@ async def root():
         "docs": "/docs",
         "health": "/health",
         "deployment": "latest",
+        "cors_enabled": True,
+        "frontend_origins": [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000"
+        ],
         "monitoring": {
             "health": "/health",
             "readiness": "/readyz",
