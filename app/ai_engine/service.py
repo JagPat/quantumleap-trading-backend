@@ -42,22 +42,39 @@ class AIEngineService:
         try:
             conn = sqlite3.connect(settings.database_path)
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT preferences FROM ai_preferences WHERE user_id = ?",
-                (user_id,)
-            )
+            cursor.execute("""
+                SELECT openai_api_key, claude_api_key, gemini_api_key, grok_api_key
+                FROM ai_user_preferences 
+                WHERE user_id = ?
+            """, (user_id,))
             result = cursor.fetchone()
             
             if result:
-                preferences = json.loads(result[0])
-                # Decrypt API keys for display (partial)
-                if preferences.get('openai_api_key'):
-                    preferences['openai_api_key_preview'] = self.get_key_preview(preferences['openai_api_key'])
-                if preferences.get('claude_api_key'):
-                    preferences['claude_api_key_preview'] = self.get_key_preview(preferences['claude_api_key'])
-                if preferences.get('gemini_api_key'):
-                    preferences['gemini_api_key_preview'] = self.get_key_preview(preferences['gemini_api_key'])
-                return preferences
+                # Decrypt API keys
+                openai_key = self.decrypt_api_key(result[0]) if result[0] else None
+                claude_key = self.decrypt_api_key(result[1]) if result[1] else None
+                gemini_key = self.decrypt_api_key(result[2]) if result[2] else None
+                grok_key = self.decrypt_api_key(result[3]) if result[3] else None
+                
+                return {
+                    "preferred_ai_provider": "auto",
+                    "provider_priorities": None,
+                    "cost_limits": None,
+                    "risk_tolerance": "medium",
+                    "trading_style": "balanced",
+                    "openai_api_key": openai_key,
+                    "claude_api_key": claude_key,
+                    "gemini_api_key": gemini_key,
+                    "grok_api_key": grok_key,
+                    "has_openai_key": bool(openai_key and len(openai_key.strip()) > 0),
+                    "has_claude_key": bool(claude_key and len(claude_key.strip()) > 0),
+                    "has_gemini_key": bool(gemini_key and len(gemini_key.strip()) > 0),
+                    "has_grok_key": bool(grok_key and len(grok_key.strip()) > 0),
+                    "openai_key_preview": self.get_key_preview(openai_key),
+                    "claude_key_preview": self.get_key_preview(claude_key),
+                    "gemini_key_preview": self.get_key_preview(gemini_key),
+                    "grok_key_preview": self.get_key_preview(grok_key)
+                }
             return None
         except Exception as e:
             print(f"Error getting user preferences: {e}")
@@ -66,47 +83,41 @@ class AIEngineService:
             if conn:
                 conn.close()
 
-    def get_key_preview(self, encrypted_key: str) -> str:
-        """Get a preview of the API key (first 8 chars + *****)"""
+    def get_key_preview(self, api_key: str) -> str:
+        """Get a preview of the API key (first 8 chars + ...)"""
         try:
-            if not encrypted_key:
-                return ""
-            decrypted = self.decrypt_api_key(encrypted_key)
-            if len(decrypted) > 8:
-                return f"{decrypted[:8]}*****"
-            return "*****"
+            if not api_key or len(api_key.strip()) == 0:
+                return "***"
+            if len(api_key) > 8:
+                return f"{api_key[:8]}..."
+            return "***"
         except:
-            return "*****"
+            return "***"
 
     async def save_user_preferences(self, user_id: str, preferences: AIPreferencesRequest) -> bool:
         """Save user AI preferences to database"""
         try:
-            # Encrypt API keys
-            prefs_dict = preferences.dict()
-            if prefs_dict.get('openai_api_key'):
-                prefs_dict['openai_api_key'] = self.encrypt_api_key(prefs_dict['openai_api_key'])
-            if prefs_dict.get('claude_api_key'):
-                prefs_dict['claude_api_key'] = self.encrypt_api_key(prefs_dict['claude_api_key'])
-            if prefs_dict.get('gemini_api_key'):
-                prefs_dict['gemini_api_key'] = self.encrypt_api_key(prefs_dict['gemini_api_key'])
-
             conn = sqlite3.connect(settings.database_path)
             cursor = conn.cursor()
-            # Create table if not exists
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS ai_preferences (
-                    user_id TEXT PRIMARY KEY,
-                    preferences TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
             
-            # Insert or update preferences
-            cursor.execute('''
-                INSERT OR REPLACE INTO ai_preferences (user_id, preferences, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP)
-            ''', (user_id, json.dumps(prefs_dict)))
+            # Encrypt API keys before storing
+            openai_key = self.encrypt_api_key(preferences.openai_api_key) if preferences.openai_api_key else None
+            claude_key = self.encrypt_api_key(preferences.claude_api_key) if preferences.claude_api_key else None
+            gemini_key = self.encrypt_api_key(preferences.gemini_api_key) if preferences.gemini_api_key else None
+            grok_key = self.encrypt_api_key(preferences.grok_api_key) if preferences.grok_api_key else None
+            
+            # Insert or update preferences (using only the columns that exist)
+            cursor.execute("""
+                INSERT OR REPLACE INTO ai_user_preferences 
+                (user_id, openai_api_key, claude_api_key, gemini_api_key, grok_api_key, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (
+                user_id,
+                openai_key,
+                claude_key,
+                gemini_key,
+                grok_key
+            ))
             
             conn.commit()
             return True
@@ -194,4 +205,7 @@ class AIEngineService:
         }
 
 # Global service instance
-ai_service = AIEngineService() 
+ai_service = AIEngineService()
+
+# Alias for backward compatibility
+AIService = AIEngineService 
