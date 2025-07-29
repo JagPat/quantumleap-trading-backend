@@ -680,38 +680,6 @@ try:
     app.include_router(simple_analysis_router)
     print("✅ Simple analysis router loaded and registered.")
     logger.info("✅ Simple analysis router loaded and registered.")
-
-try:
-    print("🔄 Including user profile router...")
-    from app.ai_engine.user_profile_router import router as user_profile_router
-    app.include_router(user_profile_router)
-    print("✅ User profile router loaded and registered.")
-    logger.info("✅ User profile router loaded and registered.")
-except Exception as e:
-    print(f"❌ Failed to load user profile router: {e}")
-    logger.error(f"❌ Failed to load user profile router: {e}")
-    
-    # Create fallback user profile router
-    from fastapi import APIRouter
-    fallback_profile_router = APIRouter(prefix="/api/user/investment-profile", tags=["User Profile - Fallback"])
-    
-    @fallback_profile_router.get("/")
-    async def fallback_get_profile():
-        return {
-            "status": "error",
-            "message": "User profile service temporarily unavailable",
-            "profile": {
-                "risk_tolerance": "medium",
-                "investment_timeline": "medium_term",
-                "profile_completeness": 0,
-                "is_new_profile": True
-            }
-        }
-    
-    app.include_router(fallback_profile_router)
-    print("🔄 Fallback user profile router created and registered.")
-    logger.info("🔄 Fallback user profile router created and registered.")
-
 except Exception as e:
     print(f"❌ Failed to load simple analysis router: {e}")
     logger.error(f"❌ Failed to load simple analysis router: {e}")
@@ -720,7 +688,7 @@ except Exception as e:
     try:
         from fastapi import APIRouter
         
-        fallback_analysis_router = APIRouter(prefix="/api/ai/analysis", tags=["AI Analysis - Fallback"])
+        fallback_analysis_router = APIRouter(prefix="/api/ai/simple-analysis", tags=["Simple AI Analysis - Fallback"])
         
         @fallback_analysis_router.post("/portfolio")
         async def fallback_portfolio_analysis(portfolio_data: dict):
@@ -743,11 +711,47 @@ except Exception as e:
             }
         
         app.include_router(fallback_analysis_router)
-        print("🔄 Fallback analysis router created and registered.")
-        logger.info("🔄 Fallback analysis router created and registered.")
+        print("🔄 Fallback simple analysis router created and registered.")
+        logger.info("🔄 Fallback simple analysis router created and registered.")
     except Exception as fallback_e:
-        print(f"❌ Failed to create fallback analysis router: {fallback_e}")
-        logger.error(f"❌ Failed to create fallback analysis router: {fallback_e}")
+        print(f"❌ Failed to create fallback simple analysis router: {fallback_e}")
+        logger.error(f"❌ Failed to create fallback simple analysis router: {fallback_e}")
+
+# Include user profile router
+try:
+    print("🔄 Including user profile router...")
+    from app.ai_engine.user_profile_router import router as user_profile_router
+    app.include_router(user_profile_router)
+    print("✅ User profile router loaded and registered.")
+    logger.info("✅ User profile router loaded and registered.")
+except Exception as e:
+    print(f"❌ Failed to load user profile router: {e}")
+    logger.error(f"❌ Failed to load user profile router: {e}")
+    
+    # Create fallback user profile router
+    try:
+        from fastapi import APIRouter
+        fallback_profile_router = APIRouter(prefix="/api/user/investment-profile", tags=["User Profile - Fallback"])
+        
+        @fallback_profile_router.get("/")
+        async def fallback_get_profile():
+            return {
+                "status": "error",
+                "message": "User profile service temporarily unavailable",
+                "profile": {
+                    "risk_tolerance": "medium",
+                    "investment_timeline": "medium_term",
+                    "profile_completeness": 0,
+                    "is_new_profile": True
+                }
+            }
+        
+        app.include_router(fallback_profile_router)
+        print("🔄 Fallback user profile router created and registered.")
+        logger.info("🔄 Fallback user profile router created and registered.")
+    except Exception as fallback_e:
+        print(f"❌ Failed to create fallback user profile router: {fallback_e}")
+        logger.error(f"❌ Failed to create fallback user profile router: {fallback_e}")
     
     # Create fallback chat router
     try:
