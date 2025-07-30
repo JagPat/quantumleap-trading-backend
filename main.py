@@ -837,9 +837,9 @@ except Exception as e:
                 app.include_router(simple_trading_engine_router)
                 print("✅ Simplified trading engine router loaded and registered.")
                 logger.info("✅ Simplified trading engine router loaded and registered.")
-        except Exception as simple_e:
-            print(f"❌ Failed to load simplified trading engine router: {simple_e}")
-            logger.error(f"❌ Failed to load simplified trading engine router: {simple_e}")
+            except Exception as simple_e:
+                print(f"❌ Failed to load simplified trading engine router: {simple_e}")
+                logger.error(f"❌ Failed to load simplified trading engine router: {simple_e}")
         
         # Create minimal fallback trading engine router
         try:
