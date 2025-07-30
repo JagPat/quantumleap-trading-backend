@@ -23,6 +23,21 @@ from .strategy_manager import strategy_manager, StrategyConfig, StrategyType
 from .strategy_controller import strategy_controller
 from .strategy_lifecycle import strategy_lifecycle_manager
 
+# Import market data components
+try:
+    from .market_data_router import router as market_data_router
+    MARKET_DATA_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Market data router not available: {e}")
+    MARKET_DATA_AVAILABLE = False
+
+try:
+    from .market_condition_router import router as market_condition_router
+    MARKET_CONDITION_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Market condition router not available: {e}")
+    MARKET_CONDITION_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Pydantic models for API requests/responses
@@ -58,6 +73,15 @@ class ControlActionRequest(BaseModel):
     parameters: Optional[Dict[str, Any]] = None
 
 router = APIRouter(prefix="/api/trading-engine", tags=["trading-engine"])
+
+# Include market data and condition monitoring sub-routers
+if MARKET_DATA_AVAILABLE:
+    router.include_router(market_data_router, prefix="/market-data", tags=["Market Data"])
+    logger.info("Market data router included in trading engine")
+
+if MARKET_CONDITION_AVAILABLE:
+    router.include_router(market_condition_router, prefix="/market-condition", tags=["Market Condition"])
+    logger.info("Market condition router included in trading engine")
 
 @router.get("/health")
 async def get_trading_engine_health() -> Dict[str, Any]:
@@ -978,8 +1002,7 @@ async def get_system_status() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting system status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-# ========
-=====================================================================
+# =============================================================================
 # TESTING AND VALIDATION ENDPOINTS
 # =============================================================================
 

@@ -32,6 +32,7 @@ class EventType(str, Enum):
     RISK_VIOLATION = "risk_violation"
     EMERGENCY_STOP = "emergency_stop"
     MARKET_DATA_UPDATE = "market_data_update"
+    MARKET_CONDITION_UPDATE = "market_condition_update"
     SYSTEM_ERROR = "system_error"
     USER_ACTION = "user_action"
 
@@ -300,6 +301,44 @@ class EventBus:
         """Clear event history"""
         self.event_history.clear()
         logger.info("Event history cleared")
+    
+    async def subscribe_to_events(self, event_types: List[str], handler_func: Callable) -> bool:
+        """Subscribe to events with a callback function"""
+        try:
+            # Create a handler wrapper
+            class CallbackHandler(EventHandler):
+                def __init__(self, handler_id: str, event_types: List[EventType], callback):
+                    super().__init__(handler_id, event_types)
+                    self.callback = callback
+                
+                async def handle_event(self, event: TradingEvent) -> bool:
+                    try:
+                        await self.callback(event)
+                        return True
+                    except Exception as e:
+                        logger.error(f"Callback handler error: {e}")
+                        return False
+            
+            # Convert string event types to EventType enums
+            enum_event_types = []
+            for event_type_str in event_types:
+                try:
+                    enum_event_types.append(EventType(event_type_str))
+                except ValueError:
+                    # Handle custom event types
+                    logger.warning(f"Unknown event type: {event_type_str}")
+            
+            if not enum_event_types:
+                return False
+            
+            # Create and register handler
+            handler_id = f"callback_handler_{len(self.handlers)}"
+            handler = CallbackHandler(handler_id, enum_event_types, handler_func)
+            return self.register_handler(handler)
+            
+        except Exception as e:
+            logger.error(f"Error subscribing to events: {e}")
+            return False
 
 # Global event bus instance
 event_bus = EventBus()
@@ -359,3 +398,54 @@ async def publish_market_data_event(symbol: str, price_data: Dict[str, Any]) -> 
         priority=EventPriority.NORMAL
     )
     return await event_bus.publish_event(event)
+
+# Market-specific event classes
+@dataclass
+class MarketEvent:
+    """Market-specific event for price updates and status changes"""
+    event_type: str
+    symbol: str
+    data: Dict[str, Any]
+    timestamp: datetime
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "event_type": self.event_type,
+            "symbol": self.symbol,
+            "data": self.data,
+            "timestamp": self.timestamp.isoformat()
+        }
+
+@dataclass
+class SignalEvent:
+    """Signal event for trading signals"""
+    signal_id: str
+    user_id: str
+    symbol: str
+    signal_type: Any  # Will be SignalType enum
+    confidence_score: float
+    priority: Any  # Will be SignalPriority enum
+    metadata: Dict[str, Any]
+    created_at: datetime
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "signal_id": self.signal_id,
+            "user_id": self.user_id,
+            "symbol": self.symbol,
+            "signal_type": str(self.signal_type),
+            "confidence_score": self.confidence_score,
+            "priority": str(self.priority),
+            "metadata": self.metadata,
+            "created_at": self.created_at.isoformat()
+        }
+
+# Event Manager alias for compatibility
+EventManager = EventBus
+
+# Function to get global event manager
+def get_event_manager() -> EventBus:
+    """Get the global event manager instance"""
+    return event_bus

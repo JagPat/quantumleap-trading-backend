@@ -36,29 +36,30 @@ async def simple_portfolio_analysis(
         # Get user preferences
         user_preferences = await ai_service.get_user_preferences(user_id)
         
-        # Check if user has valid AI providers
-        has_openai = user_preferences and user_preferences.get('has_openai_key', False)
-        has_claude = user_preferences and user_preferences.get('has_claude_key', False)
-        has_gemini = user_preferences and user_preferences.get('has_gemini_key', False)
+        # Check if user has valid AI providers (user keys OR environment variables)
+        import os
+        has_openai = (user_preferences and user_preferences.get('has_openai_key', False)) or bool(os.getenv('OPENAI_API_KEY'))
+        has_claude = (user_preferences and user_preferences.get('has_claude_key', False)) or bool(os.getenv('ANTHROPIC_API_KEY'))
+        has_gemini = (user_preferences and user_preferences.get('has_gemini_key', False)) or bool(os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY'))
         
         if not (has_openai or has_claude or has_gemini):
-            logger.info(f"No valid AI providers for user {user_id}")
+            logger.info(f"No valid AI providers for user {user_id} - no user keys or environment variables found")
             return await generate_fallback_analysis(portfolio_data, user_id)
         
         # Try to use enhanced AI analysis
         try:
             logger.info(f"Attempting enhanced AI analysis for user {user_id}")
             
-            # Get AI provider
+            # Get AI provider (prefer user keys, fallback to environment)
             if has_openai:
                 provider = "openai"
-                api_key = user_preferences.get('openai_api_key')
+                api_key = (user_preferences and user_preferences.get('openai_api_key')) or os.getenv('OPENAI_API_KEY')
             elif has_claude:
                 provider = "claude"
-                api_key = user_preferences.get('claude_api_key')
+                api_key = (user_preferences and user_preferences.get('claude_api_key')) or os.getenv('ANTHROPIC_API_KEY')
             else:
                 provider = "gemini"
-                api_key = user_preferences.get('gemini_api_key')
+                api_key = (user_preferences and user_preferences.get('gemini_api_key')) or os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY')
             
             # Generate enhanced AI analysis
             analysis_result = await generate_ai_portfolio_analysis(
@@ -73,6 +74,25 @@ async def simple_portfolio_analysis(
                     await store_analysis_for_tracking(user_id, analysis_result, provider)
                 except Exception as e:
                     logger.warning(f"Failed to store analysis for tracking: {e}")
+                
+                # Generate trading signals from analysis (if auto-trading enabled)
+                try:
+                    from .signal_generator_integration import generate_trading_signals_from_analysis
+                    signals = await generate_trading_signals_from_analysis(user_id, portfolio_data, analysis_result)
+                    if signals:
+                        logger.info(f"Generated {len(signals)} trading signals for user {user_id}")
+                        # Add signal information to analysis result
+                        analysis_result['trading_signals_generated'] = len(signals)
+                        analysis_result['signals_summary'] = [
+                            {
+                                'symbol': signal.symbol,
+                                'type': signal.signal_type.value,
+                                'confidence': signal.confidence_score,
+                                'priority': signal.priority.value
+                            } for signal in signals[:5]  # Include first 5 signals in summary
+                        ]
+                except Exception as signal_error:
+                    logger.warning(f"Failed to generate trading signals: {signal_error}")
                 
                 return analysis_result
             else:

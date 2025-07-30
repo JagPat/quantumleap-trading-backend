@@ -683,6 +683,17 @@ try:
 except Exception as e:
     print(f"❌ Failed to load simple analysis router: {e}")
     logger.error(f"❌ Failed to load simple analysis router: {e}")
+
+# AI Provider Failover router - Enhanced AI reliability
+try:
+    print("🔄 Including AI provider failover router...")
+    from app.ai_engine.failover_router import router as failover_router
+    app.include_router(failover_router, prefix="/api/ai/failover", tags=["AI Provider Failover"])
+    print("✅ AI provider failover router loaded and registered.")
+    logger.info("✅ AI provider failover router loaded and registered.")
+except Exception as e:
+    print(f"❌ Failed to load AI provider failover router: {e}")
+    logger.error(f"❌ Failed to load AI provider failover router: {e}")
     
     # Create fallback analysis router for portfolio endpoint
     try:
@@ -808,13 +819,24 @@ except Exception as e:
         print(f"❌ Failed to load full trading engine router: {full_e}")
         logger.error(f"❌ Failed to load full trading engine router: {full_e}")
         
-        # Try to load simplified trading engine router
+        # Try to load market data trading engine router
         try:
-            print("🔄 Loading simplified trading engine router...")
-            from app.trading_engine.simple_router import router as simple_trading_engine_router
-            app.include_router(simple_trading_engine_router)
-            print("✅ Simplified trading engine router loaded and registered.")
-            logger.info("✅ Simplified trading engine router loaded and registered.")
+            print("🔄 Loading market data trading engine router...")
+            from app.trading_engine.market_data_main_router import router as market_data_trading_engine_router
+            app.include_router(market_data_trading_engine_router)
+            print("✅ Market data trading engine router loaded and registered.")
+            logger.info("✅ Market data trading engine router loaded and registered.")
+        except Exception as market_data_e:
+            print(f"❌ Failed to load market data trading engine router: {market_data_e}")
+            logger.error(f"❌ Failed to load market data trading engine router: {market_data_e}")
+            
+            # Try to load simplified trading engine router
+            try:
+                print("🔄 Loading simplified trading engine router...")
+                from app.trading_engine.simple_router import router as simple_trading_engine_router
+                app.include_router(simple_trading_engine_router)
+                print("✅ Simplified trading engine router loaded and registered.")
+                logger.info("✅ Simplified trading engine router loaded and registered.")
         except Exception as simple_e:
             print(f"❌ Failed to load simplified trading engine router: {simple_e}")
             logger.error(f"❌ Failed to load simplified trading engine router: {simple_e}")

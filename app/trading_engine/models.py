@@ -130,6 +130,25 @@ class Order:
         return self.quantity - self.filled_quantity
 
 @dataclass
+class OrderResult:
+    """Result of order processing operations"""
+    success: bool
+    order: Optional['Order'] = None
+    error_message: Optional[str] = None
+    broker_order_id: Optional[str] = None
+    execution_details: Optional[Dict[str, Any]] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "success": self.success,
+            "order": self.order.to_dict() if self.order else None,
+            "error_message": self.error_message,
+            "broker_order_id": self.broker_order_id,
+            "execution_details": self.execution_details
+        }
+
+@dataclass
 class Position:
     """Position data model"""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -361,3 +380,137 @@ class TradingSignal:
         if not self.expires_at:
             return False
         return datetime.now() > self.expires_at
+
+# Market Data Models
+
+class MarketState(str, Enum):
+    """Market state enumeration"""
+    CLOSED = "closed"
+    PRE_MARKET = "pre_market"
+    OPEN = "open"
+    POST_MARKET = "post_market"
+    HOLIDAY = "holiday"
+
+@dataclass
+class MarketStatus:
+    """Market status information"""
+    state: MarketState
+    is_open: bool
+    next_open: Optional[datetime] = None
+    next_close: Optional[datetime] = None
+    timezone: str = "UTC"
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "state": self.state.value,
+            "is_open": self.is_open,
+            "next_open": self.next_open.isoformat() if self.next_open else None,
+            "next_close": self.next_close.isoformat() if self.next_close else None,
+            "timezone": self.timezone
+        }
+
+@dataclass
+class PriceData:
+    """Real-time price data"""
+    symbol: str
+    price: float
+    bid: float
+    ask: float
+    volume: int
+    timestamp: datetime
+    change: float = 0.0
+    change_percent: float = 0.0
+    high: float = 0.0
+    low: float = 0.0
+    open_price: float = 0.0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "symbol": self.symbol,
+            "price": self.price,
+            "bid": self.bid,
+            "ask": self.ask,
+            "volume": self.volume,
+            "timestamp": self.timestamp.isoformat(),
+            "change": self.change,
+            "change_percent": self.change_percent,
+            "high": self.high,
+            "low": self.low,
+            "open": self.open_price
+        }
+
+@dataclass
+class MarketHours:
+    """Market hours information"""
+    open_time: datetime
+    close_time: datetime
+    timezone: str = "UTC"
+    is_trading_day: bool = True
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "open_time": self.open_time.isoformat(),
+            "close_time": self.close_time.isoformat(),
+            "timezone": self.timezone,
+            "is_trading_day": self.is_trading_day
+        }
+
+# Signal and Event Models
+
+class SignalType(str, Enum):
+    """Trading signal types"""
+    BUY = "BUY"
+    SELL = "SELL"
+    HOLD = "HOLD"
+
+class SignalPriority(str, Enum):
+    """Signal priority levels"""
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+@dataclass
+class Signal:
+    """Enhanced trading signal model"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str = ""
+    symbol: str = ""
+    signal_type: SignalType = SignalType.BUY
+    confidence_score: float = 0.0
+    priority: SignalPriority = SignalPriority.MEDIUM
+    reasoning: str = ""
+    target_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    position_size_pct: float = 2.0  # Percentage of portfolio
+    strategy_id: Optional[str] = None
+    provider_used: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    is_active: bool = True
+    expires_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=datetime.now)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "symbol": self.symbol,
+            "signal_type": self.signal_type.value,
+            "confidence_score": self.confidence_score,
+            "priority": self.priority.value,
+            "reasoning": self.reasoning,
+            "target_price": self.target_price,
+            "stop_loss": self.stop_loss,
+            "take_profit": self.take_profit,
+            "position_size_pct": self.position_size_pct,
+            "strategy_id": self.strategy_id,
+            "provider_used": self.provider_used,
+            "metadata": self.metadata,
+            "is_active": self.is_active,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "created_at": self.created_at.isoformat()
+        }
