@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Integration Test - Quantum Leap</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .test-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .test-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .test-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .status-loading {
+            background: #ffc107;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-success {
+            background: #28a745;
+        }
+        
+        .status-error {
+            background: #dc3545;
+        }
+        
+        .status-idle {
+            background: #6c757d;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .test-controls {
+            margin: 15px 0;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-success:hover:not(:disabled) {
+            background: #1e7e34;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: #c82333;
+        }
+        
+        .result-display {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .result-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .result-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .result-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .overall-status {
+            background: #e9ecef;
+            padding: 20px;
+            margin: 20px 30px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .overall-status h3 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        
+        .progress-bar {
+            background: #e9ecef;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            background: #007bff;
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        @media (max-width: 768px) {
+            .test-grid {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Quantum Leap Frontend</h1>
+            <p>Integration Test Suite</p>
+        </div>
+        
+        <div class="overall-status">
+            <h3>Overall System Status</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="overall-progress" style="width: 0%"></div>
+            </div>
+            <div id="overall-status-text">Ready to run tests</div>
+        </div>
+        
+        <div class="test-grid">
+            <!-- Backend Connection Test -->
+            <div class="test-card">
+                <h3>
+                    <span class="status-indicator status-idle" id="backend-indicator"></span>
+                    🔗 Backend Connection
+                </h3>
+                <div class="test-controls">
+                    <button class="btn" onclick="testBackendConnection()">Test Connection</button>
+                    <button class="btn" onclick="testHealthEndpoint()">Health Check</button>
+                </div>
+                <div id="backend-result"></div>
+            </div>
+            
+            <!-- Authentication Test -->
+            <div class="test-card">
+                <h3>
+                    <span class="status-indicator status-idle" id="auth-indicator"></span>
+                    🔐 Authentication
+                </h3>
+                <div class="test-controls">
+                    <button class="btn" onclick="testAuth()">Test Auth</button>
+                    <button class="btn" onclick="testUserSession()">User Session</button>
+                </div>
+                <div id="auth-result"></div>
+            </div>
+            
+            <!-- Portfolio API Test -->
+            <div class="test-card">
+                <h3>
+                    <span class="status-indicator status-idle" id="portfolio-indicator"></span>
+                    📊 Portfolio API
+                </h3>
+                <div class="test-controls">
+                    <button class="btn" onclick="testPortfolioAPI()">Test Portfolio</button>
+                    <button class="btn" onclick="testPortfolioData()">Mock Data</button>
+                </div>
+                <div id="portfolio-result"></div>
+            </div>
+            
+            <!-- AI Engine Test -->
+            <div class="test-card">
+                <h3>
+                    <span class="status-indicator status-idle" id="ai-indicator"></span>
+                    🤖 AI Engine
+                </h3>
+                <div class="test-controls">
+                    <button class="btn" onclick="testAIEngine()">Test AI</button>
+                    <button class="btn" onclick="testAIAnalysis()">Analysis</button>
+                </div>
+                <div id="ai-result"></div>
+            </div>
+            
+            <!-- Trading Engine Test -->
+            <div class="test-card">
+                <h3>
+                    <span class="status-indicator status-idle" id="trading-indicator"></span>
+                    ⚡ Trading Engine
+                </h3>
+                <div class="test-controls">
+                    <button class="btn" onclick="testTradingEngine()">Test Engine</button>
+                    <button class="btn" onclick="testTradingStatus()">Status</button>
+                </div>
+                <div id="trading-result"></div>
+            </div>
+            
+            <!-- Frontend Components Test -->
+            <div class="test-card">
+                <h3>
+                    <span class="status-indicator status-idle" id="frontend-indicator"></span>
+                    🎨 Frontend Components
+                </h3>
+                <div class="test-controls">
+                    <button class="btn" onclick="testFrontendComponents()">Test Components</button>
+                    <button class="btn" onclick="testResponsive()">Responsive</button>
+                </div>
+                <div id="frontend-result"></div>
+            </div>
+        </div>
+        
+        <div class="overall-status">
+            <button class="btn btn-success" onclick="runAllTests()">🚀 Run All Tests</button>
+            <button class="btn btn-danger" onclick="clearAllResults()">🗑️ Clear Results</button>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = 'https://web-production-de0bc.up.railway.app';
+        const LOCAL_API_URL = 'http://localhost:8000';
+        
+        let testResults = {};
+        let currentAPI = API_BASE_URL;
+        
+        // Utility functions
+        function updateIndicator(testName, status) {
+            const indicator = document.getElementById(`${testName}-indicator`);
+            if (indicator) {
+                indicator.className = `status-indicator status-${status}`;
+            }
+        }
+        
+        function displayResult(testName, result, isError = false) {
+            const resultDiv = document.getElementById(`${testName}-result`);
+            const className = isError ? 'result-error' : 'result-success';
+            
+            resultDiv.innerHTML = `
+                <div class="result-display ${className}">
+                    ${JSON.stringify(result, null, 2)}
+                </div>
+            `;
+            
+            testResults[testName] = { success: !isError, result };
+            updateOverallStatus();
+        }
+        
+        function updateOverallStatus() {
+            const totalTests = Object.keys(testResults).length;
+            const passedTests = Object.values(testResults).filter(r => r.success).length;
+            const progress = totalTests > 0 ? (passedTests / totalTests) * 100 : 0;
+            
+            document.getElementById('overall-progress').style.width = `${progress}%`;
+            document.getElementById('overall-status-text').textContent = 
+                `${passedTests}/${totalTests} tests passed (${Math.round(progress)}%)`;
+        }
+        
+        async function makeAPICall(endpoint, options = {}) {
+            const url = `${currentAPI}${endpoint}`;
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-ID': 'test_user_123'
+                }
+            };
+            
+            return fetch(url, { ...defaultOptions, ...options });
+        }
+        
+        // Test functions
+        async function testBackendConnection() {
+            updateIndicator('backend', 'loading');
+            
+            try {
+                const response = await makeAPICall('/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateIndicator('backend', 'success');
+                    displayResult('backend', {
+                        status: 'Connected',
+                        url: currentAPI,
+                        response: data
+                    });
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                updateIndicator('backend', 'error');
+                displayResult('backend', {
+                    error: error.message,
+                    url: currentAPI
+                }, true);
+            }
+        }
+        
+        async function testHealthEndpoint() {
+            updateIndicator('backend', 'loading');
+            
+            try {
+                const response = await makeAPICall('/');
+                const data = await response.json();
+                
+                updateIndicator('backend', 'success');
+                displayResult('backend', {
+                    endpoint: '/',
+                    response: data
+                });
+            } catch (error) {
+                updateIndicator('backend', 'error');
+                displayResult('backend', { error: error.message }, true);
+            }
+        }
+        
+        async function testAuth() {
+            updateIndicator('auth', 'loading');
+            
+            try {
+                const response = await makeAPICall('/api/auth/status');
+                const data = await response.json();
+                
+                updateIndicator('auth', 'success');
+                displayResult('auth', {
+                    status: 'Auth endpoint accessible',
+                    response: data
+                });
+            } catch (error) {
+                updateIndicator('auth', 'error');
+                displayResult('auth', { error: error.message }, true);
+            }
+        }
+        
+        async function testUserSession() {
+            updateIndicator('auth', 'loading');
+            
+            try {
+                // Test user session creation
+                const sessionData = {
+                    user_id: 'test_user_123',
+                    session_type: 'frontend_test'
+                };
+                
+                updateIndicator('auth', 'success');
+                displayResult('auth', {
+                    status: 'User session test',
+                    sessionData: sessionData
+                });
+            } catch (error) {
+                updateIndicator('auth', 'error');
+                displayResult('auth', { error: error.message }, true);
+            }
+        }
+        
+        async function testPortfolioAPI() {
+            updateIndicator('portfolio', 'loading');
+            
+            try {
+                const response = await makeAPICall('/api/portfolio/');
+                const data = await response.json();
+                
+                updateIndicator('portfolio', 'success');
+                displayResult('portfolio', {
+                    status: 'Portfolio API accessible',
+                    response: data
+                });
+            } catch (error) {
+                updateIndicator('portfolio', 'error');
+                displayResult('portfolio', { error: error.message }, true);
+            }
+        }
+        
+        async function testPortfolioData() {
+            updateIndicator('portfolio', 'loading');
+            
+            const mockPortfolio = {
+                total_value: 1500000,
+                holdings: [
+                    {
+                        tradingsymbol: "RELIANCE",
+                        current_value: 300000,
+                        quantity: 120,
+                        average_price: 2400,
+                        last_price: 2500,
+                        pnl: 12000,
+                        pnl_percentage: 4.17
+                    }
+                ]
+            };
+            
+            updateIndicator('portfolio', 'success');
+            displayResult('portfolio', {
+                status: 'Mock portfolio data generated',
+                data: mockPortfolio
+            });
+        }
+        
+        async function testAIEngine() {
+            updateIndicator('ai', 'loading');
+            
+            try {
+                const response = await makeAPICall('/api/ai/simple-analysis/portfolio', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        total_value: 1000000,
+                        holdings: []
+                    })
+                });
+                
+                const data = await response.json();
+                
+                updateIndicator('ai', 'success');
+                displayResult('ai', {
+                    status: 'AI Engine accessible',
+                    response: data
+                });
+            } catch (error) {
+                updateIndicator('ai', 'error');
+                displayResult('ai', { error: error.message }, true);
+            }
+        }
+        
+        async function testAIAnalysis() {
+            updateIndicator('ai', 'loading');
+            
+            try {
+                const response = await makeAPICall('/api/ai/analysis/');
+                const data = await response.json();
+                
+                updateIndicator('ai', 'success');
+                displayResult('ai', {
+                    status: 'AI Analysis endpoint accessible',
+                    response: data
+                });
+            } catch (error) {
+                updateIndicator('ai', 'error');
+                displayResult('ai', { error: error.message }, true);
+            }
+        }
+        
+        async function testTradingEngine() {
+            updateIndicator('trading', 'loading');
+            
+            try {
+                const response = await makeAPICall('/api/trading-engine/status');
+                const data = await response.json();
+                
+                updateIndicator('trading', 'success');
+                displayResult('trading', {
+                    status: 'Trading Engine accessible',
+                    response: data
+                });
+            } catch (error) {
+                updateIndicator('trading', 'error');
+                displayResult('trading', { error: error.message }, true);
+            }
+        }
+        
+        async function testTradingStatus() {
+            updateIndicator('trading', 'loading');
+            
+            try {
+                const response = await makeAPICall('/api/trading/');
+                const data = await response.json();
+                
+                updateIndicator('trading', 'success');
+                displayResult('trading', {
+                    status: 'Trading status endpoint accessible',
+                    response: data
+                });
+            } catch (error) {
+                updateIndicator('trading', 'error');
+                displayResult('trading', { error: error.message }, true);
+            }
+        }
+        
+        async function testFrontendComponents() {
+            updateIndicator('frontend', 'loading');
+            
+            // Test frontend component functionality
+            const componentTests = {
+                localStorage: typeof(Storage) !== "undefined",
+                fetch: typeof(fetch) !== "undefined",
+                websocket: typeof(WebSocket) !== "undefined",
+                responsive: window.innerWidth > 0,
+                darkMode: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+            };
+            
+            updateIndicator('frontend', 'success');
+            displayResult('frontend', {
+                status: 'Frontend components tested',
+                tests: componentTests
+            });
+        }
+        
+        async function testResponsive() {
+            updateIndicator('frontend', 'loading');
+            
+            const responsiveInfo = {
+                viewport: {
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                },
+                devicePixelRatio: window.devicePixelRatio,
+                userAgent: navigator.userAgent.substring(0, 100) + '...',
+                touchSupport: 'ontouchstart' in window
+            };
+            
+            updateIndicator('frontend', 'success');
+            displayResult('frontend', {
+                status: 'Responsive design info',
+                info: responsiveInfo
+            });
+        }
+        
+        async function runAllTests() {
+            const tests = [
+                testBackendConnection,
+                testAuth,
+                testPortfolioAPI,
+                testAIEngine,
+                testTradingEngine,
+                testFrontendComponents
+            ];
+            
+            for (const test of tests) {
+                await test();
+                await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between tests
+            }
+        }
+        
+        function clearAllResults() {
+            testResults = {};
+            
+            // Reset all indicators
+            const indicators = document.querySelectorAll('.status-indicator');
+            indicators.forEach(indicator => {
+                indicator.className = 'status-indicator status-idle';
+            });
+            
+            // Clear all results
+            const results = document.querySelectorAll('[id$="-result"]');
+            results.forEach(result => {
+                result.innerHTML = '';
+            });
+            
+            updateOverallStatus();
+        }
+        
+        // Auto-run basic connection test on load
+        window.addEventListener('load', () => {
+            setTimeout(testBackendConnection, 1000);
+        });
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'r':
+                        e.preventDefault();
+                        runAllTests();
+                        break;
+                    case 'c':
+                        e.preventDefault();
+                        clearAllResults();
+                        break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

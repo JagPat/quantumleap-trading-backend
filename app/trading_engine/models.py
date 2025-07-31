@@ -43,6 +43,17 @@ class StrategyStatus(str, Enum):
     ERROR = "ERROR"
 
 @dataclass
+class RiskParameters:
+    """Risk management parameters"""
+    max_position_size_percent: float = 5.0  # Maximum position size as % of portfolio
+    max_portfolio_exposure_percent: float = 80.0  # Maximum portfolio exposure
+    max_sector_exposure_percent: float = 30.0  # Maximum sector exposure
+    stop_loss_percent: float = 2.0  # Stop loss percentage
+    take_profit_percent: float = 5.0  # Take profit percentage
+    max_drawdown_percent: float = 10.0  # Maximum drawdown
+    daily_loss_limit_percent: float = 5.0  # Daily loss limit
+
+@dataclass
 class Order:
     """Order data model"""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))

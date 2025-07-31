@@ -38,6 +38,30 @@ except ImportError as e:
     logger.warning(f"Market condition router not available: {e}")
     MARKET_CONDITION_AVAILABLE = False
 
+# Import emergency stop router
+try:
+    from .emergency_stop_router import router as emergency_stop_router
+    EMERGENCY_STOP_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Emergency stop router not available: {e}")
+    EMERGENCY_STOP_AVAILABLE = False
+
+# Import manual override router
+try:
+    from .manual_override_router import router as manual_override_router
+    MANUAL_OVERRIDE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Manual override router not available: {e}")
+    MANUAL_OVERRIDE_AVAILABLE = False
+
+# Import user preferences router
+try:
+    from .user_preferences_router import router as user_preferences_router
+    USER_PREFERENCES_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"User preferences router not available: {e}")
+    USER_PREFERENCES_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Pydantic models for API requests/responses
@@ -82,6 +106,18 @@ if MARKET_DATA_AVAILABLE:
 if MARKET_CONDITION_AVAILABLE:
     router.include_router(market_condition_router, prefix="/market-condition", tags=["Market Condition"])
     logger.info("Market condition router included in trading engine")
+
+if EMERGENCY_STOP_AVAILABLE:
+    router.include_router(emergency_stop_router, tags=["Emergency Stop"])
+    logger.info("Emergency stop router included in trading engine")
+
+if MANUAL_OVERRIDE_AVAILABLE:
+    router.include_router(manual_override_router, tags=["Manual Override"])
+    logger.info("Manual override router included in trading engine")
+
+if USER_PREFERENCES_AVAILABLE:
+    router.include_router(user_preferences_router, tags=["User Preferences"])
+    logger.info("User preferences router included in trading engine")
 
 @router.get("/health")
 async def get_trading_engine_health() -> Dict[str, Any]:

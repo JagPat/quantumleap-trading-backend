@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend CORS Fix Test</title>
+</head>
+<body>
+    <h1>Frontend CORS Fix Test</h1>
+    <button onclick="testAPI()">Test API Call</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                console.log('🧪 Testing API call...');
+                const response = await fetch('https://web-production-de0bc.up.railway.app/api/ai/preferences', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': 'http://localhost:5173'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<h3>✅ Success!</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    console.log('✅ API call successful:', data);
+                } else {
+                    resultDiv.innerHTML = `<h3>❌ Error: ${response.status}</h3>`;
+                    console.error('❌ API call failed:', response.status);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<h3>❌ Network Error</h3><p>Error: ${error.message}</p><p>Type: ${error.name}</p>`;
+                console.error('❌ Network error:', error);
+                console.log('🔍 Error details - Name:', error.name, 'Message:', error.message);
+            }
+        }
+    </script>
+</body>
+</html>
