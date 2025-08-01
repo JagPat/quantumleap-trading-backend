@@ -12,7 +12,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # Initialize cipher suite for encryption
-cipher_suite = Fernet(settings.get_encryption_key())
+cipher_suite = Fernet(settings.encryption_key)
 
 def get_db_connection():
     """Get a database connection"""
