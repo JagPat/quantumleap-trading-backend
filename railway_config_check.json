@@ -1,0 +1,9 @@
+{
+  "timestamp": "2025-08-01T17:57:44.051567",
+  "issues": [],
+  "recommendations": [
+    "Ensure Procfile uses: web: uvicorn main:app --host 0.0.0.0 --port $PORT",
+    "Ensure uvicorn runs with host='0.0.0.0'"
+  ],
+  "status": "ready"
+}

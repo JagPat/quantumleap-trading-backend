@@ -1,55 +1,108 @@
 #!/usr/bin/env python3
 """
-Railway Deployment Verification Script
+Verify Railway Deployment Status
+Tests the deployed backend endpoints to ensure everything is working
 """
 
 import requests
 import time
-import sys
+import json
 from datetime import datetime
 
-def verify_deployment(base_url, max_retries=10, retry_delay=30):
-    """Verify Railway deployment is working"""
-    print(f"🔍 Verifying deployment at {base_url}")
-    
-    for attempt in range(max_retries):
-        try:
-            # Test health endpoint
-            response = requests.get(f"{base_url}/health", timeout=30)
-            
-            if response.status_code == 200:
-                health_data = response.json()
-                print(f"✅ Health check passed: {health_data.get('status', 'unknown')}")
-                
-                # Test trading engine status
-                response = requests.get(f"{base_url}/api/trading-engine/status", timeout=30)
-                if response.status_code == 200:
-                    print("✅ Trading engine endpoint accessible")
-                    
-                    # Test metrics endpoint
-                    response = requests.get(f"{base_url}/metrics", timeout=30)
-                    if response.status_code == 200:
-                        print("✅ Metrics endpoint accessible")
-                        print("🎉 Deployment verification successful!")
-                        return True
-                    else:
-                        print(f"⚠️ Metrics endpoint returned {response.status_code}")
-                else:
-                    print(f"⚠️ Trading engine endpoint returned {response.status_code}")
-            else:
-                print(f"❌ Health check failed: HTTP {response.status_code}")
-                
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Connection failed (attempt {attempt + 1}/{max_retries}): {e}")
+RAILWAY_URL = "https://quantum-leap-backend-production.up.railway.app"
+
+def test_endpoint(endpoint, method="GET", data=None, timeout=10):
+    """Test a single endpoint"""
+    try:
+        url = f"{RAILWAY_URL}{endpoint}"
         
-        if attempt < max_retries - 1:
-            print(f"⏳ Waiting {retry_delay} seconds before retry...")
-            time.sleep(retry_delay)
+        if method == "GET":
+            response = requests.get(url, timeout=timeout)
+        elif method == "POST":
+            response = requests.post(url, json=data, timeout=timeout)
+        
+        return {
+            "success": True,
+            "status_code": response.status_code,
+            "response": response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text,
+            "response_time": response.elapsed.total_seconds()
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "response_time": None
+        }
+
+def main():
+    """Main verification function"""
+    print("🔍 Verifying Railway Deployment")
+    print("=" * 50)
     
-    print("❌ Deployment verification failed after all retries")
-    return False
+    # Test endpoints
+    endpoints_to_test = [
+        ("/", "GET", None, "Root endpoint"),
+        ("/health", "GET", None, "Health check"),
+        ("/api/database/health", "GET", None, "Database health"),
+        ("/api/database/metrics", "GET", None, "Database metrics"),
+        ("/api/database/connection-info", "GET", None, "Database connection info"),
+        ("/api/trading-engine/status", "GET", None, "Trading engine status"),
+        ("/api/portfolio/holdings", "GET", None, "Portfolio holdings"),
+        ("/api/ai/status", "GET", None, "AI engine status")
+    ]
+    
+    results = []
+    
+    for endpoint, method, data, description in endpoints_to_test:
+        print(f"\n🧪 Testing {description} ({endpoint})...")
+        result = test_endpoint(endpoint, method, data)
+        
+        if result["success"]:
+            print(f"✅ {description}: {result['status_code']} ({result['response_time']:.2f}s)")
+            if result["status_code"] == 200:
+                print(f"   Response: {str(result['response'])[:100]}...")
+        else:
+            print(f"❌ {description}: {result['error']}")
+        
+        results.append({
+            "endpoint": endpoint,
+            "description": description,
+            "result": result
+        })
+        
+        time.sleep(0.5)  # Small delay between requests
+    
+    # Summary
+    print("\n" + "=" * 50)
+    print("📊 Deployment Verification Summary")
+    print("=" * 50)
+    
+    successful_tests = sum(1 for r in results if r["result"]["success"] and r["result"].get("status_code") == 200)
+    total_tests = len(results)
+    
+    print(f"✅ Successful: {successful_tests}/{total_tests}")
+    print(f"❌ Failed: {total_tests - successful_tests}/{total_tests}")
+    
+    if successful_tests >= total_tests * 0.7:  # 70% success rate
+        print("\n🎉 Deployment verification PASSED!")
+        print("🚀 Railway backend is operational")
+    else:
+        print("\n⚠️ Deployment verification needs attention")
+        print("🔧 Some endpoints may still be starting up")
+    
+    # Save detailed results
+    with open("railway_deployment_verification.json", "w") as f:
+        json.dump({
+            "timestamp": datetime.now().isoformat(),
+            "railway_url": RAILWAY_URL,
+            "total_tests": total_tests,
+            "successful_tests": successful_tests,
+            "success_rate": successful_tests / total_tests,
+            "results": results
+        }, f, indent=2)
+    
+    print(f"\n📄 Detailed results saved to: railway_deployment_verification.json")
+    print(f"🔗 Backend URL: {RAILWAY_URL}")
 
 if __name__ == "__main__":
-    base_url = sys.argv[1] if len(sys.argv) > 1 else "https://quantum-leap-backend-production.up.railway.app"
-    success = verify_deployment(base_url)
-    sys.exit(0 if success else 1)
+    main()

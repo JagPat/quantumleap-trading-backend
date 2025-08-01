@@ -1,16 +1,21 @@
+#!/usr/bin/env python3
 """
-Simple Operational Procedures System
-
-A lightweight version of operational procedures that doesn't depend
-on complex system monitoring libraries, suitable for deployment environments.
+Simplified Operational Procedures System
+Standalone version that doesn't depend on database configuration
 """
 
+import os
+import json
 import logging
-from datetime import datetime
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, asdict
+import psutil
+import time
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
 from enum import Enum
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class SystemStatus(Enum):
@@ -19,7 +24,6 @@ class SystemStatus(Enum):
     WARNING = "warning"
     CRITICAL = "critical"
     FAILED = "failed"
-    RECOVERING = "recovering"
 
 class AlertLevel(Enum):
     """Alert severity levels"""
@@ -29,254 +33,391 @@ class AlertLevel(Enum):
     EMERGENCY = "emergency"
 
 @dataclass
-class SimpleSystemMetrics:
-    """Simple system performance metrics"""
+class SystemMetrics:
+    """System performance metrics"""
+    cpu_usage: float
+    memory_usage: float
+    disk_usage: float
+    network_io: Dict[str, int]
+    active_connections: int
+    response_time: float
+    error_rate: float
     timestamp: datetime
-    status: str = "operational"
-    uptime_hours: float = 24.0
-    active_connections: int = 10
-    response_time_ms: float = 150.0
-    error_rate: float = 0.02
-    throughput_per_second: float = 25.0
 
 @dataclass
-class SimpleOperationalAlert:
-    """Simple operational alert structure"""
-    id: str
-    timestamp: datetime
+class OperationalAlert:
+    """Operational alert structure"""
     level: AlertLevel
     component: str
     message: str
-    details: Dict[str, Any]
+    timestamp: datetime
     resolved: bool = False
+    resolution_time: Optional[datetime] = None
 
 class SimpleOperationalProcedures:
-    """
-    Simple operational procedures for production deployment
-    """
+    """Simplified operational procedures system"""
     
     def __init__(self):
-        self.system_status = SystemStatus.HEALTHY
-        self.monitoring_active = True
-        self.recovery_in_progress = False
-        self.active_alerts: List[SimpleOperationalAlert] = []
-        self.start_time = datetime.now()
-    
-    def get_system_status(self) -> Dict[str, Any]:
-        """Get current system status"""
-        uptime = (datetime.now() - self.start_time).total_seconds() / 3600
-        
-        return {
-            'status': self.system_status.value,
-            'timestamp': datetime.now().isoformat(),
-            'monitoring_active': self.monitoring_active,
-            'recovery_in_progress': self.recovery_in_progress,
-            'active_alerts_count': len([a for a in self.active_alerts if not a.resolved]),
-            'critical_alerts_count': len([a for a in self.active_alerts 
-                                        if a.level == AlertLevel.CRITICAL and not a.resolved]),
-            'uptime_hours': round(uptime, 1),
-            'total_alerts_today': len(self.active_alerts)
+        self.alerts: List[OperationalAlert] = []
+        self.system_metrics_history: List[SystemMetrics] = []
+        self.runbooks_path = "operational_runbooks"
+        self.scaling_thresholds = {
+            "cpu_high": 80.0,
+            "memory_high": 85.0,
+            "disk_high": 90.0,
+            "response_time_high": 5.0,
+            "error_rate_high": 5.0
         }
+        self._initialize_runbooks()
     
-    def get_operational_runbook(self) -> Dict[str, Any]:
-        """Get operational runbook and procedures"""
-        return {
-            'system_overview': {
-                'description': 'Automated Trading Engine Operational Procedures',
-                'version': '1.0.0',
-                'last_updated': datetime.now().isoformat()
-            },
-            'monitoring_procedures': {
-                'health_checks': [
-                    'System resource utilization monitoring',
-                    'Database connectivity and performance',
-                    'API response times and error rates',
-                    'Queue depths and processing rates',
-                    'Network connectivity and throughput'
-                ],
-                'alert_thresholds': {
-                    'cpu_warning': 70.0,
-                    'cpu_critical': 85.0,
-                    'memory_warning': 80.0,
-                    'memory_critical': 90.0,
-                    'response_time_warning': 1000.0,
-                    'response_time_critical': 5000.0,
-                    'error_rate_warning': 0.05,
-                    'error_rate_critical': 0.10
-                },
-                'monitoring_frequency': '30 seconds'
-            },
-            'recovery_procedures': {
-                'restart_service': {
-                    'name': 'Restart Trading Service',
-                    'description': 'Restart the main trading engine service',
-                    'conditions': ['high_error_rate', 'service_unresponsive'],
-                    'timeout_seconds': 60,
-                    'retry_count': 3,
-                    'escalation_level': 'critical'
-                },
-                'clear_queue': {
-                    'name': 'Clear Processing Queue',
-                    'description': 'Clear backed up processing queues',
-                    'conditions': ['high_queue_depth', 'queue_stalled'],
-                    'timeout_seconds': 30,
-                    'retry_count': 2,
-                    'escalation_level': 'warning'
-                },
-                'emergency_stop': {
-                    'name': 'Emergency System Stop',
-                    'description': 'Stop all trading activities immediately',
-                    'conditions': ['system_failure', 'data_corruption'],
-                    'timeout_seconds': 10,
-                    'retry_count': 1,
-                    'escalation_level': 'emergency'
-                },
-                'database_recovery': {
-                    'name': 'Database Recovery',
-                    'description': 'Recover database connections and integrity',
-                    'conditions': ['database_connection_failure', 'database_corruption'],
-                    'timeout_seconds': 180,
-                    'retry_count': 2,
-                    'escalation_level': 'critical'
-                },
-                'scale_resources': {
-                    'name': 'Scale System Resources',
-                    'description': 'Increase system resources allocation',
-                    'conditions': ['high_cpu_usage', 'high_memory_usage'],
-                    'timeout_seconds': 120,
-                    'retry_count': 1,
-                    'escalation_level': 'warning'
+    def _initialize_runbooks(self):
+        """Initialize operational runbooks"""
+        try:
+            os.makedirs(self.runbooks_path, exist_ok=True)
+            
+            # Create system health runbook
+            system_health_runbook = {
+                "title": "System Health Monitoring Runbook",
+                "version": "1.0",
+                "last_updated": datetime.now().isoformat(),
+                "procedures": {
+                    "health_check": {
+                        "description": "Perform comprehensive system health check",
+                        "steps": [
+                            "Check CPU usage (should be < 80%)",
+                            "Check memory usage (should be < 85%)",
+                            "Check disk space (should be < 90%)",
+                            "Verify API endpoints response time",
+                            "Check error logs for critical issues"
+                        ],
+                        "commands": [
+                            "curl -f http://localhost:8000/health",
+                            "df -h",
+                            "free -m",
+                            "top -n 1 -b"
+                        ]
+                    }
                 }
-            },
-            'escalation_procedures': {
-                'warning': 'Log alert and monitor for escalation',
-                'critical': 'Immediate notification to operations team',
-                'emergency': 'Immediate notification to all stakeholders and emergency response'
-            },
-            'capacity_planning': {
-                'cpu_scaling_threshold': 70,
-                'memory_scaling_threshold': 80,
-                'disk_cleanup_threshold': 85,
-                'connection_pool_scaling': 'Auto-scale based on demand',
-                'database_scaling': 'Monitor connection count and query performance'
-            },
-            'troubleshooting_guides': {
-                'high_cpu_usage': [
-                    'Check for runaway processes',
-                    'Review recent deployments',
-                    'Scale resources if needed',
-                    'Restart services if necessary'
-                ],
-                'high_memory_usage': [
-                    'Check for memory leaks',
-                    'Review application logs',
-                    'Restart affected services',
-                    'Scale memory allocation'
-                ],
-                'database_issues': [
-                    'Check database connectivity',
-                    'Review slow query logs',
-                    'Check connection pool status',
-                    'Restart database connections'
-                ],
-                'api_performance_issues': [
-                    'Check API response times',
-                    'Review error logs',
-                    'Check external service dependencies',
-                    'Scale API instances if needed'
-                ],
-                'network_connectivity': [
-                    'Check network connectivity',
-                    'Review firewall settings',
-                    'Test external service endpoints',
-                    'Monitor network latency'
-                ]
             }
-        }
+            
+            with open(f"{self.runbooks_path}/system_health_runbook.json", "w") as f:
+                json.dump(system_health_runbook, f, indent=2)
+            
+            # Create trading engine runbook
+            trading_runbook = {
+                "title": "Trading Engine Operational Runbook",
+                "version": "1.0",
+                "last_updated": datetime.now().isoformat(),
+                "procedures": {
+                    "engine_health_check": {
+                        "description": "Check trading engine health and status",
+                        "steps": [
+                            "Verify trading engine service is running",
+                            "Check strategy execution status",
+                            "Validate market data feeds",
+                            "Test order execution pipeline"
+                        ]
+                    }
+                }
+            }
+            
+            with open(f"{self.runbooks_path}/trading_engine_runbook.json", "w") as f:
+                json.dump(trading_runbook, f, indent=2)
+            
+            # Create AI system runbook
+            ai_runbook = {
+                "title": "AI System Operational Runbook",
+                "version": "1.0",
+                "last_updated": datetime.now().isoformat(),
+                "procedures": {
+                    "ai_health_check": {
+                        "description": "Check AI system health and performance",
+                        "steps": [
+                            "Verify AI service availability",
+                            "Test signal generation",
+                            "Check portfolio analysis",
+                            "Validate model performance"
+                        ]
+                    }
+                }
+            }
+            
+            with open(f"{self.runbooks_path}/ai_system_runbook.json", "w") as f:
+                json.dump(ai_runbook, f, indent=2)
+            
+            logger.info("✅ Operational runbooks initialized")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize runbooks: {e}")
     
-    def get_recent_metrics(self) -> List[Dict[str, Any]]:
-        """Get recent system metrics"""
-        # Generate mock recent metrics for demonstration
-        metrics = []
-        for i in range(5):
-            metric = SimpleSystemMetrics(
-                timestamp=datetime.now(),
-                status="operational",
-                uptime_hours=24.0 + i,
-                active_connections=10 + i,
-                response_time_ms=150.0 + (i * 10),
-                error_rate=0.02 + (i * 0.001),
-                throughput_per_second=25.0 + i
+    def collect_system_metrics(self) -> SystemMetrics:
+        """Collect current system metrics"""
+        try:
+            # CPU usage
+            cpu_usage = psutil.cpu_percent(interval=1)
+            
+            # Memory usage
+            memory = psutil.virtual_memory()
+            memory_usage = memory.percent
+            
+            # Disk usage
+            disk = psutil.disk_usage('/')
+            disk_usage = (disk.used / disk.total) * 100
+            
+            # Network I/O
+            network = psutil.net_io_counters()
+            network_io = {
+                "bytes_sent": network.bytes_sent,
+                "bytes_recv": network.bytes_recv
+            }
+            
+            # Active connections (approximate)
+            try:
+                connections = len(psutil.net_connections())
+            except:
+                connections = 0  # Fallback if permission denied
+            
+            # Mock response time and error rate
+            response_time = 0.5  # seconds
+            error_rate = 0.1     # percentage
+            
+            metrics = SystemMetrics(
+                cpu_usage=cpu_usage,
+                memory_usage=memory_usage,
+                disk_usage=disk_usage,
+                network_io=network_io,
+                active_connections=connections,
+                response_time=response_time,
+                error_rate=error_rate,
+                timestamp=datetime.now()
             )
-            metrics.append(asdict(metric))
-        
-        return metrics
+            
+            # Store metrics history (keep last 100 entries)
+            self.system_metrics_history.append(metrics)
+            if len(self.system_metrics_history) > 100:
+                self.system_metrics_history.pop(0)
+            
+            return metrics
+            
+        except Exception as e:
+            logger.error(f"Failed to collect system metrics: {e}")
+            # Return default metrics if collection fails
+            return SystemMetrics(
+                cpu_usage=0.0,
+                memory_usage=0.0,
+                disk_usage=0.0,
+                network_io={"bytes_sent": 0, "bytes_recv": 0},
+                active_connections=0,
+                response_time=1.0,
+                error_rate=0.0,
+                timestamp=datetime.now()
+            )
     
-    def get_active_alerts(self) -> List[Dict[str, Any]]:
-        """Get active alerts"""
-        active_alerts = [a for a in self.active_alerts if not a.resolved]
-        
-        alerts_data = []
-        for alert in active_alerts:
-            alerts_data.append({
-                "id": alert.id,
-                "timestamp": alert.timestamp.isoformat(),
-                "level": alert.level.value,
-                "component": alert.component,
-                "message": alert.message,
-                "details": alert.details,
-                "resolved": alert.resolved
-            })
-        
-        return alerts_data
-    
-    def get_recovery_actions(self) -> Dict[str, Any]:
-        """Get available recovery actions"""
-        runbook = self.get_operational_runbook()
-        return {
-            "recovery_actions": runbook['recovery_procedures'],
-            "count": len(runbook['recovery_procedures']),
-            "recovery_in_progress": self.recovery_in_progress
-        }
-    
-    def get_capacity_planning(self) -> Dict[str, Any]:
-        """Get capacity planning information"""
-        return {
-            "metrics_analyzed": 100,
-            "time_period_hours": 24,
-            "current_capacity": {
-                "cpu": {
-                    "average": 45.0,
-                    "peak": 65.0,
-                    "utilization_level": "medium"
+    def check_system_health(self) -> Dict[str, Any]:
+        """Perform comprehensive system health check"""
+        try:
+            metrics = self.collect_system_metrics()
+            health_status = SystemStatus.HEALTHY
+            issues = []
+            
+            # Check CPU usage
+            if metrics.cpu_usage > self.scaling_thresholds["cpu_high"]:
+                health_status = SystemStatus.WARNING
+                issues.append(f"High CPU usage: {metrics.cpu_usage:.1f}%")
+            
+            # Check memory usage
+            if metrics.memory_usage > self.scaling_thresholds["memory_high"]:
+                health_status = SystemStatus.CRITICAL if metrics.memory_usage > 95 else SystemStatus.WARNING
+                issues.append(f"High memory usage: {metrics.memory_usage:.1f}%")
+            
+            # Check disk usage
+            if metrics.disk_usage > self.scaling_thresholds["disk_high"]:
+                health_status = SystemStatus.CRITICAL
+                issues.append(f"High disk usage: {metrics.disk_usage:.1f}%")
+            
+            return {
+                "status": health_status.value,
+                "timestamp": datetime.now().isoformat(),
+                "metrics": {
+                    "cpu_usage": metrics.cpu_usage,
+                    "memory_usage": metrics.memory_usage,
+                    "disk_usage": metrics.disk_usage,
+                    "response_time": metrics.response_time,
+                    "error_rate": metrics.error_rate,
+                    "active_connections": metrics.active_connections
                 },
-                "memory": {
-                    "average": 60.0,
-                    "peak": 75.0,
-                    "utilization_level": "medium"
-                },
-                "processing": {
-                    "average_queue_depth": 250,
-                    "peak_queue_depth": 500,
-                    "average_throughput": 25.0,
-                    "peak_throughput": 35.0
-                }
-            },
-            "recommendations": [
-                {
-                    "type": "monitoring",
-                    "priority": "low",
-                    "message": "System is operating within normal parameters",
-                    "action": "Continue monitoring current metrics"
-                }
-            ],
-            "scaling_thresholds": {
-                "cpu_scale_up": 70,
-                "memory_scale_up": 80,
-                "queue_depth_scale_up": 1000,
-                "auto_scaling_enabled": True
+                "issues": issues,
+                "recommendations": self._get_health_recommendations(issues)
             }
-        }
+            
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return {
+                "status": SystemStatus.FAILED.value,
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e)
+            }
+    
+    def _get_health_recommendations(self, issues: List[str]) -> List[str]:
+        """Get recommendations based on health issues"""
+        recommendations = []
+        
+        for issue in issues:
+            if "CPU usage" in issue:
+                recommendations.append("Consider scaling horizontally or optimizing CPU-intensive operations")
+            elif "memory usage" in issue:
+                recommendations.append("Restart memory-intensive services or increase memory allocation")
+            elif "disk usage" in issue:
+                recommendations.append("Clean up old files or expand disk capacity")
+        
+        return recommendations
+    
+    def trigger_automated_recovery(self, issue_type: str) -> Dict[str, Any]:
+        """Trigger automated recovery procedure"""
+        try:
+            logger.info(f"🔧 Triggering automated recovery for: {issue_type}")
+            
+            # Simulate recovery actions
+            actions_taken = []
+            
+            if issue_type == "high_cpu":
+                actions_taken = [
+                    "Identified high CPU processes",
+                    "Logged process information",
+                    "Recommended scaling or optimization"
+                ]
+            elif issue_type == "high_memory":
+                actions_taken = [
+                    "Analyzed memory usage",
+                    "Recommended service restart",
+                    "Suggested memory optimization"
+                ]
+            elif issue_type == "disk_full":
+                actions_taken = [
+                    "Checked disk usage",
+                    "Recommended cleanup procedures",
+                    "Suggested capacity expansion"
+                ]
+            else:
+                actions_taken = [f"Generic recovery procedure for {issue_type}"]
+            
+            # Create alert
+            alert = OperationalAlert(
+                level=AlertLevel.WARNING,
+                component="automated_recovery",
+                message=f"Automated recovery triggered for {issue_type}",
+                timestamp=datetime.now()
+            )
+            self.alerts.append(alert)
+            
+            return {
+                "success": True,
+                "issue_type": issue_type,
+                "actions_taken": actions_taken,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Automated recovery failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+    
+    def get_capacity_planning_report(self) -> Dict[str, Any]:
+        """Generate capacity planning report"""
+        try:
+            if not self.system_metrics_history:
+                return {
+                    "message": "No metrics history available yet",
+                    "recommendation": "Run system for a few minutes to collect metrics"
+                }
+            
+            # Calculate trends from recent metrics
+            recent_metrics = self.system_metrics_history[-10:]  # Last 10 measurements
+            
+            avg_cpu = sum(m.cpu_usage for m in recent_metrics) / len(recent_metrics)
+            avg_memory = sum(m.memory_usage for m in recent_metrics) / len(recent_metrics)
+            avg_disk = sum(m.disk_usage for m in recent_metrics) / len(recent_metrics)
+            
+            # Generate scaling recommendations
+            scaling_recommendations = []
+            
+            if avg_cpu > 70:
+                scaling_recommendations.append({
+                    "resource": "CPU",
+                    "current_usage": avg_cpu,
+                    "recommendation": "Consider horizontal scaling within 24-48 hours",
+                    "urgency": "medium" if avg_cpu < 80 else "high"
+                })
+            
+            if avg_memory > 75:
+                scaling_recommendations.append({
+                    "resource": "Memory",
+                    "current_usage": avg_memory,
+                    "recommendation": "Consider memory upgrade or service optimization",
+                    "urgency": "medium" if avg_memory < 85 else "high"
+                })
+            
+            if avg_disk > 80:
+                scaling_recommendations.append({
+                    "resource": "Disk",
+                    "current_usage": avg_disk,
+                    "recommendation": "Plan disk expansion or data archival",
+                    "urgency": "high"
+                })
+            
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "current_utilization": {
+                    "cpu": avg_cpu,
+                    "memory": avg_memory,
+                    "disk": avg_disk
+                },
+                "scaling_recommendations": scaling_recommendations,
+                "metrics_analyzed": len(recent_metrics),
+                "next_review": (datetime.now() + timedelta(hours=24)).isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Capacity planning report failed: {e}")
+            return {"error": str(e)}
+    
+    def get_operational_status(self) -> Dict[str, Any]:
+        """Get comprehensive operational status"""
+        try:
+            health = self.check_system_health()
+            capacity = self.get_capacity_planning_report()
+            
+            # Get recent alerts
+            recent_alerts = [
+                {
+                    "level": alert.level.value,
+                    "component": alert.component,
+                    "message": alert.message,
+                    "timestamp": alert.timestamp.isoformat(),
+                    "resolved": alert.resolved
+                }
+                for alert in self.alerts[-10:]  # Last 10 alerts
+            ]
+            
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "system_health": health,
+                "capacity_planning": capacity,
+                "recent_alerts": recent_alerts,
+                "runbooks_available": len(os.listdir(self.runbooks_path)) if os.path.exists(self.runbooks_path) else 0,
+                "recovery_procedures": ["high_cpu", "high_memory", "disk_full", "service_down"]
+            }
+            
+        except Exception as e:
+            logger.error(f"Operational status failed: {e}")
+            return {"error": str(e)}
 
-# Global instance for simple deployment
+# Global instance
 simple_operational_procedures = SimpleOperationalProcedures()
+
+def get_simple_operational_procedures() -> SimpleOperationalProcedures:
+    """Get the simple operational procedures instance"""
+    return simple_operational_procedures

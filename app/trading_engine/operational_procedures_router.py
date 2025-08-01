@@ -1,451 +1,253 @@
+#!/usr/bin/env python3
 """
-Operational Procedures Router
-
-FastAPI router for operational procedures, system monitoring,
-and automated recovery management.
+Operational Procedures API Router
+FastAPI router for operational procedures and system management
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+from typing import Dict, Any, Optional
 import logging
+from datetime import datetime
 
-try:
-    from .operational_procedures import operational_procedures, SystemStatus, AlertLevel
-except ImportError as e:
-    # Fallback to simple version for deployment
-    logger.warning(f"Using simple operational procedures fallback: {e}")
-    try:
-        from .operational_procedures_simple import simple_operational_procedures as operational_procedures, SystemStatus, AlertLevel
-    except ImportError as e2:
-        logger.error(f"Could not import simple operational procedures: {e2}")
-        operational_procedures = None
-        SystemStatus = None
-        AlertLevel = None
+from .operational_procedures import get_operational_procedures
 
+# Configure logging
 logger = logging.getLogger(__name__)
 
 # Create router
-router = APIRouter()
+operational_procedures_router = APIRouter()
 
-@router.get("/status")
-async def get_operational_status():
-    """Get current operational status"""
+@operational_procedures_router.get("/health")
+async def operational_health():
+    """Get operational system health status"""
     try:
-        if operational_procedures is None:
-            return {
-                "status": "fallback",
-                "message": "Operational procedures not available",
-                "data": {
-                    "status": "healthy",
-                    "timestamp": datetime.now().isoformat(),
-                    "monitoring_active": False,
-                    "active_alerts_count": 0,
-                    "fallback_mode": True
-                },
-                "timestamp": datetime.now().isoformat()
-            }
-        
-        status = operational_procedures.get_system_status()
-        return {
-            "status": "success",
-            "data": status,
-            "timestamp": datetime.now().isoformat()
-        }
+        ops = get_operational_procedures()
+        health = ops.check_system_health()
+        return health
     except Exception as e:
-        logger.error(f"Error getting operational status: {e}")
-        return {
-            "status": "fallback",
-            "message": f"Operational status error: {str(e)}",
-            "data": {
-                "status": "unknown",
-                "timestamp": datetime.now().isoformat(),
-                "fallback_mode": True
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-
-@router.get("/runbook")
-async def get_operational_runbook():
-    """Get operational runbook and procedures"""
-    try:
-        runbook = operational_procedures.get_operational_runbook()
-        return {
-            "status": "success",
-            "data": runbook,
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Error getting operational runbook: {e}")
+        logger.error(f"Operational health check failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/metrics")
-async def get_system_metrics():
-    """Get recent system metrics"""
+@operational_procedures_router.get("/status")
+async def operational_status():
+    """Get comprehensive operational status"""
     try:
-        recent_metrics = operational_procedures.metrics_history[-10:] if operational_procedures.metrics_history else []
+        ops = get_operational_procedures()
+        status = ops.get_operational_status()
+        return status
+    except Exception as e:
+        logger.error(f"Operational status failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@operational_procedures_router.get("/metrics")
+async def system_metrics():
+    """Get current system metrics"""
+    try:
+        ops = get_operational_procedures()
+        metrics = ops.collect_system_metrics()
+        return {
+            "cpu_usage": metrics.cpu_usage,
+            "memory_usage": metrics.memory_usage,
+            "disk_usage": metrics.disk_usage,
+            "network_io": metrics.network_io,
+            "active_connections": metrics.active_connections,
+            "response_time": metrics.response_time,
+            "error_rate": metrics.error_rate,
+            "timestamp": metrics.timestamp.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"System metrics collection failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@operational_procedures_router.get("/capacity-planning")
+async def capacity_planning():
+    """Get capacity planning report"""
+    try:
+        ops = get_operational_procedures()
+        report = ops.get_capacity_planning_report()
+        return report
+    except Exception as e:
+        logger.error(f"Capacity planning failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@operational_procedures_router.post("/recovery/{issue_type}")
+async def trigger_recovery(issue_type: str, background_tasks: BackgroundTasks):
+    """Trigger automated recovery procedure"""
+    try:
+        ops = get_operational_procedures()
         
-        metrics_data = []
-        for metric in recent_metrics:
-            metrics_data.append({
-                "timestamp": metric.timestamp.isoformat(),
-                "cpu_usage": metric.cpu_usage,
-                "memory_usage": metric.memory_usage,
-                "disk_usage": metric.disk_usage,
-                "network_io": metric.network_io,
-                "active_connections": metric.active_connections,
-                "database_connections": metric.database_connections,
-                "queue_depth": metric.queue_depth,
-                "response_time_ms": metric.response_time_ms,
-                "error_rate": metric.error_rate,
-                "throughput_per_second": metric.throughput_per_second
-            })
+        # Run recovery in background
+        background_tasks.add_task(ops.trigger_automated_recovery, issue_type)
         
         return {
-            "status": "success",
-            "data": {
-                "metrics": metrics_data,
-                "count": len(metrics_data),
-                "monitoring_active": operational_procedures.monitoring_active
-            },
+            "message": f"Automated recovery triggered for {issue_type}",
+            "timestamp": datetime.now().isoformat(),
+            "status": "initiated"
+        }
+    except Exception as e:
+        logger.error(f"Recovery trigger failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@operational_procedures_router.get("/runbooks")
+async def list_runbooks():
+    """List available operational runbooks"""
+    try:
+        import os
+        runbooks_path = "operational_runbooks"
+        
+        if not os.path.exists(runbooks_path):
+            return {"runbooks": [], "message": "No runbooks directory found"}
+        
+        runbooks = []
+        for filename in os.listdir(runbooks_path):
+            if filename.endswith('.json'):
+                runbooks.append({
+                    "name": filename.replace('.json', ''),
+                    "filename": filename,
+                    "path": f"{runbooks_path}/{filename}"
+                })
+        
+        return {
+            "runbooks": runbooks,
+            "count": len(runbooks),
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"Error getting system metrics: {e}")
+        logger.error(f"Runbooks listing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/alerts")
-async def get_active_alerts():
-    """Get active system alerts"""
+@operational_procedures_router.get("/runbooks/{runbook_name}")
+async def get_runbook(runbook_name: str):
+    """Get specific operational runbook"""
     try:
-        active_alerts = [a for a in operational_procedures.active_alerts if not a.resolved]
+        import json
+        import os
+        
+        runbook_path = f"operational_runbooks/{runbook_name}.json"
+        
+        if not os.path.exists(runbook_path):
+            raise HTTPException(status_code=404, detail=f"Runbook {runbook_name} not found")
+        
+        with open(runbook_path, 'r') as f:
+            runbook = json.load(f)
+        
+        return runbook
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Runbook {runbook_name} not found")
+    except Exception as e:
+        logger.error(f"Runbook retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@operational_procedures_router.get("/alerts")
+async def get_alerts(limit: Optional[int] = 10):
+    """Get recent operational alerts"""
+    try:
+        ops = get_operational_procedures()
+        
+        # Get recent alerts
+        recent_alerts = ops.alerts[-limit:] if ops.alerts else []
         
         alerts_data = []
-        for alert in active_alerts:
+        for alert in recent_alerts:
             alerts_data.append({
-                "id": alert.id,
-                "timestamp": alert.timestamp.isoformat(),
                 "level": alert.level.value,
                 "component": alert.component,
                 "message": alert.message,
-                "details": alert.details,
-                "resolved": alert.resolved
-            })
-        
-        # Sort by timestamp (newest first)
-        alerts_data.sort(key=lambda x: x["timestamp"], reverse=True)
-        
-        return {
-            "status": "success",
-            "data": {
-                "alerts": alerts_data,
-                "count": len(alerts_data),
-                "critical_count": len([a for a in alerts_data if a["level"] == "critical"]),
-                "warning_count": len([a for a in alerts_data if a["level"] == "warning"])
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Error getting active alerts: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/alerts/history")
-async def get_alerts_history():
-    """Get alerts history"""
-    try:
-        all_alerts = operational_procedures.active_alerts
-        
-        alerts_data = []
-        for alert in all_alerts:
-            alerts_data.append({
-                "id": alert.id,
                 "timestamp": alert.timestamp.isoformat(),
-                "level": alert.level.value,
-                "component": alert.component,
-                "message": alert.message,
-                "details": alert.details,
                 "resolved": alert.resolved,
                 "resolution_time": alert.resolution_time.isoformat() if alert.resolution_time else None
             })
         
-        # Sort by timestamp (newest first)
-        alerts_data.sort(key=lambda x: x["timestamp"], reverse=True)
-        
         return {
-            "status": "success",
-            "data": {
-                "alerts": alerts_data,
-                "count": len(alerts_data),
-                "resolved_count": len([a for a in alerts_data if a["resolved"]]),
-                "active_count": len([a for a in alerts_data if not a["resolved"]])
-            },
+            "alerts": alerts_data,
+            "count": len(alerts_data),
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"Error getting alerts history: {e}")
+        logger.error(f"Alerts retrieval failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/monitoring/start")
-async def start_monitoring(background_tasks: BackgroundTasks):
-    """Start system monitoring"""
+@operational_procedures_router.post("/alerts/{alert_index}/resolve")
+async def resolve_alert(alert_index: int):
+    """Mark an alert as resolved"""
     try:
-        if operational_procedures.monitoring_active:
-            return {
-                "status": "info",
-                "message": "Monitoring is already active",
-                "timestamp": datetime.now().isoformat()
-            }
+        ops = get_operational_procedures()
         
-        # Start monitoring in background
-        background_tasks.add_task(operational_procedures.start_monitoring)
+        if alert_index >= len(ops.alerts) or alert_index < 0:
+            raise HTTPException(status_code=404, detail="Alert not found")
         
-        return {
-            "status": "success",
-            "message": "System monitoring started",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Error starting monitoring: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/monitoring/stop")
-async def stop_monitoring():
-    """Stop system monitoring"""
-    try:
-        operational_procedures.stop_monitoring()
-        
-        return {
-            "status": "success",
-            "message": "System monitoring stopped",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Error stopping monitoring: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/recovery/actions")
-async def get_recovery_actions():
-    """Get available recovery actions"""
-    try:
-        actions_data = {}
-        for action_name, action in operational_procedures.recovery_actions.items():
-            actions_data[action_name] = {
-                "name": action.name,
-                "description": action.description,
-                "conditions": action.conditions,
-                "timeout_seconds": action.timeout_seconds,
-                "retry_count": action.retry_count,
-                "escalation_level": action.escalation_level.value
-            }
-        
-        return {
-            "status": "success",
-            "data": {
-                "recovery_actions": actions_data,
-                "count": len(actions_data),
-                "recovery_in_progress": operational_procedures.recovery_in_progress
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Error getting recovery actions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/recovery/execute/{action_name}")
-async def execute_recovery_action(action_name: str, background_tasks: BackgroundTasks):
-    """Execute a specific recovery action"""
-    try:
-        if action_name not in operational_procedures.recovery_actions:
-            raise HTTPException(status_code=404, detail=f"Recovery action '{action_name}' not found")
-        
-        if operational_procedures.recovery_in_progress:
-            raise HTTPException(status_code=409, detail="Another recovery action is already in progress")
-        
-        action = operational_procedures.recovery_actions[action_name]
-        
-        # Execute recovery action in background
-        background_tasks.add_task(operational_procedures._execute_recovery_action, action)
-        
-        return {
-            "status": "success",
-            "message": f"Recovery action '{action.name}' started",
-            "action": {
-                "name": action.name,
-                "description": action.description,
-                "timeout_seconds": action.timeout_seconds
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error executing recovery action: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/alerts/{alert_id}/resolve")
-async def resolve_alert(alert_id: str):
-    """Resolve a specific alert"""
-    try:
-        # Find the alert
-        alert = None
-        for a in operational_procedures.active_alerts:
-            if a.id == alert_id:
-                alert = a
-                break
-        
-        if not alert:
-            raise HTTPException(status_code=404, detail=f"Alert '{alert_id}' not found")
-        
-        if alert.resolved:
-            return {
-                "status": "info",
-                "message": f"Alert '{alert_id}' is already resolved",
-                "timestamp": datetime.now().isoformat()
-            }
-        
-        # Resolve the alert
+        alert = ops.alerts[alert_index]
         alert.resolved = True
         alert.resolution_time = datetime.now()
         
-        logger.info(f"Alert {alert_id} resolved manually")
-        
         return {
-            "status": "success",
-            "message": f"Alert '{alert_id}' resolved",
-            "alert": {
-                "id": alert.id,
-                "level": alert.level.value,
-                "component": alert.component,
-                "message": alert.message,
-                "resolution_time": alert.resolution_time.isoformat()
-            },
-            "timestamp": datetime.now().isoformat()
+            "message": "Alert marked as resolved",
+            "alert_index": alert_index,
+            "resolution_time": alert.resolution_time.isoformat()
         }
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error resolving alert: {e}")
+        logger.error(f"Alert resolution failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/capacity/planning")
-async def get_capacity_planning():
-    """Get capacity planning information"""
+@operational_procedures_router.get("/procedures")
+async def list_procedures():
+    """List available recovery procedures"""
     try:
-        # Get recent metrics for capacity analysis
-        recent_metrics = operational_procedures.metrics_history[-100:] if operational_procedures.metrics_history else []
+        ops = get_operational_procedures()
         
-        if not recent_metrics:
-            return {
-                "status": "info",
-                "message": "No metrics available for capacity planning",
-                "timestamp": datetime.now().isoformat()
-            }
-        
-        # Calculate capacity metrics
-        avg_cpu = sum(m.cpu_usage for m in recent_metrics) / len(recent_metrics)
-        max_cpu = max(m.cpu_usage for m in recent_metrics)
-        avg_memory = sum(m.memory_usage for m in recent_metrics) / len(recent_metrics)
-        max_memory = max(m.memory_usage for m in recent_metrics)
-        avg_queue_depth = sum(m.queue_depth for m in recent_metrics) / len(recent_metrics)
-        max_queue_depth = max(m.queue_depth for m in recent_metrics)
-        avg_throughput = sum(m.throughput_per_second for m in recent_metrics) / len(recent_metrics)
-        max_throughput = max(m.throughput_per_second for m in recent_metrics)
-        
-        # Capacity recommendations
-        recommendations = []
-        
-        if avg_cpu > 60:
-            recommendations.append({
-                "type": "cpu",
-                "priority": "high" if avg_cpu > 80 else "medium",
-                "message": f"Average CPU usage is {avg_cpu:.1f}%. Consider scaling CPU resources.",
-                "action": "Scale CPU allocation or add more instances"
-            })
-        
-        if avg_memory > 70:
-            recommendations.append({
-                "type": "memory",
-                "priority": "high" if avg_memory > 85 else "medium",
-                "message": f"Average memory usage is {avg_memory:.1f}%. Consider scaling memory resources.",
-                "action": "Increase memory allocation or optimize memory usage"
-            })
-        
-        if avg_queue_depth > 500:
-            recommendations.append({
-                "type": "processing",
-                "priority": "high" if avg_queue_depth > 1000 else "medium",
-                "message": f"Average queue depth is {avg_queue_depth:.0f}. Consider scaling processing capacity.",
-                "action": "Add more worker processes or optimize processing speed"
-            })
+        procedures = list(ops.recovery_procedures.keys())
         
         return {
-            "status": "success",
-            "data": {
-                "metrics_analyzed": len(recent_metrics),
-                "time_period_hours": len(recent_metrics) * 0.5 / 60,  # 30-second intervals
-                "current_capacity": {
-                    "cpu": {
-                        "average": round(avg_cpu, 1),
-                        "peak": round(max_cpu, 1),
-                        "utilization_level": "high" if avg_cpu > 70 else "medium" if avg_cpu > 40 else "low"
-                    },
-                    "memory": {
-                        "average": round(avg_memory, 1),
-                        "peak": round(max_memory, 1),
-                        "utilization_level": "high" if avg_memory > 70 else "medium" if avg_memory > 40 else "low"
-                    },
-                    "processing": {
-                        "average_queue_depth": round(avg_queue_depth, 0),
-                        "peak_queue_depth": max_queue_depth,
-                        "average_throughput": round(avg_throughput, 1),
-                        "peak_throughput": round(max_throughput, 1)
-                    }
-                },
-                "recommendations": recommendations,
-                "scaling_thresholds": {
-                    "cpu_scale_up": 70,
-                    "memory_scale_up": 80,
-                    "queue_depth_scale_up": 1000,
-                    "auto_scaling_enabled": True
-                }
-            },
+            "procedures": procedures,
+            "count": len(procedures),
+            "description": "Available automated recovery procedures",
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"Error getting capacity planning: {e}")
+        logger.error(f"Procedures listing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/health")
-async def health_check():
-    """Health check endpoint"""
+@operational_procedures_router.get("/thresholds")
+async def get_scaling_thresholds():
+    """Get current scaling thresholds"""
     try:
-        if operational_procedures is None:
-            return {
-                "status": "fallback",
-                "message": "Operational procedures system in fallback mode",
-                "system_status": "healthy",
-                "monitoring_active": False,
-                "recovery_in_progress": False,
-                "fallback_mode": True,
-                "timestamp": datetime.now().isoformat()
-            }
-        
-        status = operational_procedures.get_system_status()
+        ops = get_operational_procedures()
         
         return {
-            "status": "operational",
-            "message": "Operational procedures system is running",
-            "system_status": status["status"],
-            "monitoring_active": status["monitoring_active"],
-            "recovery_in_progress": status["recovery_in_progress"],
+            "thresholds": ops.scaling_thresholds,
+            "description": "Current system scaling thresholds",
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error(f"Thresholds retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@operational_procedures_router.put("/thresholds")
+async def update_scaling_thresholds(thresholds: Dict[str, float]):
+    """Update scaling thresholds"""
+    try:
+        ops = get_operational_procedures()
+        
+        # Validate threshold values
+        valid_keys = set(ops.scaling_thresholds.keys())
+        provided_keys = set(thresholds.keys())
+        
+        if not provided_keys.issubset(valid_keys):
+            invalid_keys = provided_keys - valid_keys
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid threshold keys: {list(invalid_keys)}"
+            )
+        
+        # Update thresholds
+        ops.scaling_thresholds.update(thresholds)
+        
         return {
-            "status": "fallback",
-            "message": f"Operational procedures system in fallback mode: {str(e)}",
-            "system_status": "unknown",
-            "fallback_mode": True,
+            "message": "Scaling thresholds updated",
+            "updated_thresholds": thresholds,
+            "current_thresholds": ops.scaling_thresholds,
             "timestamp": datetime.now().isoformat()
         }
+    except Exception as e:
+        logger.error(f"Thresholds update failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
