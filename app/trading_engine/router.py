@@ -99,7 +99,7 @@ class ControlActionRequest(BaseModel):
     reason: str
     parameters: Optional[Dict[str, Any]] = None
 
-router = APIRouter(prefix="/api/trading-engine", tags=["trading-engine"])
+router = APIRouter(tags=["trading-engine"])
 
 # Include market data and condition monitoring sub-routers
 if MARKET_DATA_AVAILABLE:
