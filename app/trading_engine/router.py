@@ -8,6 +8,9 @@ from pydantic import BaseModel
 import logging
 from datetime import datetime
 
+# Initialize logger first
+logger = logging.getLogger(__name__)
+
 # Import all trading engine components
 from .database_schema import check_trading_engine_health, get_trading_system_config, set_trading_system_config
 from .event_bus import event_bus
@@ -118,6 +121,14 @@ if MANUAL_OVERRIDE_AVAILABLE:
 if USER_PREFERENCES_AVAILABLE:
     router.include_router(user_preferences_router, tags=["User Preferences"])
     logger.info("User preferences router included in trading engine")
+
+# Include operational procedures router
+try:
+    from .operational_procedures_router import router as operational_procedures_router
+    router.include_router(operational_procedures_router, prefix="/operational", tags=["Operational Procedures"])
+    logger.info("Operational procedures router included in trading engine")
+except ImportError as e:
+    logger.warning(f"Operational procedures router not available: {e}")
 
 @router.get("/health")
 async def get_trading_engine_health() -> Dict[str, Any]:
