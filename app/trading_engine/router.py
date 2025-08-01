@@ -1219,4 +1219,6 @@ async def fallback_status() -> Dict[str, Any]:
             "/test/endpoints"
         ],
         "timestamp": datetime.now().isoformat()
-    }
+    }# Add router alias for export
+trading_router = router
+trading_engine_router = router
