@@ -247,7 +247,7 @@
     - Add real-time performance monitoring and optimization
     - _Requirements: 10.5, 6.4, 6.5_
 
-  - [x] 14.3 Add operational procedures
+  - [ ] 14.3 Add operational procedures
     - Create operational runbooks and troubleshooting guides
     - Implement automated system recovery and failover
     - Add capacity planning and scaling procedures

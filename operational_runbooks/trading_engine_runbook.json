@@ -1,0 +1,59 @@
+{
+  "title": "Trading Engine Operations and Troubleshooting",
+  "version": "1.0",
+  "last_updated": "2025-08-01T12:29:20.644811",
+  "procedures": [
+    {
+      "issue": "Trading Engine Not Responding",
+      "symptoms": [
+        "API timeouts",
+        "No order executions",
+        "Health check failures"
+      ],
+      "diagnosis_steps": [
+        "Check trading engine process status",
+        "Review trading engine logs",
+        "Test API endpoints manually",
+        "Check database connectivity"
+      ],
+      "resolution_steps": [
+        "Restart trading engine service",
+        "Clear any stuck orders",
+        "Verify broker connectivity",
+        "Check and fix configuration issues"
+      ],
+      "prevention": [
+        "Implement health checks",
+        "Set up process monitoring",
+        "Regular service restarts",
+        "Redundant service instances"
+      ]
+    },
+    {
+      "issue": "Order Execution Failures",
+      "symptoms": [
+        "Orders stuck in pending",
+        "Broker API errors",
+        "Execution timeouts"
+      ],
+      "diagnosis_steps": [
+        "Check broker API status",
+        "Review order execution logs",
+        "Verify account permissions",
+        "Check market hours and conditions"
+      ],
+      "resolution_steps": [
+        "Retry failed orders",
+        "Check broker account status",
+        "Update API credentials if needed",
+        "Implement fallback execution methods"
+      ],
+      "prevention": [
+        "Monitor broker API health",
+        "Implement retry mechanisms",
+        "Set up backup brokers",
+        "Regular credential rotation"
+      ]
+    }
+  ]
+}

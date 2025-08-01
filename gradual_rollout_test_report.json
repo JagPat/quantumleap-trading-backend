@@ -1,0 +1,51 @@
+{
+  "tests_passed": 3,
+  "tests_failed": 6,
+  "test_details": [
+    {
+      "test": "Beta User Manager Initialization",
+      "status": "PASSED",
+      "message": "Test completed successfully"
+    },
+    {
+      "test": "Beta User Enrollment",
+      "status": "ERROR",
+      "message": "Failed to enroll valid user"
+    },
+    {
+      "test": "Rollout Phase Management",
+      "status": "ERROR",
+      "message": "database is locked"
+    },
+    {
+      "test": "Enhanced Monitoring",
+      "status": "ERROR",
+      "message": "database is locked"
+    },
+    {
+      "test": "Rollback Manager",
+      "status": "ERROR",
+      "message": "database is locked"
+    },
+    {
+      "test": "Performance Monitoring",
+      "status": "PASSED",
+      "message": "Test completed successfully"
+    },
+    {
+      "test": "Gradual Rollout Orchestrator",
+      "status": "PASSED",
+      "message": "Test completed successfully"
+    },
+    {
+      "test": "Dashboard Creation",
+      "status": "ERROR",
+      "message": "database is locked"
+    },
+    {
+      "test": "Database Operations",
+      "status": "ERROR",
+      "message": "database is locked"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "title": "AI System Operations and Troubleshooting",
+  "version": "1.0",
+  "last_updated": "2025-08-01T12:29:20.644813",
+  "procedures": [
+    {
+      "issue": "AI Analysis Failures",
+      "symptoms": [
+        "Analysis timeouts",
+        "No AI recommendations",
+        "API errors"
+      ],
+      "diagnosis_steps": [
+        "Check AI service status",
+        "Review AI service logs",
+        "Test AI API endpoints",
+        "Verify API key validity"
+      ],
+      "resolution_steps": [
+        "Restart AI services",
+        "Switch to backup AI provider",
+        "Update API keys",
+        "Clear AI service caches"
+      ],
+      "prevention": [
+        "Monitor AI service health",
+        "Implement provider failover",
+        "Regular API key rotation",
+        "Set up redundant AI services"
+      ]
+    }
+  ]
+}

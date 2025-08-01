@@ -1,0 +1,85 @@
+{
+  "title": "System Health Monitoring and Troubleshooting",
+  "version": "1.0",
+  "last_updated": "2025-08-01T12:29:20.644801",
+  "procedures": [
+    {
+      "issue": "High CPU Usage",
+      "symptoms": [
+        "CPU usage > 80%",
+        "Slow response times",
+        "System lag"
+      ],
+      "diagnosis_steps": [
+        "Check top processes: ps aux --sort=-%cpu | head -10",
+        "Monitor CPU usage: htop or top",
+        "Check system load: uptime",
+        "Review application logs for CPU-intensive operations"
+      ],
+      "resolution_steps": [
+        "Identify CPU-intensive processes",
+        "Optimize or restart heavy processes",
+        "Scale up resources if needed",
+        "Implement CPU throttling if necessary"
+      ],
+      "prevention": [
+        "Set up CPU usage alerts",
+        "Regular performance monitoring",
+        "Optimize code for CPU efficiency",
+        "Implement auto-scaling"
+      ]
+    },
+    {
+      "issue": "High Memory Usage",
+      "symptoms": [
+        "Memory usage > 85%",
+        "Out of memory errors",
+        "Swap usage"
+      ],
+      "diagnosis_steps": [
+        "Check memory usage: free -h",
+        "Identify memory-heavy processes: ps aux --sort=-%mem | head -10",
+        "Check for memory leaks in application logs",
+        "Monitor swap usage: swapon -s"
+      ],
+      "resolution_steps": [
+        "Restart memory-intensive services",
+        "Clear application caches",
+        "Increase swap space if needed",
+        "Scale up memory resources"
+      ],
+      "prevention": [
+        "Implement memory monitoring",
+        "Regular memory leak testing",
+        "Optimize data structures",
+        "Set memory limits for processes"
+      ]
+    },
+    {
+      "issue": "Database Performance Issues",
+      "symptoms": [
+        "Slow queries",
+        "Database timeouts",
+        "High database CPU"
+      ],
+      "diagnosis_steps": [
+        "Check database connections: SHOW PROCESSLIST",
+        "Analyze slow queries: SHOW SLOW QUERIES",
+        "Check database size and growth",
+        "Monitor database locks and deadlocks"
+      ],
+      "resolution_steps": [
+        "Optimize slow queries",
+        "Add missing indexes",
+        "Clean up old data",
+        "Restart database if necessary"
+      ],
+      "prevention": [
+        "Regular database maintenance",
+        "Query performance monitoring",
+        "Proper indexing strategy",
+        "Database connection pooling"
+      ]
+    }
+  ]
+}
