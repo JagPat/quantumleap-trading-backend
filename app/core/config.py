@@ -1,91 +1,67 @@
 """
-Core configuration management for QuantumLeap Trading Backend
+Application Configuration
 """
+
 import os
 from typing import Optional
-from cryptography.fernet import Fernet
-from pydantic import Field
-import logging
-
-logger = logging.getLogger(__name__)
 
 try:
     from pydantic_settings import BaseSettings
 except ImportError:
-    from pydantic import BaseSettings
-
+    # Fallback for deployment environments
+    import os
+    class BaseSettings:
+        def __init__(self, **kwargs):
+            # Set default values
+            self.database_url = os.getenv("DATABASE_URL", "sqlite:///./trading_app.db")
+            self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+            self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+            self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
+            self.google_api_key = os.getenv("GOOGLE_API_KEY", "")
+            self.kite_api_key = os.getenv("KITE_API_KEY", "")
+            self.kite_api_secret = os.getenv("KITE_API_SECRET", "")
+            self.kite_redirect_url = os.getenv("KITE_REDIRECT_URL", "http://localhost:8000/api/auth/callback")
+            self.encryption_key = os.getenv("ENCRYPTION_KEY", "HKQ5bWD9sbwXxKsWVuF57mVf6Ty_WtGtoX8GwPCmtD0=")
+            self.session_secret = os.getenv("SESSION_SECRET", "quantum-leap-secure-session-secret-2025")
+            self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+            self.database_path = os.getenv("DATABASE_PATH", "trading_app.db")
+            self.log_level = os.getenv("LOG_LEVEL", "INFO")
+            self.host = os.getenv("HOST", "0.0.0.0")
+            self.port = os.getenv("PORT", "8000")
+            
+            # Override with any provided kwargs
+            for key, value in kwargs.items():
+                setattr(self, key, value)
 
 class Settings(BaseSettings):
     """Application settings"""
     
-    # App Configuration
-    app_name: str = "QuantumLeap Trading Backend API"
-    app_version: str = "2.0.0"
-    debug: bool = False
-    
-    # Server Configuration
-    host: str = "0.0.0.0"
-    port: int = Field(
-        default=8000,
-        env="PORT",
-        description="Server port (Railway provides this via PORT env var)"
-    )
-    
-    # Database
-    database_path: str = Field(
-        default="trading_app.db",
-        env="DATABASE_PATH",
-        description="SQLite database file path (must be writable on Railway)"
-    )
-    
-    # Security
-    encryption_key: Optional[str] = Field(
-        default=None,
-        env="ENCRYPTION_KEY",
-        description="Encryption key for sensitive data (32-byte base64 encoded)"
-    )
-    session_secret: str = Field(
-        default="a-secure-secret-key-for-oauth-state-management",
-        env="SESSION_SECRET",
-        description="Secret key for OAuth state management"
-    )
-    
-    # External URLs
-    frontend_url: str = Field(
-        default="http://localhost:5175",
-        env="FRONTEND_URL",
-        description="Frontend application URL for OAuth redirects"
-    )
-    
-    # Logging
-    log_level: str = "INFO"
-    
-    # Kite Connect Configuration
-    kite_api_timeout: int = 30
-    kite_api_retries: int = 3
-    
-    # Railway Configuration
-    railway_environment: str = "development"
-    
-    # AI Engine API Keys
-    openai_api_key: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
-    google_api_key: Optional[str] = None
-    
-    def get_encryption_key(self) -> bytes:
-        """Get encryption key from environment variable or generate one"""
-        env_key = self.encryption_key or os.environ.get("ENCRYPTION_KEY")
-        if not env_key:
-            logger.warning("ENCRYPTION_KEY not found. Generating temporary key for this session.")
-            from cryptography.fernet import Fernet
-            return Fernet.generate_key()
-        return env_key.encode()
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        extra = "allow"
-
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        # Set additional attributes that might not be in BaseSettings
+        if not hasattr(self, 'database_url'):
+            self.database_url = os.getenv("DATABASE_URL", "sqlite:///./quantum_leap.db")
+        if not hasattr(self, 'openai_api_key'):
+            self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not hasattr(self, 'anthropic_api_key'):
+            self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not hasattr(self, 'google_api_key'):
+            self.google_api_key = os.getenv("GOOGLE_API_KEY")
+        if not hasattr(self, 'kite_api_key'):
+            self.kite_api_key = os.getenv("KITE_API_KEY")
+        if not hasattr(self, 'kite_api_secret'):
+            self.kite_api_secret = os.getenv("KITE_API_SECRET")
+        if not hasattr(self, 'environment'):
+            self.environment = os.getenv("ENVIRONMENT", "production")
+        if not hasattr(self, 'debug'):
+            self.debug = os.getenv("DEBUG", "false").lower() == "true"
+        if not hasattr(self, 'cors_origins'):
+            self.cors_origins = [
+                "https://quantum-leap-frontend.vercel.app",
+                "http://localhost:3000",
+                "http://localhost:5173"
+            ]
 
 # Global settings instance
 settings = Settings()
