@@ -11,21 +11,32 @@ from contextlib import asynccontextmanager
 # Import existing components
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.trading_engine.router import trading_engine_router
+from app.trading_engine.router import trading_router as trading_engine_router
 from app.trading_engine.monitoring import TradingEngineMonitor
 from app.trading_engine.event_bus import EventManager
 from app.ai_engine.analysis_router import ai_analysis_router
 from app.portfolio.service import portfolio_router
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('production.log'),
-        logging.StreamHandler()
-    ]
-)
+# Configure logging with error handling
+try:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('production.log'),
+            logging.StreamHandler()
+        ]
+    )
+except Exception as e:
+    # Fallback to console logging only
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler()
+        ]
+    )
+    print(f"Warning: Could not create log file, using console logging: {e}")
 logger = logging.getLogger(__name__)
 
 # Global components

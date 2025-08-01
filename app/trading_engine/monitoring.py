@@ -16,9 +16,17 @@ from app.core.config import settings
 trading_logger = logging.getLogger("trading_engine")
 trading_logger.setLevel(logging.INFO)
 
-# Create file handler for trading logs
-trading_handler = logging.FileHandler("logs/trading_engine.log")
-trading_handler.setLevel(logging.INFO)
+# Create file handler for trading logs with error handling
+try:
+    import os
+    os.makedirs("logs", exist_ok=True)
+    trading_handler = logging.FileHandler("logs/trading_engine.log")
+    trading_handler.setLevel(logging.INFO)
+except Exception as e:
+    # Fallback to console logging if file logging fails
+    trading_handler = logging.StreamHandler()
+    trading_handler.setLevel(logging.INFO)
+    print(f"Warning: Could not create log file, using console logging: {e}")
 
 # Create formatter
 formatter = logging.Formatter(
