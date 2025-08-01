@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Operational Procedures Dashboard</title>
+    <meta http-equiv="refresh" content="60">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status-card { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .normal { background-color: #e8f5e8; }
+        .warning { background-color: #fff3cd; }
+        .critical { background-color: #f8d7da; }
+        .metrics { display: flex; gap: 20px; flex-wrap: wrap; }
+        .metric { text-align: center; padding: 10px; border: 1px solid #ccc; border-radius: 5px; min-width: 150px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Operational Procedures Dashboard</h1>
+    <p><strong>Last Updated:</strong> 2025-08-01T12:29:50.652191</p>
+    <p><strong>System Status:</strong> 🟢 Operational</p>
+    
+    <h2>📊 Current System Metrics</h2>
+    <div class="metrics">
+        
+        <div class="metric normal">
+            <h3>CPU</h3>
+            <p><strong>25.0%</strong></p>
+            <p>Status: normal</p>
+        </div>
+            
+        <div class="metric normal">
+            <h3>MEMORY</h3>
+            <p><strong>45.0%</strong></p>
+            <p>Status: normal</p>
+        </div>
+            
+        <div class="metric normal">
+            <h3>DISK</h3>
+            <p><strong>60.0%</strong></p>
+            <p>Status: normal</p>
+        </div>
+            
+    </div>
+    
+    <h2>🤖 Automated Recovery</h2>
+    
+    <div class="status-card">
+        <p><strong>Recovery System:</strong> 🟢 Active</p>
+        <p><strong>Recoveries (24h):</strong> 1</p>
+    </div>
+    
+    <h3>Recent Recovery Actions</h3>
+    <div style="max-height: 300px; overflow-y: auto;">
+        
+        <div class="status-card">
+            ✅ <strong>trading_engine_failure</strong> - 2025-08-01T12:29:20.820575<br>
+            <small>Actions: 3</small>
+        </div>
+            
+    </div>
+    
+    <h2>📈 Capacity Planning</h2>
+    
+    <div class="status-card">
+        <h3>Recommendations</h3>
+        <p>• System capacity appears adequate for current load</p>
+    </div>
+    
+    <h2>📚 Available Runbooks</h2>
+    <div class="status-card">
+        <ul>
+            <li>System Health Monitoring and Troubleshooting</li>
+            <li>Trading Engine Operations and Troubleshooting</li>
+            <li>AI System Operations and Troubleshooting</li>
+        </ul>
+    </div>
+    
+    <div>
+        <button onclick="location.reload()">🔄 Refresh</button>
+    </div>
+</body>
+</html>
+        

@@ -1,0 +1,68 @@
+{
+  "report_generated": "2025-08-01T12:29:50.651550",
+  "current_capacity": {
+    "timestamp": "2025-08-01T12:29:50.649887",
+    "cpu_usage": 25.0,
+    "memory_usage": 45.0,
+    "disk_usage": 60.0,
+    "network_io": {
+      "bytes_sent": 0,
+      "bytes_recv": 0
+    },
+    "active_connections": 5,
+    "requests_per_second": 50.0,
+    "database_connections": 10,
+    "response_time": 5.0
+  },
+  "capacity_trends": {
+    "analysis_period_hours": 24,
+    "metrics_analyzed": 1,
+    "trends": {},
+    "recommendations": [
+      "System capacity appears adequate for current load"
+    ]
+  },
+  "scaling_rules": {
+    "cpu_scaling": {
+      "metric": "cpu_usage",
+      "scale_up_threshold": 70.0,
+      "scale_down_threshold": 30.0,
+      "min_instances": 1,
+      "max_instances": 10,
+      "cooldown_period": 300
+    },
+    "memory_scaling": {
+      "metric": "memory_usage",
+      "scale_up_threshold": 75.0,
+      "scale_down_threshold": 40.0,
+      "min_instances": 1,
+      "max_instances": 8,
+      "cooldown_period": 300
+    },
+    "request_scaling": {
+      "metric": "requests_per_second",
+      "scale_up_threshold": 100.0,
+      "scale_down_threshold": 20.0,
+      "min_instances": 2,
+      "max_instances": 20,
+      "cooldown_period": 180
+    }
+  },
+  "capacity_recommendations": [
+    "System capacity appears adequate for current load"
+  ],
+  "resource_utilization": {
+    "cpu": {
+      "current": 25.0,
+      "status": "normal"
+    },
+    "memory": {
+      "current": 45.0,
+      "status": "normal"
+    },
+    "disk": {
+      "current": 60.0,
+      "status": "normal"
+    }
+  }
+}

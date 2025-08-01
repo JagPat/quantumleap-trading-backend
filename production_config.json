@@ -1,0 +1,42 @@
+{
+  "environment": "production",
+  "debug": false,
+  "database": {
+    "url": "sqlite:///production_trading.db",
+    "pool_size": 20,
+    "max_overflow": 30,
+    "pool_timeout": 30,
+    "pool_recycle": 3600
+  },
+  "trading_engine": {
+    "max_concurrent_strategies": 50,
+    "max_orders_per_minute": 100,
+    "risk_check_interval": 5,
+    "position_update_interval": 1,
+    "market_data_timeout": 10
+  },
+  "monitoring": {
+    "health_check_interval": 60,
+    "performance_metrics_interval": 300,
+    "alert_thresholds": {
+      "cpu_usage": 80,
+      "memory_usage": 85,
+      "response_time": 2.0,
+      "error_rate": 0.05
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "retention_days": 30,
+    "max_file_size": "100MB",
+    "backup_count": 10
+  },
+  "security": {
+    "api_rate_limit": "1000/hour",
+    "max_request_size": "10MB",
+    "cors_origins": [
+      "https://quantum-leap-frontend.vercel.app"
+    ],
+    "require_authentication": true
+  }
+}
