@@ -1,0 +1,35 @@
+{
+  "alert_thresholds": {
+    "query_latency_ms": {
+      "warning": 200,
+      "critical": 500
+    },
+    "error_rate_percent": {
+      "warning": 1.0,
+      "critical": 5.0
+    },
+    "connection_pool_usage_percent": {
+      "warning": 70.0,
+      "critical": 90.0
+    },
+    "database_size_mb": {
+      "warning": 1000,
+      "critical": 2000
+    }
+  },
+  "monitoring_interval_seconds": 300,
+  "alert_channels": {
+    "email": {
+      "enabled": false,
+      "recipients": []
+    },
+    "webhook": {
+      "enabled": false,
+      "url": ""
+    },
+    "log": {
+      "enabled": true,
+      "level": "WARNING"
+    }
+  }
+}

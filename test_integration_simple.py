@@ -1,474 +1,312 @@
-#!/usr/bin/env python3
 """
-Simplified Integration Testing Suite for Automated Trading Engine
-Tests Railway deployment, database integration, and core workflows
+Simple Integration Test for Trading Engine Database
+Tests the integration without external dependencies
 """
-
-import json
-import time
-import sys
 import os
-from datetime import datetime
-import sqlite3
+import sys
+import asyncio
 import tempfile
-import subprocess
-import urllib.request
-import urllib.parse
-import urllib.error
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import shutil
+from datetime import datetime
 
-# Railway deployment URL
-RAILWAY_BASE_URL = "https://quantum-leap-backend-production.up.railway.app"
-LOCAL_BASE_URL = "http://localhost:8000"
+# Add the app directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 
-class SimpleIntegrationTester:
-    """Simple integration testing without async complexity"""
-    
-    def __init__(self, base_url=None):
-        self.base_url = base_url or RAILWAY_BASE_URL
-        self.test_results = {}
-    
-    def make_request(self, endpoint, method="GET", data=None, timeout=10):
-        """Make HTTP request with error handling"""
-        try:
-            url = f"{self.base_url}{endpoint}"
-            
-            if method == "GET":
-                req = urllib.request.Request(url)
-            else:  # POST
-                json_data = json.dumps(data).encode('utf-8') if data else b'{}'
-                req = urllib.request.Request(url, data=json_data, method=method)
-            
-            req.add_header('Content-Type', 'application/json')
-            req.add_header('User-Agent', 'Integration-Test/1.0')
-            
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                return {
-                    'status': response.status,
-                    'data': json.loads(response.read().decode()) if response.read() else {},
-                    'success': True
-                }
-                
-        except urllib.error.HTTPError as e:
-            return {
-                'status': e.code,
-                'error': f"HTTP {e.code}: {e.reason}",
-                'success': e.code in [200, 201, 404, 422]  # Some codes are acceptable
-            }
-        except urllib.error.URLError as e:
-            return {
-                'status': 'connection_error',
-                'error': f"Connection error: {e.reason}",
-                'success': False
-            }
-        except Exception as e:
-            return {
-                'status': 'error',
-                'error': str(e),
-                'success': False
-            }
-    
-    def test_backend_health(self):
-        """Test backend health and availability"""
-        print("🏥 Testing Backend Health...")
-        
-        # Test root endpoint
-        result = self.make_request("/")
-        if result['success']:
-            print(f"  ✅ Root endpoint accessible: {result['status']}")
-        else:
-            print(f"  ❌ Root endpoint failed: {result.get('error', 'Unknown error')}")
-        
-        # Test health endpoint if it exists
-        health_result = self.make_request("/health")
-        if health_result['success']:
-            print(f"  ✅ Health endpoint accessible: {health_result['status']}")
-        else:
-            print(f"  ⚠️ Health endpoint: {health_result.get('error', 'Not available')}")
-        
-        return result['success'] or health_result['success']
-    
-    def test_api_endpoints(self):
-        """Test key API endpoints"""
-        print("🔌 Testing API Endpoints...")
-        
-        endpoints = [
-            ("/api/portfolio/holdings", "GET", "Portfolio holdings"),
-            ("/api/ai/analyze", "POST", "AI analysis"),
-            ("/api/trading-engine/status", "GET", "Trading engine status"),
-            ("/api/trading-engine/strategies", "GET", "Trading strategies"),
-        ]
-        
-        results = {}
-        successful_tests = 0
-        
-        for endpoint, method, description in endpoints:
-            if method == "POST":
-                test_data = {"test": True, "integration_test": True}
-                result = self.make_request(endpoint, method, test_data)
-            else:
-                result = self.make_request(endpoint, method)
-            
-            results[endpoint] = result
-            
-            if result['success']:
-                print(f"  ✅ {description}: {result['status']}")
-                successful_tests += 1
-            else:
-                print(f"  ❌ {description}: {result.get('error', 'Failed')}")
-        
-        success_rate = (successful_tests / len(endpoints)) * 100
-        print(f"  📊 API Endpoint Success Rate: {success_rate:.1f}%")
-        
-        return results
-    
-    def test_database_operations(self):
-        """Test local database operations"""
-        print("💾 Testing Database Operations...")
-        
-        # Create temporary database
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tmp_db:
-            db_path = tmp_db.name
-        
-        try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            
-            # Create test table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS test_portfolios (
-                    id INTEGER PRIMARY KEY,
-                    user_id TEXT,
-                    symbol TEXT,
-                    quantity INTEGER,
-                    price REAL,
-                    timestamp TEXT
-                )
-            ''')
-            
-            # Test insertion
-            test_data = [
-                ('test_user_1', 'RELIANCE', 100, 2500.0, datetime.now().isoformat()),
-                ('test_user_1', 'TCS', 50, 3000.0, datetime.now().isoformat()),
-                ('test_user_2', 'INFY', 75, 1500.0, datetime.now().isoformat())
-            ]
-            
-            cursor.executemany(
-                'INSERT INTO test_portfolios (user_id, symbol, quantity, price, timestamp) VALUES (?, ?, ?, ?, ?)',
-                test_data
-            )
-            conn.commit()
-            print("  ✅ Data insertion successful")
-            
-            # Test retrieval
-            cursor.execute('SELECT COUNT(*) FROM test_portfolios')
-            count = cursor.fetchone()[0]
-            print(f"  ✅ Data retrieval successful: {count} records")
-            
-            # Test transaction
-            try:
-                cursor.execute('BEGIN TRANSACTION')
-                cursor.execute(
-                    'INSERT INTO test_portfolios (user_id, symbol, quantity, price, timestamp) VALUES (?, ?, ?, ?, ?)',
-                    ('test_user_3', 'HDFC', 25, 1800.0, datetime.now().isoformat())
-                )
-                cursor.execute('COMMIT')
-                print("  ✅ Transaction handling successful")
-            except Exception as e:
-                cursor.execute('ROLLBACK')
-                print(f"  ❌ Transaction failed: {e}")
-                return False
-            
-            conn.close()
-            return True
-            
-        except Exception as e:
-            print(f"  ❌ Database operations error: {e}")
-            return False
-        finally:
-            if os.path.exists(db_path):
-                os.unlink(db_path)
-    
-    def test_concurrent_requests(self):
-        """Test concurrent API requests"""
-        print("⚡ Testing Concurrent Requests...")
-        
-        def make_test_request(request_id):
-            """Make a single test request"""
-            endpoint = "/api/trading-engine/status"
-            result = self.make_request(endpoint)
-            return {
-                'request_id': request_id,
-                'success': result['success'],
-                'status': result['status'],
-                'response_time': time.time()
-            }
-        
-        # Execute concurrent requests
-        start_time = time.time()
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(make_test_request, i) for i in range(10)]
-            results = [future.result() for future in as_completed(futures)]
-        end_time = time.time()
-        
-        # Analyze results
-        successful_requests = sum(1 for r in results if r['success'])
-        total_requests = len(results)
-        total_time = end_time - start_time
-        
-        print(f"  ✅ Concurrent requests: {successful_requests}/{total_requests} successful")
-        print(f"  ⏱️ Total time: {total_time:.2f}s")
-        print(f"  📊 Average time per request: {total_time/total_requests:.2f}s")
-        
-        return successful_requests >= total_requests * 0.7  # 70% success rate
-    
-    def test_error_handling(self):
-        """Test error handling"""
-        print("🚨 Testing Error Handling...")
-        
-        # Test invalid endpoint
-        result = self.make_request("/api/nonexistent/endpoint")
-        if result['status'] == 404 or result['status'] == 'connection_error':
-            print("  ✅ 404 handling works correctly")
-        else:
-            print(f"  ⚠️ Unexpected response for invalid endpoint: {result['status']}")
-        
-        # Test malformed request
-        malformed_data = {"invalid": "data", "missing_fields": True}
-        result = self.make_request("/api/ai/analyze", "POST", malformed_data)
-        if result['status'] in [400, 422, 500, 'connection_error']:
-            print("  ✅ Malformed request handled appropriately")
-        else:
-            print(f"  ⚠️ Unexpected response for malformed request: {result['status']}")
-        
-        return True
+try:
+    from app.database.trading_engine_integration import TradingDatabaseIntegration
+    from app.trading_engine.optimized_order_db import OptimizedOrderDatabase
+    from app.trading_engine.models import (
+        Order, Position, Execution, TradingSignal,
+        OrderType, OrderSide, OrderStatus
+    )
+except ImportError as e:
+    print(f"Import error: {e}")
+    print("Make sure all required modules are available")
+    sys.exit(1)
 
-def test_git_repository_status():
-    """Test git repository status for deployment"""
-    print("🔄 Testing Git Repository Status...")
+async def test_basic_integration():
+    """Test basic integration functionality"""
+    print("🧪 Testing Trading Engine Database Integration...")
+    
+    # Create temporary database
+    temp_dir = tempfile.mkdtemp()
+    test_db_path = os.path.join(temp_dir, "test_integration.db")
     
     try:
-        # Check git status
-        result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True)
-        if result.returncode == 0:
-            if result.stdout.strip():
-                print("  📝 Uncommitted changes detected:")
-                for line in result.stdout.strip().split('\n'):
-                    print(f"    {line}")
-            else:
-                print("  ✅ No uncommitted changes")
-        else:
-            print("  ⚠️ Not in a git repository or git not available")
-            return False
+        print(f"📁 Using temporary database: {test_db_path}")
         
-        # Check current branch
-        result = subprocess.run(['git', 'branch', '--show-current'], capture_output=True, text=True)
-        if result.returncode == 0:
-            branch = result.stdout.strip()
-            print(f"  🌿 Current branch: {branch}")
+        # Initialize integration
+        print("🔧 Initializing database integration...")
+        integration = TradingDatabaseIntegration(test_db_path)
+        await integration.initialize()
+        print("✅ Database integration initialized")
         
-        # Check remote status
-        result = subprocess.run(['git', 'remote', '-v'], capture_output=True, text=True)
-        if result.returncode == 0 and result.stdout:
-            print("  🔗 Remote repositories configured")
+        # Initialize optimized database
+        print("🔧 Initializing optimized order database...")
+        optimized_db = OptimizedOrderDatabase()
+        optimized_db.integration = integration
+        await optimized_db.initialize()
+        print("✅ Optimized order database initialized")
+        
+        # Test 1: Order Operations
+        print("\n📋 Testing Order Operations...")
+        
+        test_order = Order(
+            id="test_order_001",
+            user_id="test_user_001",
+            symbol="AAPL",
+            order_type=OrderType.MARKET,
+            side=OrderSide.BUY,
+            quantity=100,
+            price=150.00
+        )
+        
+        # Create order
+        success = await optimized_db.create_order(test_order)
+        assert success, "❌ Order creation failed"
+        print("✅ Order created successfully")
+        
+        # Retrieve order
+        retrieved_order = await optimized_db.get_order(test_order.id)
+        assert retrieved_order is not None, "❌ Order retrieval failed"
+        assert retrieved_order.id == test_order.id, "❌ Order ID mismatch"
+        print("✅ Order retrieved successfully")
+        
+        # Update order
+        test_order.status = OrderStatus.FILLED
+        test_order.filled_quantity = 100
+        success = await optimized_db.update_order(test_order)
+        assert success, "❌ Order update failed"
+        print("✅ Order updated successfully")
+        
+        # Test 2: Position Operations
+        print("\n📊 Testing Position Operations...")
+        
+        test_position = Position(
+            id="test_position_001",
+            user_id="test_user_001",
+            symbol="AAPL",
+            quantity=100,
+            average_price=150.00,
+            current_price=155.00
+        )
+        
+        # Create position
+        success = await optimized_db.create_position(test_position)
+        assert success, "❌ Position creation failed"
+        print("✅ Position created successfully")
+        
+        # Retrieve position
+        retrieved_position = await optimized_db.get_position(
+            test_position.user_id, test_position.symbol
+        )
+        assert retrieved_position is not None, "❌ Position retrieval failed"
+        print("✅ Position retrieved successfully")
+        
+        # Test 3: Execution Operations
+        print("\n⚡ Testing Execution Operations...")
+        
+        test_execution = Execution(
+            id="test_execution_001",
+            order_id=test_order.id,
+            user_id="test_user_001",
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            quantity=100,
+            price=150.00,
+            commission=1.00
+        )
+        
+        # Record execution
+        success = await optimized_db.record_execution(test_execution)
+        assert success, "❌ Execution recording failed"
+        print("✅ Execution recorded successfully")
+        
+        # Retrieve executions
+        executions = await optimized_db.get_executions_by_order(test_order.id)
+        assert len(executions) == 1, "❌ Execution retrieval failed"
+        print("✅ Execution retrieved successfully")
+        
+        # Test 4: Signal Operations
+        print("\n📡 Testing Signal Operations...")
+        
+        test_signal = TradingSignal(
+            id="test_signal_001",
+            user_id="test_user_001",
+            symbol="AAPL",
+            signal_type="BUY",
+            confidence_score=0.85,
+            reasoning="Strong technical indicators"
+        )
+        
+        # Create signal
+        success = await optimized_db.create_trading_signal(test_signal)
+        assert success, "❌ Signal creation failed"
+        print("✅ Signal created successfully")
+        
+        # Retrieve active signals
+        signals = await optimized_db.get_active_signals("test_user_001")
+        assert len(signals) == 1, "❌ Signal retrieval failed"
+        print("✅ Signal retrieved successfully")
+        
+        # Test 5: Performance Metrics
+        print("\n📈 Testing Performance Metrics...")
+        
+        metrics = await optimized_db.get_performance_metrics()
+        assert isinstance(metrics, dict), "❌ Performance metrics retrieval failed"
+        print("✅ Performance metrics retrieved successfully")
+        
+        # Test 6: Health Status
+        print("\n🏥 Testing Health Status...")
+        
+        health = await optimized_db.get_health_status()
+        assert isinstance(health, dict), "❌ Health status retrieval failed"
+        assert health.get('initialized') is True, "❌ Database not properly initialized"
+        print("✅ Health status retrieved successfully")
+        
+        # Test 7: Transaction Operations
+        print("\n🔄 Testing Transaction Operations...")
+        
+        async with integration.optimized_transaction() as transaction_id:
+            assert transaction_id is not None, "❌ Transaction creation failed"
+            
+            # Execute a test query within transaction
+            result = await integration.db_manager.execute_query(
+                "SELECT COUNT(*) FROM orders WHERE user_id = ?",
+                ("test_user_001",),
+                transaction_id=transaction_id
+            )
+            assert result is not None, "❌ Transaction query failed"
+        
+        print("✅ Transaction operations successful")
+        
+        # Test 8: Bulk Operations
+        print("\n📦 Testing Bulk Operations...")
+        
+        # Create multiple orders
+        bulk_orders = []
+        for i in range(5):
+            order = Order(
+                id=f"bulk_order_{i:03d}",
+                user_id="test_user_001",
+                symbol=f"STOCK{i}",
+                order_type=OrderType.MARKET,
+                side=OrderSide.BUY,
+                quantity=100 * (i + 1)
+            )
+            bulk_orders.append(order)
+            success = await optimized_db.create_order(order)
+            assert success, f"❌ Bulk order {i} creation failed"
+        
+        # Retrieve user orders
+        user_orders = await optimized_db.get_orders_by_user("test_user_001")
+        assert len(user_orders) >= 5, "❌ Bulk order retrieval failed"
+        print("✅ Bulk operations successful")
+        
+        print("\n🎉 All integration tests passed successfully!")
+        
+        # Cleanup
+        await integration.shutdown()
+        print("✅ Database integration shutdown completed")
         
         return True
         
     except Exception as e:
-        print(f"  ❌ Git status check error: {e}")
+        print(f"\n❌ Integration test failed: {e}")
+        import traceback
+        traceback.print_exc()
         return False
+        
+    finally:
+        # Cleanup temp directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        print(f"🧹 Cleaned up temporary directory: {temp_dir}")
 
-def create_deployment_update_script():
-    """Create script to update backend deployment"""
-    print("📝 Creating Deployment Update Script...")
+async def test_performance_monitoring():
+    """Test performance monitoring functionality"""
+    print("\n📊 Testing Performance Monitoring...")
     
-    script_content = '''#!/bin/bash
-# Backend Deployment Update Script
-# This script commits changes and triggers Railway deployment
+    temp_dir = tempfile.mkdtemp()
+    test_db_path = os.path.join(temp_dir, "test_performance.db")
+    
+    try:
+        # Initialize integration
+        integration = TradingDatabaseIntegration(test_db_path)
+        await integration.initialize()
+        
+        # Test performance dashboard
+        from app.database.trading_performance_dashboard import TradingPerformanceDashboard
+        
+        dashboard = TradingPerformanceDashboard()
+        dashboard.integration = integration
+        
+        # Test dashboard data retrieval
+        dashboard_data = await dashboard.get_dashboard_data()
+        assert isinstance(dashboard_data, dict), "❌ Dashboard data retrieval failed"
+        print("✅ Performance dashboard data retrieved")
+        
+        # Test metrics collection
+        current_metrics = await dashboard.get_current_metrics()
+        assert isinstance(current_metrics, list), "❌ Current metrics retrieval failed"
+        print("✅ Current metrics retrieved")
+        
+        # Test performance summary
+        summary = await dashboard.get_performance_summary()
+        assert isinstance(summary, dict), "❌ Performance summary retrieval failed"
+        assert 'health_score' in summary, "❌ Health score missing from summary"
+        print("✅ Performance summary retrieved")
+        
+        # Test trading-specific metrics
+        trading_metrics = await dashboard.get_trading_specific_metrics()
+        assert isinstance(trading_metrics, dict), "❌ Trading metrics retrieval failed"
+        print("✅ Trading-specific metrics retrieved")
+        
+        print("✅ Performance monitoring tests passed")
+        
+        await integration.shutdown()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Performance monitoring test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+        
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
-echo "🚀 Starting Backend Deployment Update..."
-
-# Check for changes
-if [ -n "$(git status --porcelain)" ]; then
-    echo "📝 Committing changes..."
-    git add .
-    git commit -m "Update automated trading engine - $(date)"
-    
-    echo "📤 Pushing to repository..."
-    git push origin main
-    
-    echo "✅ Changes pushed to repository"
-    echo "🚂 Railway will automatically deploy the changes"
-    echo "⏳ Please wait 2-3 minutes for deployment to complete"
-else
-    echo "ℹ️ No changes to commit"
-fi
-
-echo "🔗 Railway App URL: https://quantum-leap-backend-production.up.railway.app"
-echo "📊 Check deployment status at: https://railway.app"
-'''
-    
-    with open('deploy_backend_update.sh', 'w') as f:
-        f.write(script_content)
-    
-    # Make script executable
-    os.chmod('deploy_backend_update.sh', 0o755)
-    
-    print("  ✅ Deployment script created: deploy_backend_update.sh")
-    return True
-
-def run_integration_tests():
+async def main():
     """Run all integration tests"""
-    print("🧪 Starting Integration Testing Suite...\n")
+    print("🚀 Starting Trading Engine Database Integration Tests")
+    print("=" * 60)
     
-    test_results = {}
+    # Test basic integration
+    basic_success = await test_basic_integration()
     
-    # Test 1: Git repository status
-    test_results['git_status'] = test_git_repository_status()
+    # Test performance monitoring
+    performance_success = await test_performance_monitoring()
     
-    # Test 2: Create deployment script
-    test_results['deployment_script'] = create_deployment_update_script()
+    print("\n" + "=" * 60)
+    print("📋 TEST SUMMARY")
+    print("=" * 60)
+    print(f"Basic Integration: {'✅ PASSED' if basic_success else '❌ FAILED'}")
+    print(f"Performance Monitoring: {'✅ PASSED' if performance_success else '❌ FAILED'}")
     
-    # Test 3: Database operations
-    test_results['database_operations'] = SimpleIntegrationTester().test_database_operations()
+    overall_success = basic_success and performance_success
     
-    # Test 4: Railway deployment
-    print("\n🚂 Testing Railway Deployment...")
-    railway_tester = SimpleIntegrationTester(RAILWAY_BASE_URL)
-    
-    # Test backend health
-    railway_health = railway_tester.test_backend_health()
-    test_results['railway_health'] = railway_health
-    
-    if railway_health:
-        print("  ✅ Railway deployment is accessible")
-        # Run additional tests
-        test_results['api_endpoints'] = railway_tester.test_api_endpoints()
-        test_results['concurrent_requests'] = railway_tester.test_concurrent_requests()
-        test_results['error_handling'] = railway_tester.test_error_handling()
+    if overall_success:
+        print("\n🎉 ALL TESTS PASSED!")
+        print("The trading engine database integration is working correctly.")
+        print("\nNext steps:")
+        print("1. Run the migration script: python app/database/migrate_trading_engine.py")
+        print("2. Update your trading engine components to use the optimized database")
+        print("3. Monitor performance using the dashboard")
     else:
-        print("  ⚠️ Railway deployment not accessible, testing local fallback...")
-        local_tester = SimpleIntegrationTester(LOCAL_BASE_URL)
-        local_health = local_tester.test_backend_health()
-        
-        if local_health:
-            print("  ✅ Local deployment accessible")
-            test_results['api_endpoints'] = local_tester.test_api_endpoints()
-            test_results['concurrent_requests'] = local_tester.test_concurrent_requests()
-            test_results['error_handling'] = local_tester.test_error_handling()
-        else:
-            print("  ❌ Neither Railway nor local deployment accessible")
-            test_results.update({
-                'api_endpoints': False,
-                'concurrent_requests': False,
-                'error_handling': False
-            })
+        print("\n❌ SOME TESTS FAILED!")
+        print("Please check the error messages above and fix any issues.")
     
-    return test_results
-
-def create_integration_summary(test_results):
-    """Create integration test summary"""
-    print("\n📄 Creating Integration Test Summary...")
-    
-    # Calculate success metrics
-    total_tests = len([k for k, v in test_results.items() if isinstance(v, bool)])
-    successful_tests = sum(1 for k, v in test_results.items() if isinstance(v, bool) and v)
-    success_rate = (successful_tests / total_tests * 100) if total_tests > 0 else 0
-    
-    summary = {
-        "test_name": "Integration Testing Suite - Railway Deployment",
-        "test_date": datetime.now().isoformat(),
-        "status": "✅ COMPLETE" if success_rate >= 70 else "⚠️ NEEDS ATTENTION",
-        "success_rate": success_rate,
-        "railway_url": RAILWAY_BASE_URL,
-        "test_results": test_results
-    }
-    
-    with open('INTEGRATION_TESTING_RAILWAY_SUMMARY.md', 'w') as f:
-        f.write("# Integration Testing Suite - Railway Deployment Summary\n\n")
-        f.write(f"**Test Date:** {summary['test_date']}\n")
-        f.write(f"**Status:** {summary['status']}\n")
-        f.write(f"**Success Rate:** {success_rate:.1f}%\n")
-        f.write(f"**Railway URL:** {RAILWAY_BASE_URL}\n\n")
-        
-        f.write("## Test Results\n")
-        for test_name, result in test_results.items():
-            if isinstance(result, bool):
-                status = "✅" if result else "❌"
-                f.write(f"- {status} {test_name.replace('_', ' ').title()}\n")
-            elif isinstance(result, dict):
-                f.write(f"- 📊 {test_name.replace('_', ' ').title()}: Multiple endpoints tested\n")
-        
-        f.write("\n## Deployment Instructions\n\n")
-        f.write("### To Update Backend Deployment:\n")
-        f.write("1. **Commit Changes**: Run `./deploy_backend_update.sh`\n")
-        f.write("2. **Monitor Deployment**: Check Railway dashboard\n")
-        f.write("3. **Verify Deployment**: Re-run integration tests\n\n")
-        
-        f.write("### Manual Deployment Steps:\n")
-        f.write("```bash\n")
-        f.write("# Commit and push changes\n")
-        f.write("git add .\n")
-        f.write('git commit -m "Update trading engine backend"\n')
-        f.write("git push origin main\n\n")
-        f.write("# Railway will automatically deploy\n")
-        f.write("# Check status at: https://railway.app\n")
-        f.write("```\n\n")
-        
-        f.write("## Integration Test Categories\n")
-        f.write("- **Git Repository**: Version control and deployment readiness\n")
-        f.write("- **Database Operations**: Local database functionality\n")
-        f.write("- **Railway Health**: Backend deployment accessibility\n")
-        f.write("- **API Endpoints**: Core API functionality\n")
-        f.write("- **Concurrent Requests**: Load handling capability\n")
-        f.write("- **Error Handling**: Graceful error management\n\n")
-        
-        f.write("## Next Steps\n")
-        if success_rate >= 80:
-            f.write("- ✅ System ready for production use\n")
-            f.write("- ✅ All critical integration points validated\n")
-            f.write("- 🚀 Proceed with user acceptance testing\n")
-        elif success_rate >= 60:
-            f.write("- ⚠️ System mostly functional with minor issues\n")
-            f.write("- 🔧 Address failed tests before full deployment\n")
-            f.write("- 📊 Monitor system performance closely\n")
-        else:
-            f.write("- ❌ System needs significant fixes\n")
-            f.write("- 🛠️ Address critical integration failures\n")
-            f.write("- 🔄 Re-run tests after fixes\n")
-    
-    print(f"📄 Integration summary saved to INTEGRATION_TESTING_RAILWAY_SUMMARY.md")
+    return overall_success
 
 if __name__ == "__main__":
-    print("🚀 Starting Integration Testing Suite for Railway Deployment...\n")
-    
-    try:
-        # Run integration tests
-        test_results = run_integration_tests()
-        
-        # Create summary
-        create_integration_summary(test_results)
-        
-        # Print final results
-        total_tests = len([k for k, v in test_results.items() if isinstance(v, bool)])
-        successful_tests = sum(1 for k, v in test_results.items() if isinstance(v, bool) and v)
-        success_rate = (successful_tests / total_tests * 100) if total_tests > 0 else 0
-        
-        print(f"\n📊 Integration Test Results:")
-        print(f"   Success Rate: {success_rate:.1f}%")
-        print(f"   Successful Tests: {successful_tests}/{total_tests}")
-        print(f"   Railway URL: {RAILWAY_BASE_URL}")
-        
-        if success_rate >= 70:
-            print("\n🎉 Integration testing completed successfully!")
-            print("✅ System ready for deployment validation!")
-            print("🚀 Use './deploy_backend_update.sh' to update Railway deployment")
-        else:
-            print(f"\n⚠️ Integration testing completed with issues.")
-            print("Please address failed tests before deployment.")
-        
-        sys.exit(0)
-        
-    except Exception as e:
-        print(f"\n❌ Integration testing failed: {e}")
-        sys.exit(1)
+    success = asyncio.run(main())
+    sys.exit(0 if success else 1)

@@ -1,0 +1,21 @@
+{
+  "database_path": "production_trading_optimized.db",
+  "connection_settings": {
+    "pool_size": 20,
+    "timeout_seconds": 30,
+    "retry_attempts": 3,
+    "retry_delay_seconds": 1
+  },
+  "optimization_settings": {
+    "enable_query_caching": true,
+    "cache_size_mb": 64,
+    "enable_wal_mode": true,
+    "enable_memory_temp_store": true,
+    "mmap_size_mb": 256
+  },
+  "performance_monitoring": {
+    "enabled": true,
+    "interval_seconds": 60,
+    "metrics_retention_days": 30
+  }
+}

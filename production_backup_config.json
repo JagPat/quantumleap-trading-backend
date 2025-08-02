@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "interval_hours": 6,
+  "retention_days": 30,
+  "backup_directory": "production_backups",
+  "compression": true,
+  "verify_backups": true
+}

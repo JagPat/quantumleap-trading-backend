@@ -1,0 +1,41 @@
+{
+  "core_files": {
+    "railway_main_optimized.py": "main.py",
+    "requirements_railway.txt": "requirements.txt",
+    "Dockerfile_railway": "Dockerfile",
+    "railway.toml": "railway.toml"
+  },
+  "database_optimization": {
+    "app/database/trading_engine_integration.py": "app/database/trading_engine_integration.py",
+    "app/database/optimized_manager.py": "app/database/optimized_manager.py",
+    "app/database/trading_performance_dashboard.py": "app/database/trading_performance_dashboard.py",
+    "app/database/performance_analysis_tools.py": "app/database/performance_analysis_tools.py",
+    "app/database/load_testing_framework.py": "app/database/load_testing_framework.py",
+    "app/database/backup_recovery_system.py": "app/database/backup_recovery_system.py",
+    "app/database/query_optimizer.py": "app/database/query_optimizer.py",
+    "app/database/performance_collector.py": "app/database/performance_collector.py",
+    "app/database/transaction_manager.py": "app/database/transaction_manager.py",
+    "app/database/data_validator.py": "app/database/data_validator.py",
+    "app/database/database_monitor.py": "app/database/database_monitor.py",
+    "app/database/alert_manager.py": "app/database/alert_manager.py",
+    "app/database/index_manager.py": "app/database/index_manager.py",
+    "app/database/data_lifecycle_manager.py": "app/database/data_lifecycle_manager.py",
+    "app/database/maintenance_system.py": "app/database/maintenance_system.py",
+    "app/database/error_handler.py": "app/database/error_handler.py",
+    "app/database/migration_engine.py": "app/database/migration_engine.py",
+    "app/database/schema_version_manager.py": "app/database/schema_version_manager.py",
+    "app/database/trading_schema.py": "app/database/trading_schema.py"
+  },
+  "trading_engine": {
+    "app/trading_engine/optimized_order_db.py": "app/trading_engine/optimized_order_db.py",
+    "app/trading_engine/models.py": "app/trading_engine/models.py",
+    "app/trading_engine/position_manager.py": "app/trading_engine/position_manager.py",
+    "app/trading_engine/order_service.py": "app/trading_engine/order_service.py"
+  },
+  "configuration": {
+    "production_database_config.json": "production_database_config.json",
+    "production_monitoring_config.json": "production_monitoring_config.json",
+    "production_backup_config.json": "production_backup_config.json",
+    "API_DOCUMENTATION.md": "API_DOCUMENTATION.md"
+  }
+}
