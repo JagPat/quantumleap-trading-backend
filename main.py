@@ -1,157 +1,154 @@
+#!/usr/bin/env python3
 """
 Quantum Leap Trading Platform - Production Backend
-Restored working configuration from successful deployment
+Fixed version for Railway deployment with AI components
 """
+
 import os
+import sys
+import logging
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import uvicorn
 
-# Import AI components router
-try:
-    from app.ai_engine.ai_components_router import router as ai_components_router
-    AI_COMPONENTS_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: AI components router not available: {e}")
-    AI_COMPONENTS_AVAILABLE = False
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
+# Create FastAPI app
 app = FastAPI(
-    title="Quantum Leap Trading Platform", 
-    version="2.0.0",
-    description="Production trading platform backend - Working Configuration"
+    title="Quantum Leap Trading Platform",
+    description="AI-powered trading platform with comprehensive portfolio management",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Configure appropriately for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include AI components router if available
-if AI_COMPONENTS_AVAILABLE:
-    app.include_router(ai_components_router, prefix="/api")
-    print("✅ AI Components Router loaded successfully")
+# Health check endpoint (CRITICAL for Railway deployment)
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Railway deployment"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "service": "quantum-leap-backend",
+        "version": "1.0.0",
+        "port": os.environ.get("PORT", "8000")
+    }
 
 @app.get("/")
 async def root():
+    """Root endpoint"""
     return {
         "message": "Quantum Leap Trading Platform API",
-        "version": "2.0.0",
         "status": "operational",
-        "environment": "railway-production",
-        "port": os.getenv("PORT", "8000"),
         "timestamp": datetime.now().isoformat(),
-        "deployment": "working-configuration"
+        "docs": "/docs",
+        "health": "/health",
+        "version": "1.0.0"
     }
 
-@app.get("/health")
-async def health_check():
+# Import and include routers with error handling
+routers_loaded = []
+
+try:
+    # Import new AI components router first
+    from app.ai_engine.ai_components_router import router as ai_components_router
+    app.include_router(ai_components_router, prefix="/api")
+    routers_loaded.append("AI Components")
+    logger.info("✅ AI Components router loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️  AI Components router not available: {str(e)}")
+
+try:
+    # Import existing routers
+    from app.portfolio.router import router as portfolio_router
+    app.include_router(portfolio_router, prefix="/api")
+    routers_loaded.append("Portfolio")
+    logger.info("✅ Portfolio router loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️  Portfolio router not available: {str(e)}")
+
+try:
+    from app.broker.router import router as broker_router
+    app.include_router(broker_router, prefix="/api")
+    routers_loaded.append("Broker")
+    logger.info("✅ Broker router loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️  Broker router not available: {str(e)}")
+
+try:
+    from app.trading_engine.simple_router import router as trading_engine_router
+    app.include_router(trading_engine_router, prefix="/api")
+    routers_loaded.append("Trading Engine")
+    logger.info("✅ Trading Engine router loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️  Trading Engine router not available: {str(e)}")
+
+try:
+    from app.ai_engine.simple_analysis_router import router as ai_router
+    app.include_router(ai_router, prefix="/api")
+    routers_loaded.append("AI Analysis")
+    logger.info("✅ AI Analysis router loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️  AI Analysis router not available: {str(e)}")
+
+# Status endpoint showing loaded routers
+@app.get("/status")
+async def status():
+    """Status endpoint showing loaded components"""
     return {
-        "status": "healthy",
-        "port": os.getenv("PORT", "8000"),
+        "status": "operational",
         "timestamp": datetime.now().isoformat(),
-        "deployment": "working-configuration"
+        "routers_loaded": routers_loaded,
+        "total_routers": len(routers_loaded),
+        "environment": os.environ.get("RAILWAY_ENVIRONMENT", "development"),
+        "port": os.environ.get("PORT", "8000")
     }
 
-@app.get("/api/database/performance")
-async def get_database_performance():
-    return {
-        "success": True,
-        "data": {
-            "query_latency_ms": 45.2,
-            "throughput_ops_per_sec": 1250,
-            "cache_hit_rate_percent": 87.5,
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.error(f"Global exception: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "message": "Internal server error",
             "timestamp": datetime.now().isoformat()
         }
-    }
-
-@app.get("/api/database/dashboard")
-async def get_performance_dashboard():
-    return {
-        "success": True,
-        "data": {
-            "health_score": 95.2,
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat()
-        }
-    }
-
-@app.get("/api/database/health")
-async def get_database_health():
-    return {
-        "success": True,
-        "data": {
-            "status": "healthy",
-            "connection_status": "connected",
-            "database_size_mb": 156.8,
-            "last_backup": datetime.now().isoformat(),
-            "uptime_hours": 24.5
-        }
-    }
-
-@app.post("/api/database/backup")
-async def create_database_backup():
-    backup_name = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    return {
-        "success": True,
-        "message": f"Backup created: {backup_name}",
-        "backup_id": backup_name
-    }
-
-@app.get("/api/trading/orders/{user_id}")
-async def get_user_orders(user_id: str):
-    return {
-        "success": True,
-        "data": [{
-            "id": "order_001",
-            "user_id": user_id,
-            "symbol": "AAPL",
-            "side": "BUY",
-            "quantity": 100,
-            "price": 150.00,
-            "status": "FILLED",
-            "created_at": datetime.now().isoformat()
-        }]
-    }
-
-@app.get("/api/trading/positions/{user_id}")
-async def get_user_positions(user_id: str):
-    return {
-        "success": True,
-        "data": [{
-            "id": "pos_001",
-            "user_id": user_id,
-            "symbol": "AAPL",
-            "quantity": 100,
-            "average_price": 150.00,
-            "current_price": 155.00,
-            "unrealized_pnl": 500.00
-        }]
-    }
-
-@app.get("/api/trading/signals/{user_id}")
-async def get_active_signals(user_id: str):
-    return {
-        "success": True,
-        "data": [{
-            "id": "signal_001",
-            "user_id": user_id,
-            "symbol": "AAPL",
-            "signal_type": "BUY",
-            "confidence_score": 0.85,
-            "reasoning": "Strong technical indicators"
-        }]
-    }
+    )
 
 if __name__ == "__main__":
-    # Working port handling (exactly like successful deployment)
-    try:
-        port = int(os.getenv("PORT", 8000))
-    except (ValueError, TypeError):
-        port = 8000
+    # Get port from environment variable (Railway sets this)
+    port = int(os.environ.get("PORT", 8000))
+    host = "0.0.0.0"  # CRITICAL: Must bind to 0.0.0.0 for Railway
     
-    print(f"🚀 Starting production server on port {port}")
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    logger.info(f"🚀 Starting Quantum Leap Trading Platform")
+    logger.info(f"   Host: {host}")
+    logger.info(f"   Port: {port}")
+    logger.info(f"   Routers loaded: {len(routers_loaded)}")
+    logger.info(f"   Environment: {os.environ.get('RAILWAY_ENVIRONMENT', 'development')}")
+    
+    # Run with uvicorn
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=port,
+        log_level="info",
+        access_log=True
+    )
