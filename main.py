@@ -135,12 +135,25 @@ async def global_exception_handler(request, exc):
 
 if __name__ == "__main__":
     # Get port from environment variable (Railway sets this)
-    port = int(os.environ.get("PORT", 8000))
+    port_env = os.environ.get("PORT", "8000")
+    
+    # Handle empty PORT environment variable
+    if not port_env or port_env.strip() == "":
+        port = 8000
+        logger.warning("PORT environment variable is empty, using default: 8000")
+    else:
+        try:
+            port = int(port_env)
+        except ValueError:
+            port = 8000
+            logger.warning(f"Invalid PORT value '{port_env}', using default: 8000")
+    
     host = "0.0.0.0"  # CRITICAL: Must bind to 0.0.0.0 for Railway
     
     logger.info(f"🚀 Starting Quantum Leap Trading Platform")
     logger.info(f"   Host: {host}")
     logger.info(f"   Port: {port}")
+    logger.info(f"   PORT env: '{port_env}'")
     logger.info(f"   Routers loaded: {len(routers_loaded)}")
     logger.info(f"   Environment: {os.environ.get('RAILWAY_ENVIRONMENT', 'development')}")
     
