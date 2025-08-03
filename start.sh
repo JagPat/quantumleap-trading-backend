@@ -1,18 +1,24 @@
 #!/bin/bash
-# Railway Start Script
+# Railway Start Script - Permanent Solution
 set -e
 
 echo "🚀 Starting Quantum Leap Trading Backend on Railway..."
-echo "📍 Port: ${PORT:-8000}"
+echo "📍 Raw PORT value: '${PORT}'"
 echo "🕐 Time: $(date)"
 
-# Ensure port is properly set
+# Validate and set PORT with proper integer handling
 if [ -z "$PORT" ]; then
-    export PORT=8000
-    echo "⚠️  PORT not set, defaulting to 8000"
+    VALIDATED_PORT=8000
+    echo "⚠️  PORT not set, using default: $VALIDATED_PORT"
+elif ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
+    VALIDATED_PORT=8000
+    echo "⚠️  PORT '$PORT' is not a valid integer, using default: $VALIDATED_PORT"
 else
-    echo "✅ PORT set to: $PORT"
+    VALIDATED_PORT=$PORT
+    echo "✅ PORT validated: $VALIDATED_PORT"
 fi
 
-# Start the application with proper port handling
-exec uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
+echo "🚀 Starting uvicorn with port: $VALIDATED_PORT"
+
+# Start the application with validated port
+exec uvicorn main:app --host 0.0.0.0 --port $VALIDATED_PORT --workers 1
