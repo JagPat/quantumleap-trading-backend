@@ -1,5 +1,5 @@
 """
-Quantum Leap Trading Platform - Test Backend
+Quantum Leap Trading Platform - Railway Optimized Backend
 """
 import os
 from datetime import datetime
@@ -7,7 +7,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-app = FastAPI(title="Quantum Leap Trading Platform", version="2.0.0")
+app = FastAPI(
+    title="Quantum Leap Trading Platform", 
+    version="2.0.0",
+    description="Railway-optimized trading platform backend"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +27,8 @@ async def root():
         "message": "Quantum Leap Trading Platform API",
         "version": "2.0.0",
         "status": "operational",
+        "environment": "railway",
+        "port": os.getenv("PORT", "8000"),
         "timestamp": datetime.now().isoformat()
     }
 
@@ -30,6 +36,7 @@ async def root():
 async def health_check():
     return {
         "status": "healthy",
+        "port": os.getenv("PORT", "8000"),
         "timestamp": datetime.now().isoformat()
     }
 
@@ -124,5 +131,12 @@ async def get_active_signals(user_id: str):
     }
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    # Railway-safe port handling
+    try:
+        port = int(os.getenv("PORT", 8000))
+    except (ValueError, TypeError):
+        print("⚠️  Invalid PORT value, using default 8000")
+        port = 8000
+    
+    print(f"🚀 Starting server on port {port}")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, workers=1)
