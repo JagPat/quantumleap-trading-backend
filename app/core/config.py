@@ -105,14 +105,17 @@ class Settings(BaseSettings):
         default="http://localhost:5173",
         description="Frontend URL for CORS"
     )
-    cors_origins: List[str] = Field(
-        default=[
-            "https://quantum-leap-frontend.vercel.app",
-            "http://localhost:3000",
-            "http://localhost:5173"
-        ],
-        description="CORS allowed origins"
+    cors_origins: str = Field(
+        default="https://quantum-leap-frontend.vercel.app,http://localhost:3000,http://localhost:5173",
+        description="CORS allowed origins (comma-separated)"
     )
+    
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Convert comma-separated CORS origins to list"""
+        if not self.cors_origins:
+            return ["http://localhost:5173"]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
     
     class Config:
         env_file = ".env"
