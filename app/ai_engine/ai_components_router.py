@@ -84,7 +84,7 @@ class RiskSettings(BaseModel):
 
 class OptimizationAction(BaseModel):
     recommendation_id: int
-    action: str = Field(..., regex="^(apply|dismiss)$")
+    action: str = Field(..., pattern="^(apply|dismiss)$")
 
 # ============================================================================
 # AI CHAT ENDPOINTS
