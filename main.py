@@ -1,6 +1,6 @@
 """
 Quantum Leap Trading Platform - Production Backend
-Permanent Railway deployment solution
+Restored working configuration from successful deployment
 """
 import os
 from datetime import datetime
@@ -8,10 +8,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
+# Import AI components router
+try:
+    from app.ai_engine.ai_components_router import router as ai_components_router
+    AI_COMPONENTS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: AI components router not available: {e}")
+    AI_COMPONENTS_AVAILABLE = False
+
 app = FastAPI(
     title="Quantum Leap Trading Platform", 
     version="2.0.0",
-    description="Production trading platform backend"
+    description="Production trading platform backend - Working Configuration"
 )
 
 app.add_middleware(
@@ -22,6 +30,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include AI components router if available
+if AI_COMPONENTS_AVAILABLE:
+    app.include_router(ai_components_router, prefix="/api")
+    print("✅ AI Components Router loaded successfully")
+
 @app.get("/")
 async def root():
     return {
@@ -30,7 +43,8 @@ async def root():
         "status": "operational",
         "environment": "railway-production",
         "port": os.getenv("PORT", "8000"),
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "deployment": "working-configuration"
     }
 
 @app.get("/health")
@@ -38,7 +52,8 @@ async def health_check():
     return {
         "status": "healthy",
         "port": os.getenv("PORT", "8000"),
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "deployment": "working-configuration"
     }
 
 @app.get("/api/database/performance")
@@ -132,12 +147,11 @@ async def get_active_signals(user_id: str):
     }
 
 if __name__ == "__main__":
-    # Production-ready port handling
+    # Working port handling (exactly like successful deployment)
     try:
         port = int(os.getenv("PORT", 8000))
     except (ValueError, TypeError):
-        print("⚠️  Invalid PORT value, using default 8000")
         port = 8000
     
     print(f"🚀 Starting production server on port {port}")
-    uvicorn.run("main:app", host="0.0.0.0", port=port, workers=1)
+    uvicorn.run("main:app", host="0.0.0.0", port=port)

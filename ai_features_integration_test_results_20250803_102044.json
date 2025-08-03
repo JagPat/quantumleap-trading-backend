@@ -1,0 +1,261 @@
+{
+  "test_summary": {
+    "total_tests": 31,
+    "passed_tests": 10,
+    "failed_tests": 21,
+    "success_rate": 32.25806451612903,
+    "test_timestamp": "2025-08-03T10:20:44.218042"
+  },
+  "detailed_results": [
+    {
+      "test": "Backend API: AI Components Health Check",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"WDsw0AC6TaWYhjO6kNsGEQ\"}",
+      "timestamp": "2025-08-03T10:20:38.223873"
+    },
+    {
+      "test": "Backend API: AI Chat - Market Condition Query",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"7N5-KfqkROy8lc8wkNsGEQ\"}",
+      "timestamp": "2025-08-03T10:20:38.489363"
+    },
+    {
+      "test": "Backend API: AI Chat - Portfolio Risk Analysis with Session",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"Ps1DgMEDTQSx-ocUBdfYkw\"}",
+      "timestamp": "2025-08-03T10:20:38.884205"
+    },
+    {
+      "test": "Backend API: Get All Strategy Templates",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"iTZY9O9_ROSJgpBd9N7Bqw\"}",
+      "timestamp": "2025-08-03T10:20:39.267860"
+    },
+    {
+      "test": "Backend API: Deploy Strategy Template",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"mdTG3p-BTW2oHmg5vVzGSw\"}",
+      "timestamp": "2025-08-03T10:20:39.650004"
+    },
+    {
+      "test": "Backend API: Backtest Strategy Template",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"i8hIDRNJQvi5DCSTBdfYkw\"}",
+      "timestamp": "2025-08-03T10:20:39.882830"
+    },
+    {
+      "test": "Backend API: Market Intelligence - NIFTY50 Analysis",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"G_BiMkX0QUG7zOkLTUT29g\"}",
+      "timestamp": "2025-08-03T10:20:40.260589"
+    },
+    {
+      "test": "Backend API: Market Intelligence - BANKNIFTY Analysis",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"2r1MRTrfR_m5zCrh9N7Bqw\"}",
+      "timestamp": "2025-08-03T10:20:40.500261"
+    },
+    {
+      "test": "Backend API: Performance Analytics - 1 Month",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"rLV5gpQkTImFXwzrBdfYkw\"}",
+      "timestamp": "2025-08-03T10:20:40.745890"
+    },
+    {
+      "test": "Backend API: Performance Analytics - 3 Months",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"7qsGUPt6Qwepv8J5BdfYkw\"}",
+      "timestamp": "2025-08-03T10:20:40.985692"
+    },
+    {
+      "test": "Backend API: Get Current Risk Metrics",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"QGqsDn9JTdCrgr_M9N7Bqw\"}",
+      "timestamp": "2025-08-03T10:20:41.237187"
+    },
+    {
+      "test": "Backend API: Update Risk Management Settings",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"FyaoCcw_TzmH7YtfkeNF4A\"}",
+      "timestamp": "2025-08-03T10:20:41.638190"
+    },
+    {
+      "test": "Backend API: Learning Insights - 1 Month",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"90Jp2pmbQnS2_HenZqJw2A\"}",
+      "timestamp": "2025-08-03T10:20:42.041626"
+    },
+    {
+      "test": "Backend API: Learning Insights - 3 Months",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"E9MS9jdOTwakXUooZqJw2A\"}",
+      "timestamp": "2025-08-03T10:20:42.276125"
+    },
+    {
+      "test": "Backend API: Get Optimization Recommendations",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"GQgN5c62Tdi2gGyc9N7Bqw\"}",
+      "timestamp": "2025-08-03T10:20:42.558815"
+    },
+    {
+      "test": "Backend API: Dismiss Optimization Recommendation",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"8fBDzmN9Ro-mLWcuBdfYkw\"}",
+      "timestamp": "2025-08-03T10:20:42.793688"
+    },
+    {
+      "test": "Backend API: Comprehensive AI Analysis - 1 Month",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"u1aNdTwJTkyT5H4ikNsGEQ\"}",
+      "timestamp": "2025-08-03T10:20:43.045320"
+    },
+    {
+      "test": "Backend API: Comprehensive AI Analysis - 1 Week",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"JckGrZFNRzePXvsjBdfYkw\"}",
+      "timestamp": "2025-08-03T10:20:43.277705"
+    },
+    {
+      "test": "Backend API: Portfolio AI Analysis",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"cUl4p_5YRa6jH3E1BdfYkw\"}",
+      "timestamp": "2025-08-03T10:20:43.502926"
+    },
+    {
+      "test": "Backend API: Portfolio AI Recommendations",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"xGaYLzw-QC-Zx9CMUbHMkA\"}",
+      "timestamp": "2025-08-03T10:20:43.931903"
+    },
+    {
+      "test": "Frontend Component: AI Assistant",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "AI Assistant component accessible and loads correctly",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:43.932567"
+    },
+    {
+      "test": "Frontend Component: Strategy Generation",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "Strategy Generation component accessible and loads correctly",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:43.932583"
+    },
+    {
+      "test": "Frontend Component: Market Analysis",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "Market Analysis component accessible and loads correctly",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:43.932593"
+    },
+    {
+      "test": "Frontend Component: Trading Signals",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "Trading Signals component accessible and loads correctly",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:43.932603"
+    },
+    {
+      "test": "Frontend Component: Strategy Insights",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "Strategy Insights component accessible and loads correctly",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:43.932611"
+    },
+    {
+      "test": "Frontend Component: Feedback",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "Feedback component accessible and loads correctly",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:43.932619"
+    },
+    {
+      "test": "Frontend Component: Crowd Intelligence",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "Crowd Intelligence component accessible and loads correctly",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:43.932628"
+    },
+    {
+      "test": "Frontend Component: Strategy Templates",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "Strategy Templates component accessible and loads correctly",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:43.932636"
+    },
+    {
+      "test": "Frontend Component: Strategy Monitoring",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "Strategy Monitoring component accessible and loads correctly",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:43.932645"
+    },
+    {
+      "test": "Backend API: AI Configuration Health Check",
+      "status": "\u274c FAIL",
+      "success": false,
+      "message": "Status: 404",
+      "details": "{\"status\":\"error\",\"code\":404,\"message\":\"Application not found\",\"request_id\":\"_xVujb3mSiG3DPoP9N7Bqw\"}",
+      "timestamp": "2025-08-03T10:20:44.217282"
+    },
+    {
+      "test": "AI Settings UI in Settings Page",
+      "status": "\u2705 PASS",
+      "success": true,
+      "message": "AI configuration section accessible in Settings page",
+      "details": null,
+      "timestamp": "2025-08-03T10:20:44.217666"
+    }
+  ],
+  "backend_url": "https://quantum-leap-backend-production.up.railway.app",
+  "frontend_url": "http://localhost:5173"
+}
