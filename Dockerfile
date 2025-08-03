@@ -21,9 +21,11 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs /app/backups
 
-# Copy and make start script executable
+# Copy and make start scripts executable
 COPY start.sh /start.sh
+COPY railway_start.py /railway_start.py
 RUN chmod +x /start.sh
+RUN chmod +x /railway_start.py
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -36,5 +38,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Use Python directly with proper port handling
-CMD ["python", "main.py"]
+# Use Python start script for better error handling
+CMD ["python", "/railway_start.py"]
