@@ -1,67 +1,124 @@
 """
-Application Configuration
+Application Configuration - Pydantic v2 Compatible
 """
 
 import os
-from typing import Optional
+from typing import List, Optional
 
 try:
     from pydantic_settings import BaseSettings
+    from pydantic import Field
+    PYDANTIC_V2_AVAILABLE = True
 except ImportError:
-    # Fallback for deployment environments
-    import os
-    class BaseSettings:
-        def __init__(self, **kwargs):
-            # Set default values
-            self.database_url = os.getenv("DATABASE_URL", "sqlite:///./trading_app.db")
-            self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-            self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
-            self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-            self.google_api_key = os.getenv("GOOGLE_API_KEY", "")
-            self.kite_api_key = os.getenv("KITE_API_KEY", "")
-            self.kite_api_secret = os.getenv("KITE_API_SECRET", "")
-            self.kite_redirect_url = os.getenv("KITE_REDIRECT_URL", "http://localhost:8000/api/auth/callback")
-            self.encryption_key = os.getenv("ENCRYPTION_KEY", "HKQ5bWD9sbwXxKsWVuF57mVf6Ty_WtGtoX8GwPCmtD0=")
-            self.session_secret = os.getenv("SESSION_SECRET", "quantum-leap-secure-session-secret-2025")
-            self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-            self.database_path = os.getenv("DATABASE_PATH", "trading_app.db")
-            self.log_level = os.getenv("LOG_LEVEL", "INFO")
-            self.host = os.getenv("HOST", "0.0.0.0")
-            self.port = os.getenv("PORT", "8000")
-            
-            # Override with any provided kwargs
-            for key, value in kwargs.items():
-                setattr(self, key, value)
+    # Fallback for environments without pydantic-settings
+    from pydantic import BaseModel, Field
+    PYDANTIC_V2_AVAILABLE = False
+    
+    class BaseSettings(BaseModel):
+        class Config:
+            env_file = ".env"
+            case_sensitive = False
 
 class Settings(BaseSettings):
-    """Application settings"""
+    """Application settings - Pydantic v2 compatible"""
     
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        
-        # Set additional attributes that might not be in BaseSettings
-        if not hasattr(self, 'database_url'):
-            self.database_url = os.getenv("DATABASE_URL", "sqlite:///./quantum_leap.db")
-        if not hasattr(self, 'openai_api_key'):
-            self.openai_api_key = os.getenv("OPENAI_API_KEY")
-        if not hasattr(self, 'anthropic_api_key'):
-            self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not hasattr(self, 'google_api_key'):
-            self.google_api_key = os.getenv("GOOGLE_API_KEY")
-        if not hasattr(self, 'kite_api_key'):
-            self.kite_api_key = os.getenv("KITE_API_KEY")
-        if not hasattr(self, 'kite_api_secret'):
-            self.kite_api_secret = os.getenv("KITE_API_SECRET")
-        if not hasattr(self, 'environment'):
-            self.environment = os.getenv("ENVIRONMENT", "production")
-        if not hasattr(self, 'debug'):
-            self.debug = os.getenv("DEBUG", "false").lower() == "true"
-        if not hasattr(self, 'cors_origins'):
-            self.cors_origins = [
-                "https://quantum-leap-frontend.vercel.app",
-                "http://localhost:3000",
-                "http://localhost:5173"
-            ]
+    # Database settings
+    database_url: str = Field(
+        default="sqlite:///./quantum_leap.db",
+        description="Database connection URL"
+    )
+    database_path: str = Field(
+        default="quantum_leap.db",
+        description="SQLite database file path"
+    )
+    
+    # Redis settings
+    redis_url: str = Field(
+        default="redis://localhost:6379",
+        description="Redis connection URL"
+    )
+    
+    # AI API Keys
+    openai_api_key: Optional[str] = Field(
+        default=None,
+        description="OpenAI API key"
+    )
+    anthropic_api_key: Optional[str] = Field(
+        default=None,
+        description="Anthropic API key"
+    )
+    google_api_key: Optional[str] = Field(
+        default=None,
+        description="Google API key"
+    )
+    
+    # Kite Connect API settings
+    kite_api_key: Optional[str] = Field(
+        default=None,
+        description="Kite Connect API key"
+    )
+    kite_api_secret: Optional[str] = Field(
+        default=None,
+        description="Kite Connect API secret"
+    )
+    kite_redirect_url: str = Field(
+        default="http://localhost:8000/api/auth/callback",
+        description="Kite Connect redirect URL"
+    )
+    
+    # Security settings
+    encryption_key: str = Field(
+        default="HKQ5bWD9sbwXxKsWVuF57mVf6Ty_WtGtoX8GwPCmtD0=",
+        description="Encryption key for sensitive data"
+    )
+    session_secret: str = Field(
+        default="quantum-leap-secure-session-secret-2025",
+        description="Session secret key"
+    )
+    
+    # Application settings
+    environment: str = Field(
+        default="production",
+        description="Application environment"
+    )
+    debug: bool = Field(
+        default=False,
+        description="Debug mode"
+    )
+    log_level: str = Field(
+        default="INFO",
+        description="Logging level"
+    )
+    
+    # Server settings
+    host: str = Field(
+        default="0.0.0.0",
+        description="Server host"
+    )
+    port: str = Field(
+        default="8000",
+        description="Server port"
+    )
+    
+    # Frontend settings
+    frontend_url: str = Field(
+        default="http://localhost:5173",
+        description="Frontend URL for CORS"
+    )
+    cors_origins: List[str] = Field(
+        default=[
+            "https://quantum-leap-frontend.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:5173"
+        ],
+        description="CORS allowed origins"
+    )
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+        # Allow environment variables to override defaults
+        env_prefix = ""
 
 # Global settings instance
 settings = Settings()
