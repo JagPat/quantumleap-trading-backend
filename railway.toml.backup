@@ -1,6 +1,5 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile.emergency"
 
 [deploy]
 healthcheckPath = "/health"
@@ -8,7 +7,7 @@ healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 
-# Let Railway handle PORT completely
+# Railway will automatically set PORT, but we can provide a default
 [env]
 PYTHONPATH = "/app"
 PYTHONUNBUFFERED = "1"
