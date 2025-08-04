@@ -22,6 +22,9 @@ import json
 import logging
 from enum import Enum
 
+# Configure logging first
+logger = logging.getLogger(__name__)
+
 # Import authentication middleware
 try:
     from app.core.auth import get_current_user_id, verify_jwt_token
