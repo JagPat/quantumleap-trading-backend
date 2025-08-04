@@ -8,7 +8,7 @@ from ..core.config import settings
 from datetime import datetime
 import json
 
-router = APIRouter(prefix="/api/portfolio", tags=["Portfolio"])
+router = APIRouter(prefix="/portfolio", tags=["Portfolio"])
 
 @router.post("/fetch-live", response_model=FetchResponse)
 async def fetch_live_portfolio(user_id: str = Depends(get_user_from_headers)):

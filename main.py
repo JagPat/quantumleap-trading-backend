@@ -97,7 +97,7 @@ except ImportError as e:
 
 try:
     from app.broker.router import router as broker_router
-    app.include_router(broker_router, prefix="/api")
+    app.include_router(broker_router)
     routers_loaded.append("Broker")
     logger.info("✅ Broker router loaded successfully")
 except ImportError as e:
@@ -105,7 +105,7 @@ except ImportError as e:
 
 try:
     from app.trading_engine.simple_router import router as trading_engine_router
-    app.include_router(trading_engine_router, prefix="/api")
+    app.include_router(trading_engine_router)
     routers_loaded.append("Trading Engine")
     logger.info("✅ Trading Engine router loaded successfully")
 except ImportError as e:
