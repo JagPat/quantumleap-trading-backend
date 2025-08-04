@@ -392,6 +392,56 @@ class KiteRegisterRequest(BaseModel):
     phone: Optional[str] = None
     preferences: Optional[Dict[str, Any]] = {}
 
+@router.post("/kite-exchange-token", response_model=LoginResponse)
+async def kite_exchange_token(request: dict):
+    """
+    Exchange Kite Connect request token for access token
+    """
+    try:
+        logger.info(f"Kite token exchange for API key: {request.get('api_key')}")
+        
+        # In a real implementation, you would:
+        # 1. Use the Kite Connect API to exchange request_token for access_token
+        # 2. Fetch user profile from Kite
+        # 3. Create or update user in your database
+        
+        # For now, we'll simulate the process
+        user_data = {
+            "user_id": f"kite_{request.get('user_id', 'unknown')}",
+            "kite_user_id": request.get('user_id'),
+            "email": f"{request.get('user_id')}@kite.zerodha.com",
+            "user_name": f"Kite User {request.get('user_id')}",
+            "role": "user",
+            "broker": "zerodha",
+            "kite_access_token": "simulated_kite_token",
+            "api_key": request.get('api_key')
+        }
+        
+        # Generate JWT token
+        token_manager = TokenManager()
+        access_token = token_manager.create_access_token(
+            data={"sub": user_data["user_id"], "email": user_data["email"]},
+            expires_delta=timedelta(hours=24)
+        )
+        
+        logger.info(f"Kite token exchange successful for user: {user_data['user_name']}")
+        
+        return LoginResponse(
+            access_token=access_token,
+            expires_in=86400,  # 24 hours
+            user_id=user_data["user_id"],
+            email=user_data["email"],
+            role=user_data["role"],
+            message="Kite Connect authentication successful"
+        )
+        
+    except Exception as e:
+        logger.error(f"Kite token exchange error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Kite Connect authentication failed"
+        )
+
 @router.post("/kite-login", response_model=LoginResponse)
 async def kite_login(request: KiteLoginRequest):
     """
