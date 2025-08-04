@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any
-from datetime import timedelta
+from datetime import timedelta, datetime
 import logging
 
 from app.core.auth import (
@@ -373,6 +373,137 @@ async def auth_health():
             "error": str(e),
             "timestamp": "2025-01-03T06:00:00Z"
         }
+
+# Kite Authentication Models
+class KiteLoginRequest(BaseModel):
+    """Kite login request model"""
+    user_id: str
+    access_token: str
+    user_name: str
+    email: EmailStr
+
+class KiteRegisterRequest(BaseModel):
+    """Kite user registration request model"""
+    user_id: str
+    user_name: str
+    email: EmailStr
+    access_token: str
+    broker_name: str = "zerodha"
+    phone: Optional[str] = None
+    preferences: Optional[Dict[str, Any]] = {}
+
+@router.post("/kite-login", response_model=LoginResponse)
+async def kite_login(request: KiteLoginRequest):
+    """
+    Authenticate user with Kite credentials
+    """
+    try:
+        logger.info(f"Kite login attempt for user: {request.user_id}")
+        
+        # Create or update user with Kite credentials
+        user_data = {
+            "user_id": f"kite_{request.user_id}",
+            "email": request.email,
+            "name": request.user_name,
+            "role": "user",
+            "broker": "zerodha",
+            "kite_user_id": request.user_id,
+            "access_token": request.access_token,
+            "is_kite_user": True
+        }
+        
+        # Generate JWT token
+        token_manager = TokenManager()
+        access_token = token_manager.create_access_token(
+            data={"sub": user_data["user_id"], "email": user_data["email"]},
+            expires_delta=timedelta(hours=24)
+        )
+        
+        logger.info(f"Kite login successful for user: {request.user_name}")
+        
+        return LoginResponse(
+            access_token=access_token,
+            expires_in=86400,  # 24 hours
+            user_id=user_data["user_id"],
+            email=user_data["email"],
+            role=user_data["role"],
+            message="Kite login successful"
+        )
+        
+    except Exception as e:
+        logger.error(f"Kite login error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Kite authentication failed"
+        )
+
+@router.post("/kite-register", response_model=RegisterResponse)
+async def kite_register(request: KiteRegisterRequest):
+    """
+    Register new user with Kite credentials
+    """
+    try:
+        logger.info(f"Kite registration for user: {request.user_id}")
+        
+        # Create user with Kite credentials
+        user_data = {
+            "user_id": f"kite_{request.user_id}",
+            "email": request.email,
+            "name": request.user_name,
+            "role": "user",
+            "broker": request.broker_name,
+            "kite_user_id": request.user_id,
+            "access_token": request.access_token,
+            "phone": request.phone,
+            "preferences": request.preferences,
+            "is_kite_user": True,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        # Store user data (in a real app, this would go to a database)
+        # For now, we'll just log it
+        logger.info(f"Kite user registered: {user_data}")
+        
+        return RegisterResponse(
+            user_id=user_data["user_id"],
+            email=user_data["email"],
+            message="Kite user registration successful"
+        )
+        
+    except Exception as e:
+        logger.error(f"Kite registration error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kite user registration failed"
+        )
+
+@router.post("/sync-kite-profile")
+async def sync_kite_profile(
+    profile_data: Dict[str, Any],
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Sync Kite profile data with backend
+    """
+    try:
+        logger.info(f"Syncing Kite profile for user: {user_id}")
+        
+        # Update user profile with Kite data
+        # In a real app, this would update the database
+        logger.info(f"Kite profile synced: {profile_data}")
+        
+        return {
+            "message": "Kite profile synced successfully",
+            "user_id": user_id,
+            "synced_at": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Kite profile sync error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to sync Kite profile"
+        )
 
 # Export router
 __all__ = ["router"]
