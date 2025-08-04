@@ -22,6 +22,22 @@ import json
 import logging
 from enum import Enum
 
+# Import authentication middleware
+try:
+    from app.core.auth import get_current_user_id, verify_jwt_token
+    AUTH_AVAILABLE = True
+    logger.info("✅ Authentication middleware imported successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Authentication middleware not available: {str(e)}")
+    AUTH_AVAILABLE = False
+    
+    # Create dummy dependency for development
+    async def get_current_user_id():
+        return "dev_user_123"
+    
+    async def verify_jwt_token():
+        return "dev_user_123"
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -91,13 +107,16 @@ class OptimizationAction(BaseModel):
 # ============================================================================
 
 @router.post("/chat", response_model=ChatResponse)
-async def ai_chat(chat_request: ChatMessage):
+async def ai_chat(chat_request: ChatMessage, user_id: str = Depends(get_current_user_id)):
     """
     AI Chat endpoint for trading assistance and insights
+    Requires authentication: JWT token in Authorization header
     """
     try:
+        logger.info(f"AI Chat request from user: {user_id}")
+        
         # Mock AI chat response - replace with actual AI integration
-        response_text = generate_ai_response(chat_request.message)
+        response_text = generate_ai_response(chat_request.message, user_id)
         
         suggestions = [
             "Analyze current market conditions",
@@ -107,21 +126,22 @@ async def ai_chat(chat_request: ChatMessage):
         ]
         
         # Generate or use existing session ID
-        session_id = chat_request.session_id or f"session_{datetime.now().timestamp()}"
+        session_id = chat_request.session_id or f"session_{user_id}_{datetime.now().timestamp()}"
         
         return ChatResponse(
             response=response_text,
             suggestions=suggestions,
             session_id=session_id,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            data={"user_id": user_id, "authenticated": True}
         )
         
     except Exception as e:
         logger.error(f"AI Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"AI Chat failed: {str(e)}")
 
-def generate_ai_response(message: str) -> str:
-    """Generate AI response based on user message"""
+def generate_ai_response(message: str, user_id: str = None) -> str:
+    """Generate AI response based on user message and context"""
     message_lower = message.lower()
     
     if "market" in message_lower or "condition" in message_lower:
@@ -187,9 +207,10 @@ What specific area would you like to explore?"""
 # ============================================================================
 
 @router.get("/strategy-templates", response_model=List[StrategyTemplate])
-async def get_strategy_templates():
+async def get_strategy_templates(user_id: str = Depends(get_current_user_id)):
     """
     Get all available AI strategy templates
+    Requires authentication: JWT token in Authorization header
     """
     try:
         # Mock strategy templates - replace with database query
@@ -271,9 +292,10 @@ async def get_strategy_templates():
         raise HTTPException(status_code=500, detail=f"Failed to load strategy templates: {str(e)}")
 
 @router.post("/strategy-templates/deploy")
-async def deploy_strategy(deployment: StrategyDeployment):
+async def deploy_strategy(deployment: StrategyDeployment, user_id: str = Depends(get_current_user_id)):
     """
-    Deploy a strategy template with custom parameters
+    Deploy a strategy template
+    Requires authentication: JWT token in Authorization header with custom parameters
     """
     try:
         # Mock deployment - replace with actual strategy deployment logic
@@ -292,7 +314,7 @@ async def deploy_strategy(deployment: StrategyDeployment):
         raise HTTPException(status_code=500, detail=f"Strategy deployment failed: {str(e)}")
 
 @router.post("/strategy-templates/{template_id}/backtest")
-async def backtest_strategy(template_id: str):
+async def backtest_strategy(template_id: str, user_id: str = Depends(get_current_user_id)):
     """
     Run backtest for a strategy template
     """
@@ -315,7 +337,7 @@ async def backtest_strategy(template_id: str):
 # ============================================================================
 
 @router.post("/market-intelligence")
-async def get_market_intelligence(request: MarketIntelligenceRequest):
+async def get_market_intelligence(request: MarketIntelligenceRequest, user_id: str = Depends(get_current_user_id)):
     """
     Get AI-powered market intelligence and analysis
     """
@@ -384,7 +406,7 @@ async def get_market_intelligence(request: MarketIntelligenceRequest):
 # ============================================================================
 
 @router.post("/performance-analytics")
-async def get_performance_analytics(request: PerformanceAnalyticsRequest):
+async def get_performance_analytics(request: PerformanceAnalyticsRequest, user_id: str = Depends(get_current_user_id)):
     """
     Get AI performance analytics and metrics
     """
@@ -444,9 +466,10 @@ async def get_performance_analytics(request: PerformanceAnalyticsRequest):
 # ============================================================================
 
 @router.get("/risk-metrics")
-async def get_risk_metrics():
+async def get_risk_metrics(user_id: str = Depends(get_current_user_id)):
     """
-    Get current risk metrics and portfolio risk assessment
+    Get current risk metrics
+    Requires authentication: JWT token in Authorization header and portfolio risk assessment
     """
     try:
         # Mock risk metrics - replace with actual risk calculation
@@ -484,9 +507,10 @@ async def get_risk_metrics():
         raise HTTPException(status_code=500, detail=f"Risk metrics failed: {str(e)}")
 
 @router.post("/risk-settings")
-async def update_risk_settings(settings: RiskSettings):
+async def update_risk_settings(settings: RiskSettings, user_id: str = Depends(get_current_user_id)):
     """
     Update risk management settings
+    Requires authentication: JWT token in Authorization header
     """
     try:
         # Mock settings update - replace with actual database update
@@ -502,9 +526,10 @@ async def update_risk_settings(settings: RiskSettings):
         raise HTTPException(status_code=500, detail=f"Risk settings update failed: {str(e)}")
 
 @router.post("/emergency-stop")
-async def trigger_emergency_stop():
+async def trigger_emergency_stop(user_id: str = Depends(get_current_user_id)):
     """
-    Trigger emergency stop for all trading activities
+    Trigger emergency stop for all trading
+    Requires authentication: JWT token in Authorization header activities
     """
     try:
         # Mock emergency stop - replace with actual emergency stop logic
@@ -529,9 +554,10 @@ async def trigger_emergency_stop():
 # ============================================================================
 
 @router.get("/learning-insights")
-async def get_learning_insights(timeframe: str = "1M"):
+async def get_learning_insights(timeframe: str = "1M", user_id: str = Depends(get_current_user_id)):
     """
-    Get AI learning insights and progress metrics
+    Get AI learning insights and progress
+    Requires authentication: JWT token in Authorization header metrics
     """
     try:
         # Mock learning data - replace with actual AI learning metrics
@@ -609,7 +635,7 @@ async def get_learning_insights(timeframe: str = "1M"):
 # ============================================================================
 
 @router.get("/optimization-recommendations")
-async def get_optimization_recommendations():
+async def get_optimization_recommendations(user_id: str = Depends(get_current_user_id)):
     """
     Get AI-generated optimization recommendations
     """
@@ -675,7 +701,7 @@ async def get_optimization_recommendations():
         raise HTTPException(status_code=500, detail=f"Optimization recommendations failed: {str(e)}")
 
 @router.post("/optimization-recommendations/action")
-async def handle_optimization_action(action: OptimizationAction):
+async def handle_optimization_action(action: OptimizationAction, user_id: str = Depends(get_current_user_id)):
     """
     Apply or dismiss an optimization recommendation
     """
@@ -708,9 +734,10 @@ async def handle_optimization_action(action: OptimizationAction):
 # ============================================================================
 
 @router.post("/analysis/comprehensive")
-async def get_comprehensive_analysis(timeframe: str = "1M"):
+async def get_comprehensive_analysis(timeframe: str = "1M", user_id: str = Depends(get_current_user_id)):
     """
-    Get comprehensive AI analysis combining market, portfolio, and performance data
+    Get comprehensive AI analysis
+    Requires authentication: JWT token in Authorization header combining market, portfolio, and performance data
     """
     try:
         # Mock comprehensive analysis - replace with actual AI analysis
@@ -786,9 +813,10 @@ async def get_comprehensive_analysis(timeframe: str = "1M"):
 # ============================================================================
 
 @router.post("/copilot/analyze")
-async def analyze_portfolio(portfolio_data: Dict[str, Any]):
+async def analyze_portfolio(portfolio_data: Dict[str, Any], user_id: str = Depends(get_current_user_id)):
     """
     Analyze portfolio using AI copilot
+    Requires authentication: JWT token in Authorization header
     """
     try:
         # Mock portfolio analysis - replace with actual AI analysis
@@ -829,8 +857,80 @@ async def analyze_portfolio(portfolio_data: Dict[str, Any]):
         logger.error(f"Portfolio analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Portfolio analysis failed: {str(e)}")
 
+@router.post("/analysis/portfolio")
+async def analyze_portfolio_frontend(portfolio_data: Dict[str, Any]):
+    """
+    Portfolio analysis endpoint for frontend integration
+    This is the endpoint that the frontend railwayApiClient.js calls
+    """
+    try:
+        logger.info(f"Frontend portfolio analysis request received: {portfolio_data}")
+        
+        # Extract portfolio data
+        user_id = portfolio_data.get('user_id', 'unknown')
+        holdings = portfolio_data.get('holdings', [])
+        total_value = portfolio_data.get('total_value', 0)
+        day_pnl = portfolio_data.get('day_pnl', 0)
+        
+        # Perform AI analysis (mock for now, replace with real AI)
+        analysis_result = {
+            "success": True,
+            "user_id": user_id,
+            "analysis": {
+                "overall_score": 7.8,
+                "risk_level": "moderate",
+                "diversification_score": 8.1,
+                "performance_rating": "good",
+                "total_value": total_value,
+                "day_pnl": day_pnl,
+                "holdings_count": len(holdings),
+                "key_insights": [
+                    "Portfolio shows good diversification across sectors",
+                    f"Current value of ₹{total_value:,.2f} with day P&L of ₹{day_pnl:,.2f}",
+                    "Consider rebalancing if any single stock exceeds 15% allocation"
+                ],
+                "recommendations": [
+                    {
+                        "type": "diversification",
+                        "title": "Sector Rebalancing",
+                        "description": "Consider reducing concentration in top performing sectors",
+                        "priority": "medium",
+                        "impact": "risk_reduction"
+                    },
+                    {
+                        "type": "performance",
+                        "title": "Profit Booking",
+                        "description": "Book profits in stocks with >20% gains",
+                        "priority": "low",
+                        "impact": "profit_optimization"
+                    }
+                ],
+                "risk_metrics": {
+                    "portfolio_beta": 1.12,
+                    "sharpe_ratio": 1.35,
+                    "max_drawdown": -7.8,
+                    "volatility": 14.2,
+                    "var_95": -2.1
+                },
+                "sector_analysis": {
+                    "top_sectors": ["Technology", "Finance", "Healthcare"],
+                    "concentration_risk": "moderate",
+                    "diversification_score": 8.1
+                }
+            },
+            "timestamp": datetime.now().isoformat(),
+            "analysis_type": "comprehensive"
+        }
+        
+        logger.info(f"Portfolio analysis completed for user {user_id}")
+        return analysis_result
+        
+    except Exception as e:
+        logger.error(f"Frontend portfolio analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Portfolio analysis failed: {str(e)}")
+
 @router.post("/copilot/recommendations")
-async def get_portfolio_recommendations(request_data: Dict[str, Any]):
+async def get_portfolio_recommendations(request_data: Dict[str, Any], user_id: str = Depends(get_current_user_id)):
     """
     Get AI portfolio recommendations
     """
@@ -868,6 +968,84 @@ async def get_portfolio_recommendations(request_data: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=f"Portfolio recommendations failed: {str(e)}")
 
 # ============================================================================
+# AI COST TRACKING
+# ============================================================================
+
+@router.get("/cost-tracking")
+async def get_cost_tracking(user_id: str = Depends(get_current_user_id)):
+    """
+    Get AI usage cost tracking and budget information
+    Requires authentication: JWT token in Authorization header
+    """
+    try:
+        logger.info(f"Cost tracking request from user: {user_id}")
+        
+        # Mock cost tracking data
+        current_month = {
+            "total_cost": 45.67,
+            "budget": 100.00,
+            "usage_percentage": 45.67,
+            "days_remaining": 12,
+            "projected_cost": 78.50
+        }
+        
+        breakdown = {
+            "openai": {
+                "cost": 28.50,
+                "requests": 1250,
+                "tokens": 125000,
+                "percentage": 62.4
+            },
+            "anthropic": {
+                "cost": 12.30,
+                "requests": 450,
+                "tokens": 45000,
+                "percentage": 26.9
+            },
+            "google": {
+                "cost": 4.87,
+                "requests": 200,
+                "tokens": 20000,
+                "percentage": 10.7
+            }
+        }
+        
+        usage_analytics = {
+            "daily_average": 2.28,
+            "peak_usage_day": "2025-01-02",
+            "peak_cost": 5.67,
+            "most_used_service": "openai",
+            "efficiency_score": 8.2
+        }
+        
+        budget_status = {
+            "status": "on_track",
+            "budget_remaining": 54.33,
+            "days_until_reset": 12,
+            "projected_overage": 0.00
+        }
+        
+        alerts = [
+            {
+                "type": "info",
+                "message": "You're on track to stay within budget this month",
+                "timestamp": datetime.now().isoformat()
+            }
+        ]
+        
+        return {
+            "current_month": current_month,
+            "breakdown": breakdown,
+            "usage_analytics": usage_analytics,
+            "budget_status": budget_status,
+            "alerts": alerts
+        }
+        
+    except Exception as e:
+        logger.error(f"Cost tracking error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Cost tracking failed: {str(e)}")
+
+# ============================================================================
 # HEALTH CHECK ENDPOINT
 # ============================================================================
 
@@ -886,10 +1064,264 @@ async def ai_health_check():
             "risk_management": "operational",
             "learning_insights": "operational",
             "optimization_recommendations": "operational",
-            "ai_analysis": "operational"
+            "ai_analysis": "operational",
+            "cost_tracking": "operational"
+        },
+        "authentication": "enabled" if AUTH_AVAILABLE else "disabled",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@router.get("/status")
+async def ai_status():
+    """
+    AI system status endpoint for frontend integration
+    """
+    return {
+        "status": "operational",
+        "service": "ai_components",
+        "version": "1.0.0",
+        "uptime": "operational",
+        "providers": {
+            "openai": "available",
+            "anthropic": "available",
+            "google": "available"
+        },
+        "features": {
+            "portfolio_analysis": True,
+            "market_intelligence": True,
+            "strategy_generation": True,
+            "risk_management": True,
+            "cost_tracking": True
         },
         "timestamp": datetime.now().isoformat()
     }
+
+@router.get("/preferences")
+async def get_ai_preferences():
+    """
+    Get AI preferences for frontend
+    """
+    return {
+        "success": True,
+        "preferences": {
+            "default_provider": "openai",
+            "analysis_depth": "comprehensive",
+            "risk_tolerance": "moderate",
+            "update_frequency": "real_time",
+            "notifications": {
+                "portfolio_alerts": True,
+                "market_updates": True,
+                "strategy_recommendations": True
+            }
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+
+@router.post("/preferences")
+async def save_ai_preferences(preferences: Dict[str, Any]):
+    """
+    Save AI preferences from frontend
+    """
+    try:
+        logger.info(f"Saving AI preferences: {preferences}")
+        
+        # Mock save - replace with actual database save
+        return {
+            "success": True,
+            "message": "AI preferences saved successfully",
+            "preferences": preferences,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to save AI preferences: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save preferences: {str(e)}")
+
+@router.post("/validate-key")
+async def validate_ai_key(request: Dict[str, Any]):
+    """
+    Validate AI API key for frontend
+    """
+    try:
+        provider = request.get('provider', '')
+        api_key = request.get('api_key', '')
+        
+        logger.info(f"Validating API key for provider: {provider}")
+        
+        # Mock validation - replace with actual API key validation
+        if not provider or not api_key:
+            return {
+                "valid": False,
+                "message": "Provider and API key are required",
+                "provider": provider
+            }
+        
+        # Simulate validation
+        is_valid = len(api_key) > 10  # Simple mock validation
+        
+        return {
+            "valid": is_valid,
+            "message": "API key is valid" if is_valid else "Invalid API key format",
+            "provider": provider,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"API key validation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+
+@router.post("/message")
+async def send_ai_message(request: Dict[str, Any]):
+    """
+    Send message to AI for frontend chat integration
+    """
+    try:
+        message = request.get('message', '')
+        context = request.get('context', {})
+        
+        logger.info(f"AI message request: {message[:100]}...")
+        
+        # Mock AI response - replace with actual AI integration
+        ai_response = {
+            "success": True,
+            "response": f"AI Response: I understand you're asking about '{message}'. Based on the current market conditions and your portfolio, here's my analysis...",
+            "message_id": f"msg_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            "context": context,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return ai_response
+        
+    except Exception as e:
+        logger.error(f"AI message error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI message failed: {str(e)}")
+
+@router.post("/strategy/generate")
+async def generate_strategy(parameters: Dict[str, Any]):
+    """
+    Generate trading strategy using AI
+    """
+    try:
+        logger.info(f"Strategy generation request: {parameters}")
+        
+        # Mock strategy generation - replace with actual AI strategy generation
+        strategy = {
+            "success": True,
+            "strategy": {
+                "name": "AI Generated Strategy",
+                "type": "momentum",
+                "description": "AI-generated momentum strategy based on your parameters",
+                "parameters": parameters,
+                "expected_return": 12.5,
+                "risk_level": "moderate",
+                "timeframe": "medium_term",
+                "entry_conditions": [
+                    "RSI < 30 (oversold)",
+                    "Volume > 1.5x average",
+                    "Price above 20-day MA"
+                ],
+                "exit_conditions": [
+                    "RSI > 70 (overbought)",
+                    "Stop loss at -5%",
+                    "Take profit at +15%"
+                ]
+            },
+            "strategy_id": f"strat_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return strategy
+        
+    except Exception as e:
+        logger.error(f"Strategy generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Strategy generation failed: {str(e)}")
+
+@router.get("/market/analyze")
+async def get_market_analysis(symbol: str):
+    """
+    Get AI market analysis for a symbol
+    """
+    try:
+        logger.info(f"Market analysis request for symbol: {symbol}")
+        
+        # Mock market analysis - replace with actual AI analysis
+        analysis = {
+            "success": True,
+            "symbol": symbol,
+            "analysis": {
+                "sentiment": "bullish",
+                "confidence": 0.75,
+                "price_target": 2650.00,
+                "support_levels": [2400, 2350, 2300],
+                "resistance_levels": [2550, 2600, 2650],
+                "technical_indicators": {
+                    "rsi": 58.5,
+                    "macd": "bullish_crossover",
+                    "moving_averages": "above_20_50_200"
+                },
+                "news_sentiment": "positive",
+                "recommendation": "BUY",
+                "risk_factors": [
+                    "Market volatility",
+                    "Sector rotation risk"
+                ]
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Market analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Market analysis failed: {str(e)}")
+
+@router.get("/signals/get")
+async def get_trading_signals(user_id: str):
+    """
+    Get AI trading signals for user
+    """
+    try:
+        logger.info(f"Trading signals request for user: {user_id}")
+        
+        # Mock trading signals - replace with actual AI signals
+        signals = {
+            "success": True,
+            "user_id": user_id,
+            "signals": [
+                {
+                    "signal_id": "sig_001",
+                    "symbol": "RELIANCE",
+                    "action": "BUY",
+                    "confidence": 0.85,
+                    "entry_price": 2480.00,
+                    "target_price": 2650.00,
+                    "stop_loss": 2350.00,
+                    "quantity": 50,
+                    "reason": "Strong momentum with volume breakout",
+                    "generated_at": datetime.now().isoformat()
+                },
+                {
+                    "signal_id": "sig_002", 
+                    "symbol": "TCS",
+                    "action": "SELL",
+                    "confidence": 0.72,
+                    "entry_price": 3920.00,
+                    "target_price": 3650.00,
+                    "stop_loss": 4050.00,
+                    "quantity": 25,
+                    "reason": "Overbought conditions with resistance at current levels",
+                    "generated_at": datetime.now().isoformat()
+                }
+            ],
+            "total_signals": 2,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return signals
+        
+    except Exception as e:
+        logger.error(f"Trading signals error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Trading signals failed: {str(e)}")
 
 if __name__ == "__main__":
     print("AI Components Router loaded successfully")

@@ -66,7 +66,16 @@ async def root():
 routers_loaded = []
 
 try:
-    # Import new AI components router first
+    # Import authentication router first (CRITICAL for security)
+    from app.auth.auth_router import router as auth_router
+    app.include_router(auth_router)
+    routers_loaded.append("Authentication")
+    logger.info("✅ Authentication router loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️  Authentication router not available: {str(e)}")
+
+try:
+    # Import new AI components router
     from app.ai_engine.ai_components_router import router as ai_components_router
     app.include_router(ai_components_router, prefix="/api")
     routers_loaded.append("AI Components")

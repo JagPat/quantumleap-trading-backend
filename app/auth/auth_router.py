@@ -1,0 +1,378 @@
+"""
+Authentication Router for Quantum Leap AI Components
+Handles login, token management, and user authentication
+"""
+
+from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi.security import HTTPBearer
+from pydantic import BaseModel, EmailStr
+from typing import Optional, Dict, Any
+from datetime import timedelta
+import logging
+
+from app.core.auth import (
+    TokenManager, 
+    PasswordManager, 
+    get_current_user_id,
+    AuthValidator,
+    AuthenticationError
+)
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Create router
+router = APIRouter(prefix="/api/auth", tags=["authentication"])
+
+# Request/Response models
+class LoginRequest(BaseModel):
+    """Login request model"""
+    email: EmailStr
+    password: str
+    remember_me: Optional[bool] = False
+
+class LoginResponse(BaseModel):
+    """Login response model"""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user_id: str
+    message: str = "Login successful"
+
+class RegisterRequest(BaseModel):
+    """User registration request model"""
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+    confirm_password: str
+
+class RegisterResponse(BaseModel):
+    """Registration response model"""
+    user_id: str
+    email: str
+    message: str = "Registration successful"
+    access_token: Optional[str] = None
+
+class TokenValidationResponse(BaseModel):
+    """Token validation response model"""
+    valid: bool
+    user_id: Optional[str] = None
+    expires_at: Optional[int] = None
+    message: str
+
+class AuthStatusResponse(BaseModel):
+    """Authentication status response model"""
+    authenticated: bool
+    user_id: Optional[str] = None
+    token_valid: bool
+    message: str
+
+# Mock user database (replace with real database in production)
+MOCK_USERS = {
+    "test@quantumleap.com": {
+        "user_id": "test_user_123",
+        "email": "test@quantumleap.com",
+        "password_hash": PasswordManager.hash_password("testpassword123"),
+        "full_name": "Test User",
+        "active": True
+    },
+    "admin@quantumleap.com": {
+        "user_id": "admin_user_456", 
+        "email": "admin@quantumleap.com",
+        "password_hash": PasswordManager.hash_password("adminpassword123"),
+        "full_name": "Admin User",
+        "active": True,
+        "role": "admin"
+    }
+}
+
+# Authentication endpoints
+@router.post("/login", response_model=LoginResponse)
+async def login(request: LoginRequest):
+    """
+    Authenticate user and return JWT token
+    """
+    try:
+        logger.info(f"Login attempt for email: {request.email}")
+        
+        # Find user in mock database
+        user = MOCK_USERS.get(request.email.lower())
+        if not user:
+            logger.warning(f"Login failed: User not found - {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+        
+        # Verify password
+        if not PasswordManager.verify_password(request.password, user["password_hash"]):
+            logger.warning(f"Login failed: Invalid password - {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+        
+        # Check if user is active
+        if not user.get("active", True):
+            logger.warning(f"Login failed: User inactive - {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account is inactive"
+            )
+        
+        # Create access token
+        token_data = {
+            "user_id": user["user_id"],
+            "email": user["email"],
+            "role": user.get("role", "user")
+        }
+        
+        # Set token expiry based on remember_me
+        expires_delta = timedelta(days=30) if request.remember_me else timedelta(hours=24)
+        access_token = TokenManager.create_access_token(
+            data=token_data,
+            expires_delta=expires_delta
+        )
+        
+        logger.info(f"Login successful for user: {user['user_id']}")
+        
+        return LoginResponse(
+            access_token=access_token,
+            expires_in=int(expires_delta.total_seconds()),
+            user_id=user["user_id"],
+            message="Login successful"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Login failed due to server error"
+        )
+
+@router.post("/register", response_model=RegisterResponse)
+async def register(request: RegisterRequest):
+    """
+    Register a new user account
+    """
+    try:
+        logger.info(f"Registration attempt for email: {request.email}")
+        
+        # Validate password confirmation
+        if request.password != request.confirm_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Passwords do not match"
+            )
+        
+        # Check if user already exists
+        if request.email.lower() in MOCK_USERS:
+            logger.warning(f"Registration failed: User already exists - {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with this email already exists"
+            )
+        
+        # Validate password strength (basic validation)
+        if len(request.password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 8 characters long"
+            )
+        
+        # Create new user
+        user_id = f"user_{len(MOCK_USERS) + 1}_{request.email.split('@')[0]}"
+        new_user = {
+            "user_id": user_id,
+            "email": request.email.lower(),
+            "password_hash": PasswordManager.hash_password(request.password),
+            "full_name": request.full_name or request.email.split('@')[0],
+            "active": True,
+            "role": "user"
+        }
+        
+        # Add to mock database
+        MOCK_USERS[request.email.lower()] = new_user
+        
+        logger.info(f"Registration successful for user: {user_id}")
+        
+        return RegisterResponse(
+            user_id=user_id,
+            email=request.email,
+            message="Registration successful"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed due to server error"
+        )
+
+@router.post("/validate-token", response_model=TokenValidationResponse)
+async def validate_token(user_id: str = Depends(get_current_user_id)):
+    """
+    Validate current JWT token
+    """
+    try:
+        logger.debug(f"Token validation for user: {user_id}")
+        
+        return TokenValidationResponse(
+            valid=True,
+            user_id=user_id,
+            message="Token is valid"
+        )
+        
+    except Exception as e:
+        logger.warning(f"Token validation failed: {str(e)}")
+        return TokenValidationResponse(
+            valid=False,
+            message="Token is invalid or expired"
+        )
+
+@router.get("/status", response_model=AuthStatusResponse)
+async def auth_status(user_id: Optional[str] = Depends(get_current_user_id)):
+    """
+    Get current authentication status
+    """
+    try:
+        if user_id:
+            return AuthStatusResponse(
+                authenticated=True,
+                user_id=user_id,
+                token_valid=True,
+                message="User is authenticated"
+            )
+        else:
+            return AuthStatusResponse(
+                authenticated=False,
+                token_valid=False,
+                message="User is not authenticated"
+            )
+            
+    except Exception as e:
+        logger.debug(f"Auth status check failed: {str(e)}")
+        return AuthStatusResponse(
+            authenticated=False,
+            token_valid=False,
+            message="Authentication status unknown"
+        )
+
+@router.post("/logout")
+async def logout(user_id: str = Depends(get_current_user_id)):
+    """
+    Logout user (client should discard token)
+    """
+    try:
+        logger.info(f"Logout for user: {user_id}")
+        
+        # In a real implementation, you might want to blacklist the token
+        # For now, we just return success and rely on client to discard token
+        
+        return {
+            "message": "Logout successful",
+            "user_id": user_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Logout error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Logout failed"
+        )
+
+@router.get("/test-users")
+async def get_test_users():
+    """
+    Get available test users for development
+    """
+    try:
+        test_users = []
+        for email, user_data in MOCK_USERS.items():
+            test_users.append({
+                "email": email,
+                "user_id": user_data["user_id"],
+                "role": user_data.get("role", "user")
+            })
+        
+        return {
+            "test_users": test_users,
+            "note": "Use these credentials for testing. Remove this endpoint in production."
+        }
+        
+    except Exception as e:
+        logger.error(f"Get test users error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get test users"
+        )
+
+@router.get("/test-auth")
+async def test_authentication():
+    """
+    Test authentication system configuration
+    """
+    try:
+        # Validate authentication setup
+        validation_results = await AuthValidator.validate_authentication_setup()
+        
+        # Create and test a token
+        test_token = AuthValidator.create_test_token("test_validation_user")
+        token_test = await AuthValidator.test_token_validation(test_token)
+        
+        return {
+            "message": "Authentication system test",
+            "setup_validation": validation_results,
+            "token_test": {
+                "token_created": bool(test_token),
+                "token_valid": token_test["valid"],
+                "test_user_id": token_test.get("user_id")
+            },
+            "mock_users_available": len(MOCK_USERS),
+            "test_credentials": {
+                "email": "test@quantumleap.com",
+                "password": "testpassword123",
+                "note": "Use these credentials for testing"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Authentication test failed: {str(e)}")
+        return {
+            "message": "Authentication system test failed",
+            "error": str(e),
+            "setup_validation": {"overall_status": "error"}
+        }
+
+# Health check endpoint for authentication service
+@router.get("/health")
+async def auth_health():
+    """
+    Authentication service health check
+    """
+    try:
+        # Test basic functionality
+        validation_results = await AuthValidator.validate_authentication_setup()
+        
+        return {
+            "status": "healthy" if validation_results["overall_status"] == "valid" else "degraded",
+            "service": "authentication",
+            "timestamp": "2025-01-03T06:00:00Z",
+            "details": validation_results
+        }
+        
+    except Exception as e:
+        logger.error(f"Auth health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "service": "authentication", 
+            "error": str(e),
+            "timestamp": "2025-01-03T06:00:00Z"
+        }
+
+# Export router
+__all__ = ["router"]

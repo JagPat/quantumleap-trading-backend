@@ -1,0 +1,270 @@
+{
+  "test_results": {
+    "health_checks": [
+      {
+        "endpoint": "/",
+        "method": "GET",
+        "status_code": 200,
+        "response_time": 1007.78,
+        "success": true,
+        "response_size": 163,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/health",
+        "method": "GET",
+        "status_code": 200,
+        "response_time": 356.37,
+        "success": true,
+        "response_size": 126,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/health",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 351.6,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      }
+    ],
+    "portfolio_endpoints": [
+      {
+        "endpoint": "/api/portfolio/fetch-live-simple",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 350.14,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/portfolio/holdings",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 354.15,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/portfolio/performance",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 347.81,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/portfolio/summary",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 350.8,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      }
+    ],
+    "ai_endpoints": [
+      {
+        "endpoint": "/api/ai/copilot/analyze",
+        "method": "POST",
+        "status_code": 200,
+        "response_time": 437.58,
+        "success": true,
+        "response_size": 537,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/ai/analysis/portfolio",
+        "method": "POST",
+        "status_code": 404,
+        "response_time": 351.77,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/ai/analysis/market",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 351.46,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/ai/analysis/signals",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 356.92,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      }
+    ],
+    "broker_endpoints": [
+      {
+        "endpoint": "/api/broker/status",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 349.28,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/broker/connect",
+        "method": "POST",
+        "status_code": 404,
+        "response_time": 356.81,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/broker/positions",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 347.84,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      }
+    ],
+    "trading_engine_endpoints": [
+      {
+        "endpoint": "/api/trading/status",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 359.5,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/trading/strategies",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 349.08,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/trading/positions",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 349.65,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/trading/orders",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 360.85,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      }
+    ],
+    "database_endpoints": [
+      {
+        "endpoint": "/api/database/health",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 350.22,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      },
+      {
+        "endpoint": "/api/database/stats",
+        "method": "GET",
+        "status_code": 404,
+        "response_time": 349.25,
+        "success": false,
+        "response_size": 22,
+        "content_type": "application/json",
+        "error": null
+      }
+    ]
+  },
+  "summary": {
+    "overall": {
+      "total_tests": 20,
+      "passed": 3,
+      "failed": 17,
+      "pass_rate": 15.0,
+      "avg_response_time": 389.44
+    },
+    "categories": {
+      "health_checks": {
+        "total": 3,
+        "passed": 2,
+        "failed": 1,
+        "pass_rate": 66.66666666666666,
+        "avg_response_time": 571.92
+      },
+      "portfolio_endpoints": {
+        "total": 4,
+        "passed": 0,
+        "failed": 4,
+        "pass_rate": 0.0,
+        "avg_response_time": 350.73
+      },
+      "ai_endpoints": {
+        "total": 4,
+        "passed": 1,
+        "failed": 3,
+        "pass_rate": 25.0,
+        "avg_response_time": 374.43
+      },
+      "broker_endpoints": {
+        "total": 3,
+        "passed": 0,
+        "failed": 3,
+        "pass_rate": 0.0,
+        "avg_response_time": 351.31
+      },
+      "trading_engine_endpoints": {
+        "total": 4,
+        "passed": 0,
+        "failed": 4,
+        "pass_rate": 0.0,
+        "avg_response_time": 354.77
+      },
+      "database_endpoints": {
+        "total": 2,
+        "passed": 0,
+        "failed": 2,
+        "pass_rate": 0.0,
+        "avg_response_time": 349.74
+      }
+    }
+  },
+  "timestamp": "2025-08-03 11:22:46"
+}

@@ -236,6 +236,8 @@ async def portfolio_status():
             "fetch_live_simple": "/api/portfolio/fetch-live-simple",
             "latest_simple": "/api/portfolio/latest-simple",
             "mock": "/api/portfolio/mock",
+            "summary": "/api/portfolio/summary",
+            "performance": "/api/portfolio/performance",
             "status": "/api/portfolio/status"
         },
         "timestamp": datetime.now().isoformat()
@@ -296,6 +298,118 @@ async def debug_database():
             "error": str(e),
             "error_type": type(e).__name__,
             "database_path": settings.database_path
+        }
+
+@router.get("/summary")
+async def get_portfolio_summary(user_id: str = Query(..., description="User ID")):
+    """
+    Get portfolio summary with key metrics
+    """
+    try:
+        snapshot = portfolio_service.get_latest_portfolio(user_id)
+        if not snapshot:
+            return {
+                "status": "error",
+                "success": False,
+                "message": "No portfolio data found",
+                "data": None
+            }
+        
+        # Calculate additional summary metrics
+        holdings_count = len(snapshot.holdings) if snapshot.holdings else 0
+        positions_count = len(snapshot.positions) if snapshot.positions else 0
+        
+        # Calculate percentage changes (mock for now)
+        day_pnl_percent = (snapshot.day_pnl / snapshot.total_value * 100) if snapshot.total_value > 0 else 0
+        total_pnl_percent = (snapshot.total_pnl / (snapshot.total_value - snapshot.total_pnl) * 100) if (snapshot.total_value - snapshot.total_pnl) > 0 else 0
+        
+        summary_data = {
+            "user_id": snapshot.user_id,
+            "timestamp": snapshot.timestamp,
+            "total_value": snapshot.total_value,
+            "day_pnl": snapshot.day_pnl,
+            "day_pnl_percent": round(day_pnl_percent, 2),
+            "total_pnl": snapshot.total_pnl,
+            "total_pnl_percent": round(total_pnl_percent, 2),
+            "holdings_count": holdings_count,
+            "positions_count": positions_count,
+            "invested_value": snapshot.total_value - snapshot.total_pnl,
+            "current_value": snapshot.total_value
+        }
+        
+        return {
+            "status": "success",
+            "success": True,
+            "message": "Portfolio summary retrieved",
+            "data": summary_data
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "success": False,
+            "message": f"Failed to get portfolio summary: {str(e)}",
+            "data": None
+        }
+
+@router.get("/performance")
+async def get_portfolio_performance(
+    user_id: str = Query(..., description="User ID"),
+    timeframe: str = Query("1M", description="Timeframe: 1D, 1W, 1M, 3M, 6M, 1Y")
+):
+    """
+    Get portfolio performance metrics over specified timeframe
+    """
+    try:
+        # For now, return mock performance data
+        # In production, this would calculate actual historical performance
+        
+        mock_performance = {
+            "user_id": user_id,
+            "timeframe": timeframe,
+            "timestamp": datetime.now().isoformat(),
+            "performance_metrics": {
+                "total_return": 12.5,
+                "total_return_percent": 8.3,
+                "annualized_return": 15.2,
+                "volatility": 18.7,
+                "sharpe_ratio": 0.81,
+                "max_drawdown": -5.2,
+                "win_rate": 68.5,
+                "best_day": 3.2,
+                "worst_day": -2.8
+            },
+            "historical_values": [
+                {"date": "2024-01-01", "value": 100000},
+                {"date": "2024-01-15", "value": 102500},
+                {"date": "2024-02-01", "value": 105200},
+                {"date": "2024-02-15", "value": 103800},
+                {"date": "2024-03-01", "value": 108300},
+                {"date": "2024-03-15", "value": 112500}
+            ],
+            "benchmark_comparison": {
+                "benchmark": "NIFTY 50",
+                "portfolio_return": 12.5,
+                "benchmark_return": 8.7,
+                "alpha": 3.8,
+                "beta": 1.15,
+                "correlation": 0.85
+            }
+        }
+        
+        return {
+            "status": "success",
+            "success": True,
+            "message": f"Portfolio performance for {timeframe} retrieved",
+            "data": mock_performance
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "success": False,
+            "message": f"Failed to get portfolio performance: {str(e)}",
+            "data": None
         }
 
 @router.delete("/cleanup/{user_id}")
