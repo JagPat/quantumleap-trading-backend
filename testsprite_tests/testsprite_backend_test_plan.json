@@ -1,0 +1,42 @@
+[
+  {
+    "id": "TC001",
+    "title": "broker authentication oauth flow",
+    "description": "Test the OAuth-based authentication process for multiple broker providers including Zerodha Kite Connect and Upstox. Verify secure token storage, session persistence, and automatic token refresh functionality."
+  },
+  {
+    "id": "TC002",
+    "title": "trading dashboard portfolio and market data display",
+    "description": "Verify the main trading dashboard displays portfolio summary, real-time market data, P&L visualization, and quick action buttons correctly with responsive design across devices."
+  },
+  {
+    "id": "TC003",
+    "title": "portfolio management holdings and performance",
+    "description": "Test portfolio management features including holdings display, position tracking, P&L calculations, performance metrics, and export functionality to ensure accurate portfolio tracking and analysis."
+  },
+  {
+    "id": "TC004",
+    "title": "ai chat interface response generation",
+    "description": "Validate the AI-powered chat interface for trading insights including chat interface usability, AI response generation, trading context awareness, message history, and support for BYOAI providers."
+  },
+  {
+    "id": "TC005",
+    "title": "trading signals real-time updates and history",
+    "description": "Test the real-time trading signals feature for correct signal display, detailed signal information, mobile optimization, real-time updates, and signal history tracking."
+  },
+  {
+    "id": "TC006",
+    "title": "responsive design across devices",
+    "description": "Verify the mobile-first responsive design implementation across mobile, tablet, and desktop layouts including touch optimization and adaptive navigation."
+  },
+  {
+    "id": "TC007",
+    "title": "accessibility features compliance",
+    "description": "Test accessibility features for WCAG 2.1 AA compliance including keyboard navigation, screen reader support, color contrast compliance, focus indicators, and ARIA labels."
+  },
+  {
+    "id": "TC008",
+    "title": "performance optimization targets",
+    "description": "Validate performance optimization targets such as page load time under 3 seconds, API response time under 2 seconds, memory usage under 100MB, code splitting, and asset optimization."
+  }
+]

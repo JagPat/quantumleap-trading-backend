@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Import authentication middleware
 try:
-    from app.core.auth import get_current_user_id, verify_jwt_token
+    from app.core.auth import get_current_user_id, get_current_user_optional, verify_jwt_token
     AUTH_AVAILABLE = True
     logger.info("✅ Authentication middleware imported successfully")
 except ImportError as e:
@@ -36,6 +36,9 @@ except ImportError as e:
     
     # Create dummy dependency for development
     async def get_current_user_id():
+        return "dev_user_123"
+    
+    async def get_current_user_optional():
         return "dev_user_123"
     
     async def verify_jwt_token():
@@ -210,12 +213,15 @@ What specific area would you like to explore?"""
 # ============================================================================
 
 @router.get("/strategy-templates", response_model=List[StrategyTemplate])
-async def get_strategy_templates(user_id: str = Depends(get_current_user_id)):
+async def get_strategy_templates(user_id: Optional[str] = Depends(get_current_user_optional)):
     """
     Get all available AI strategy templates
-    Requires authentication: JWT token in Authorization header
+    Optional authentication: JWT token in Authorization header
     """
     try:
+        # Use default user if not authenticated
+        if not user_id:
+            user_id = "anonymous_user"
         # Mock strategy templates - replace with database query
         templates = [
             {
@@ -469,12 +475,15 @@ async def get_performance_analytics(request: PerformanceAnalyticsRequest, user_i
 # ============================================================================
 
 @router.get("/risk-metrics")
-async def get_risk_metrics(user_id: str = Depends(get_current_user_id)):
+async def get_risk_metrics(user_id: Optional[str] = Depends(get_current_user_optional)):
     """
     Get current risk metrics
-    Requires authentication: JWT token in Authorization header and portfolio risk assessment
+    Optional authentication: JWT token in Authorization header
     """
     try:
+        # Use default user if not authenticated
+        if not user_id:
+            user_id = "anonymous_user"
         # Mock risk metrics - replace with actual risk calculation
         risk_data = {
             "current_risk_level": "medium",

@@ -32,6 +32,20 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database and perform startup tasks"""
+    try:
+        from app.database.service import init_database
+        logger.info("🗄️  Initializing database...")
+        init_database()
+        logger.info("✅ Database initialization completed successfully")
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {str(e)}")
+        # Don't fail startup, but log the error
+        logger.error("Application will continue but database functionality may be limited")
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -104,8 +118,9 @@ except ImportError as e:
     logger.warning(f"⚠️  Broker router not available: {str(e)}")
 
 try:
-    from app.trading_engine.simple_router import router as trading_engine_router
+    from app.trading_engine.simple_router import router as trading_engine_router, trading_router
     app.include_router(trading_engine_router)
+    app.include_router(trading_router)  # Include the legacy trading router
     routers_loaded.append("Trading Engine")
     logger.info("✅ Trading Engine router loaded successfully")
 except ImportError as e:

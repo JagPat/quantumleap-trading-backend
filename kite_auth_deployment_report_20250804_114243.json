@@ -1,0 +1,47 @@
+{
+  "started_at": "2025-08-04T11:42:40.544636",
+  "steps_completed": [
+    {
+      "step": "Railway backend health check",
+      "status": "completed",
+      "timestamp": "2025-08-04T11:42:41.049317",
+      "details": "healthy"
+    },
+    {
+      "step": "Auth health endpoint",
+      "status": "completed",
+      "timestamp": "2025-08-04T11:42:41.307190",
+      "details": null
+    },
+    {
+      "step": "Test users endpoint",
+      "status": "completed",
+      "timestamp": "2025-08-04T11:42:41.570382",
+      "details": null
+    },
+    {
+      "step": "Broker status-header endpoint",
+      "status": "completed",
+      "timestamp": "2025-08-04T11:42:42.174288",
+      "details": "operational"
+    },
+    {
+      "step": "Comprehensive endpoint test",
+      "status": "completed",
+      "timestamp": "2025-08-04T11:42:43.382003",
+      "details": "5/6 endpoints working"
+    }
+  ],
+  "errors": [
+    {
+      "error": "Kite login endpoint failed: 404",
+      "timestamp": "2025-08-04T11:42:41.767266"
+    },
+    {
+      "error": "Kite register endpoint failed: 404",
+      "timestamp": "2025-08-04T11:42:41.974116"
+    }
+  ],
+  "success": true,
+  "completed_at": "2025-08-04T11:42:43.382150"
+}

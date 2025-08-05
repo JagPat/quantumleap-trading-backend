@@ -231,6 +231,39 @@ async def create_session(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating session: {str(e)}")
 
+@router.get("/session")
+async def get_session(user_id: str):
+    """Get user session information"""
+    try:
+        session_data = load_user_session(user_id)
+        
+        if session_data:
+            # Remove sensitive information before returning
+            safe_session = {
+                "status": "active",
+                "user_id": user_id,
+                "last_updated": session_data.get('last_updated'),
+                "is_valid": True,
+                "session_exists": True
+            }
+            return safe_session
+        else:
+            return {
+                "status": "inactive",
+                "user_id": user_id,
+                "is_valid": False,
+                "session_exists": False,
+                "message": "No active session found"
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "user_id": user_id,
+            "is_valid": False,
+            "session_exists": False,
+            "message": f"Error retrieving session: {str(e)}"
+        }
+
 @router.delete("/session")
 async def delete_session(user_id: str = Depends(get_user_from_headers)):
     """Delete user session"""

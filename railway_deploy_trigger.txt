@@ -1,0 +1,6 @@
+Kite Auth Deployment Trigger: 2025-08-04T11:43:40.923361
+This file triggers Railway redeploy with Kite authentication endpoints
+New endpoints added:
+- /api/auth/kite-login
+- /api/auth/kite-register
+- /api/auth/sync-kite-profile

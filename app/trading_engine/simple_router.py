@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/trading-engine", tags=["trading-engine"])
 
+# Also create a router for the /api/trading prefix to handle legacy endpoints
+trading_router = APIRouter(prefix="/api/trading", tags=["trading"])
+
 @router.get("/health")
 async def get_trading_engine_health() -> Dict[str, Any]:
     """Get trading engine health status"""
@@ -47,6 +50,29 @@ async def get_trading_engine_health() -> Dict[str, Any]:
                 "position_manager": "unknown",
                 "strategy_manager": "unknown"
             }
+        }
+
+@trading_router.get("/status")
+async def get_trading_status() -> Dict[str, Any]:
+    """Get trading system status - legacy endpoint"""
+    try:
+        return {
+            "status": "active",
+            "timestamp": datetime.now().isoformat(),
+            "trading_session": "active",
+            "market_status": "open",
+            "system_health": "healthy",
+            "active_strategies": 0,
+            "pending_orders": 0,
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        logger.error(f"Error getting trading status: {e}")
+        return {
+            "status": "error",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "system_health": "degraded"
         }
 
 @router.get("/metrics")

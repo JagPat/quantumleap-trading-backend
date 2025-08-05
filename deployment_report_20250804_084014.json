@@ -1,0 +1,125 @@
+{
+  "deployment_info": {
+    "timestamp": "2025-08-04T08:40:14.422051",
+    "github_repo": "https://github.com/JagPat/quantumleap-trading-backend",
+    "railway_url": "https://web-production-de0bc.up.railway.app",
+    "total_deployment_time_minutes": 10.4
+  },
+  "changes_deployed": [
+    "Added kiteconnect==4.2.0 to requirements.txt",
+    "Added missing portfolio endpoints (/summary, /performance)",
+    "Added all missing AI service endpoints",
+    "Preserved existing broker and portfolio functionality",
+    "Complete frontend-backend API integration"
+  ],
+  "verification_results": {
+    "backend_healthy": false,
+    "overall_success_rate": 4.3478260869565215,
+    "total_tests": 23,
+    "total_passed": 1,
+    "category_results": {
+      "Portfolio": [
+        [
+          "Fetch Live Portfolio",
+          false
+        ],
+        [
+          "Get Latest Portfolio",
+          false
+        ],
+        [
+          "Get Mock Portfolio",
+          false
+        ],
+        [
+          "Get Portfolio Summary",
+          false
+        ],
+        [
+          "Get Portfolio Performance",
+          false
+        ],
+        [
+          "Portfolio Service Status",
+          false
+        ]
+      ],
+      "AI Services": [
+        [
+          "AI Health Check",
+          true
+        ],
+        [
+          "AI Status",
+          false
+        ],
+        [
+          "Get AI Preferences",
+          false
+        ],
+        [
+          "Save AI Preferences",
+          false
+        ],
+        [
+          "Validate AI Key",
+          false
+        ],
+        [
+          "Analyze Portfolio",
+          false
+        ],
+        [
+          "Send AI Message",
+          false
+        ],
+        [
+          "Generate Strategy",
+          false
+        ],
+        [
+          "Market Analysis",
+          false
+        ],
+        [
+          "Trading Signals",
+          false
+        ]
+      ],
+      "Broker": [
+        [
+          "Broker Status",
+          false
+        ],
+        [
+          "Broker Session",
+          false
+        ],
+        [
+          "Broker Status Header",
+          false
+        ]
+      ],
+      "Trading Engine": [
+        [
+          "Trading Engine Status",
+          false
+        ],
+        [
+          "Active Strategies",
+          false
+        ],
+        [
+          "Performance Metrics",
+          false
+        ],
+        [
+          "System Health",
+          false
+        ]
+      ]
+    }
+  },
+  "deployment_status": "FAILED",
+  "status_message": "Deployment failed - significant issues detected"
+}
