@@ -1,0 +1,441 @@
+[
+  {
+    "id": "TC001",
+    "title": "Successful OAuth2 Login and JWT Session Establishment",
+    "description": "Verify user can log in via OAuth2 with supported brokers (Zerodha, Upstox), complete OAuth callback successfully, and obtain a valid JWT session with token refresh functionality.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to login page and select broker OAuth2 login option (Zerodha)"
+      },
+      {
+        "type": "action",
+        "description": "Complete broker OAuth2 login flow in popup and authorize application"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify OAuth callback endpoint is reached and JWT token is issued"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate JWT token is stored securely in session storage"
+      },
+      {
+        "type": "action",
+        "description": "Wait until JWT token expiry and trigger token refresh endpoint"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify JWT token is refreshed successfully without user intervention"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Invalid OAuth2 Login Attempt Handling",
+    "description": "Ensure system handles invalid or denied OAuth2 authorization gracefully with error feedback and no session establishment.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Initiate OAuth2 login with broker and deny authorization in OAuth popup"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify application displays clear error message explaining denial"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure no JWT token or session is created in frontend or backend"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Portfolio Dashboard Real-Time Data Accuracy",
+    "description": "Verify portfolio dashboard loads and displays real-time holdings, P&L calculations, and performance metrics accurately matching backend data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login successfully and navigate to Portfolio dashboard page"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate displayed holdings match backend portfolio data"
+      },
+      {
+        "type": "assertion",
+        "description": "Check realtime updates on holdings values and P&L on simulated market price changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate performance graphs and metrics update correctly and match calculation logic"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Portfolio Data Load Failure and Error Handling",
+    "description": "Test backend portfolio API failure is handled gracefully with user notification and retry capability.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate backend /api/portfolio failure or timeouts"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to portfolio dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify UI displays user-friendly error message about data loading failure"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm retry option is available and functional"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Broker Integration Successful Account Sync and Live Data Feed",
+    "description": "Verify that broker account linking via Kite Connect API connects successfully, syncs account data, subscribes to live market data feed, and enables order execution.",
+    "category": "integration",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login and navigate to Broker Integration page"
+      },
+      {
+        "type": "action",
+        "description": "Initiate Kite Connect authentication and complete OAuth flow"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify broker account credentials are stored encrypted"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm live market data feed subscription is established and ticker updates reflect in UI"
+      },
+      {
+        "type": "action",
+        "description": "Place a test order via order management UI"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure order is successfully submitted to broker and status updates reflect accurately"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Broker Integration Failure and Recovery",
+    "description": "Validate behavior when Kite Connect API fails or disconnects, ensuring appropriate error reporting and retry capability.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate Kite Connect API failures (authentication error, disconnection)"
+      },
+      {
+        "type": "action",
+        "description": "Monitor UI broker integration status indicators"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm error messages are shown with guidance for re-connection"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to reconnect broker integration"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify successful recovery and data feed re-subscription"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "AI Chat Interface Functional Interaction and Context Maintenance",
+    "description": "Test multi-provider AI chat interface responds to user queries accurately, maintains conversation context, and handles API errors gracefully.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to Chat page"
+      },
+      {
+        "type": "action",
+        "description": "Send a sequence of trading-related queries to AI chat"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify AI responds with coherent, context-aware answers using multiple AI providers"
+      },
+      {
+        "type": "action",
+        "description": "Simulate API failure from one AI provider"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm fallback to other providers or graceful error message in chat"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify conversation history is preserved and displayed correctly"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Real-Time Trading Signals Delivery and Alert Functionality on Mobile",
+    "description": "Verify trading signals are pushed in real-time to the mobile-optimized dashboard, alerts trigger correctly, and analytics can be viewed on mobile devices.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Access signals dashboard on a mobile device or emulator"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm new trading signals appear in real-time without manual refresh"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify alert notifications are received on mobile devices for new signals"
+      },
+      {
+        "type": "action",
+        "description": "Navigate through signal analytics screens on mobile"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm UI responsiveness and usability on various mobile screen sizes"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Mobile Offline Support and PWA Functionality",
+    "description": "Ensure the platform supports offline usage via service workers, caching data and allowing navigation with degraded features, following PWA standards.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Load application on mobile device with internet connectivity"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to key pages to cache resources"
+      },
+      {
+        "type": "action",
+        "description": "Disable network connectivity to simulate offline mode"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify pages load from cache with previously loaded data available"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm appropriate offline fallback UI or notification is shown where live data is unavailable"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Accessibility Compliance Verification (WCAG 2.1)",
+    "description": "Validate keyboard navigability, screen reader support, and color contrast meet WCAG 2.1 standards across key pages.",
+    "category": "ui",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate the application completely using only keyboard inputs"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure all interactive elements are reachable and usable via keyboard"
+      },
+      {
+        "type": "action",
+        "description": "Use a screen reader to navigate key pages (Portfolio, Chat, Signals)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify screen reader correctly announces UI elements, labels, and content"
+      },
+      {
+        "type": "assertion",
+        "description": "Check color contrast ratio for text and UI components meets accessible thresholds"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Global Error Boundary and Reporting Dashboard Functionality",
+    "description": "Test global error boundaries capture frontend errors without crashing the app and errors appear on the error reporting dashboard for user feedback.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger an uncaught exception in frontend UI (e.g., by injecting a runtime error)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify application displays fallback UI and does not crash"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the error reporting dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the triggered error is logged and visible with details"
+      },
+      {
+        "type": "action",
+        "description": "Submit user feedback via integrated user testing interface related to the error"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify feedback is received and tied to the error report"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Performance Analytics Dashboard Displays Accurate Metrics",
+    "description": "Confirm real-time resource usage, performance metrics, and trading strategy effectiveness are displayed correctly and update without significant delays.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Access Performance Analytics page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify page load time is under 3 seconds"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate displayed CPU, memory, and network usage metrics reflect backend state"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm trading strategy effectiveness metrics update in real-time"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Security Validation: Session and Credential Protection",
+    "description": "Test that JWT tokens are securely stored, OAuth flow uses state validation, broker credentials are encrypted, and key security headers are configured.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Perform login and capture JWT token from client storage"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm JWT token is stored securely (HttpOnly cookie or secure storage)"
+      },
+      {
+        "type": "action",
+        "description": "Inspect OAuth2 flow for presence and verification of state parameter"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify state token is unique and validated on callback"
+      },
+      {
+        "type": "action",
+        "description": "Access stored broker credentials in backend database"
+      },
+      {
+        "type": "assertion",
+        "description": "Check credentials are encrypted with strong cryptography"
+      },
+      {
+        "type": "action",
+        "description": "Use security scanner or inspect HTTP headers"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify CORS, CSP, and secure session middleware headers are set correctly"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Cross-Browser Compatibility Testing",
+    "description": "Verify core functionalities including authentication, portfolio display, AI chat, trading signals, and broker integration work seamlessly across supported modern browsers.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open application on latest versions of Chrome, Firefox, Edge, and Safari"
+      },
+      {
+        "type": "assertion",
+        "description": "Perform login via OAuth2 on each browser"
+      },
+      {
+        "type": "assertion",
+        "description": "Access portfolio dashboard and AI chat interface"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify trading signals update in real-time and alerts function as expected"
+      },
+      {
+        "type": "assertion",
+        "description": "Check UI layout consistency and responsiveness"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Load and Stress Testing for Concurrent Users",
+    "description": "Ensure the system supports 1000+ concurrent users by testing API response times and system stability under simulated load conditions.",
+    "category": "performance",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate 1000 concurrent user logins and perform typical user flows (login, portfolio view, trading signals, AI chat)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify average API response time remains under 2 seconds"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no critical errors or crashes during load"
+      },
+      {
+        "type": "assertion",
+        "description": "Monitor platform uptime and ensure 99.9% availability during test"
+      }
+    ]
+  }
+]
