@@ -160,6 +160,18 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Simple test endpoint to verify deployment
+app.get('/api/test', (req, res) => {
+  res.json({
+    message: 'QuantumLeap Trading Backend is running!',
+    timestamp: new Date().toISOString(),
+    version: '2.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    port: PORT,
+    deployment: 'railway'
+  });
+});
+
 // Module management endpoints (for development/debugging)
 app.get('/api/modules', (req, res) => {
   try {
