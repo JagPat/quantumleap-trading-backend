@@ -6,7 +6,7 @@
     "watchPatterns": ["**/*.js", "package.json", "Dockerfile"]
   },
   "deploy": {
-    "startCommand": "npm start",
+    "startCommand": "node server-modular.js",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
