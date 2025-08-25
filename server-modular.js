@@ -33,8 +33,8 @@ const logger = winston.createLogger({
 });
 
 const app = express();
-// Use port 4000 to avoid collision with current server.js (port 3000)
-const PORT = process.env.MODULAR_PORT || 4000;
+// Use Railway's PORT environment variable or fallback to 4000
+const PORT = process.env.PORT || process.env.MODULAR_PORT || 4000;
 
 // Initialize service container and event bus
 const serviceContainer = new ServiceContainer();
@@ -45,6 +45,8 @@ app.use(helmet());
 app.use(cors({
   origin: [
     'https://vitan-task-frontend.up.railway.app',
+    'https://quantum-leap-frontend-production.up.railway.app',
+    'https://quantumleap-trading-frontend.up.railway.app',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:3002',
