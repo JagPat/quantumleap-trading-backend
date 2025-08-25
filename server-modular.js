@@ -8,6 +8,13 @@ const winston = require('winston');
 // Load environment variables
 dotenv.config();
 
+// Immediate startup logging
+console.log('🚀 QuantumLeap Trading Backend Starting...');
+console.log(`📊 PORT: ${process.env.PORT || 'not set'}`);
+console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+console.log(`🐳 Platform: ${process.platform}`);
+console.log(`📦 Node: ${process.version}`);
+
 // Import modular architecture components
 const ServiceContainer = require('./service-container');
 const EventBus = require('./shared/events/eventBus');
@@ -131,28 +138,30 @@ async function initializeModules() {
   }
 }
 
-// Simple health check endpoint for Railway
+// Railway health check endpoint - MUST respond immediately
 app.get('/health', (req, res) => {
-  try {
-    logger.info('Health check requested');
-    
-    res.status(200).json({ 
-      status: 'OK', 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-      port: PORT,
-      version: '2.0.0',
-      deployment: 'railway'
-    });
-  } catch (error) {
-    logger.error('Health check failed:', error);
-    res.status(500).json({ 
-      status: 'ERROR',
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
+  // Immediate response - no async operations
+  res.status(200).json({ 
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    port: PORT,
+    version: '2.0.0',
+    ready: true
+  });
+});
+
+// Backup health endpoints
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'QuantumLeap Trading Backend',
+    status: 'running',
+    version: '2.0.0'
+  });
 });
 
 // Enhanced health check with modules (for debugging)
@@ -394,29 +403,75 @@ app.use('*', (req, res) => {
 // Start server
 async function startServer() {
   try {
+    console.log('🚀 Starting server...');
+    logger.info('🚀 Starting server...');
+    
     // Start server first to make health check available immediately
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      logger.info(`QuantumLeap Trading Backend server running on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`Health check available at: http://0.0.0.0:${PORT}/health`);
-      logger.info(`Test endpoint available at: http://0.0.0.0:${PORT}/api/test`);
+    const server = app.listen(PORT, '0.0.0.0', async () => {
+      console.log(`✅ Server listening on port ${PORT}`);
+      logger.info(`✅ QuantumLeap Trading Backend server running on port ${PORT}`);
+      logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`❤️ Health check: http://0.0.0.0:${PORT}/health`);
+      logger.info(`🧪 Test endpoint: http://0.0.0.0:${PORT}/api/test`);
+      
+      // Test health endpoint immediately
+      setTimeout(() => {
+        const http = require('http');
+        const req = http.request({
+          hostname: 'localhost',
+          port: PORT,
+          path: '/health',
+          method: 'GET'
+        }, (res) => {
+          console.log(`✅ Internal health check: ${res.statusCode}`);
+          logger.info(`✅ Internal health check: ${res.statusCode}`);
+        });
+        req.on('error', (err) => {
+          console.error('❌ Internal health check failed:', err.message);
+          logger.error('❌ Internal health check failed:', err.message);
+        });
+        req.end();
+      }, 500);
+      
+      // Initialize services in background after server is listening
+      setImmediate(async () => {
+        console.log('🔧 Initializing core services...');
+        try {
+          await initializeCoreServices();
+          console.log('✅ Core services initialized');
+          logger.info('✅ Core services initialized');
+        } catch (error) {
+          console.warn('⚠️ Core services initialization failed:', error.message);
+          logger.warn('⚠️ Core services initialization failed:', error.message);
+        }
+        
+        console.log('🔧 Initializing modules...');
+        try {
+          await initializeModules();
+          console.log('✅ Modules initialized');
+          logger.info('✅ Modules initialized');
+        } catch (error) {
+          console.warn('⚠️ Module initialization failed:', error.message);
+          logger.warn('⚠️ Module initialization failed:', error.message);
+        }
+        
+        console.log('🚀 Backend fully ready!');
+        logger.info('🚀 Backend fully ready!');
+      });
     });
     
-    // Initialize core services in background
-    try {
-      await initializeCoreServices();
-      logger.info('Core services initialized successfully');
-    } catch (error) {
-      logger.warn('Core services initialization failed, continuing with basic server:', error.message);
-    }
+    // Handle server errors
+    server.on('error', (error) => {
+      console.error('❌ Server error:', error);
+      logger.error('❌ Server error:', error);
+      process.exit(1);
+    });
     
-    // Initialize modules in background
-    try {
-      await initializeModules();
-      logger.info('Modules initialized successfully');
-    } catch (error) {
-      logger.warn('Module initialization failed, continuing with basic server:', error.message);
-    }
+    // Handle server listening event
+    server.on('listening', () => {
+      console.log(`🎯 Server is listening on ${server.address().address}:${server.address().port}`);
+      logger.info(`🎯 Server is listening on ${server.address().address}:${server.address().port}`);
+    });
     
     // Graceful shutdown
     process.on('SIGTERM', async () => {
