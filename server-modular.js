@@ -131,10 +131,34 @@ async function initializeModules() {
   }
 }
 
-// Health check endpoint (enhanced for modular architecture)
-app.get('/health', async (req, res) => {
+// Simple health check endpoint for Railway
+app.get('/health', (req, res) => {
   try {
     logger.info('Health check requested');
+    
+    res.status(200).json({ 
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      port: PORT,
+      version: '2.0.0',
+      deployment: 'railway'
+    });
+  } catch (error) {
+    logger.error('Health check failed:', error);
+    res.status(500).json({ 
+      status: 'ERROR',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Enhanced health check with modules (for debugging)
+app.get('/health/detailed', async (req, res) => {
+  try {
+    logger.info('Detailed health check requested');
     
     // Get modular architecture health
     const modularHealth = await serviceContainer.healthCheck();
@@ -147,17 +171,36 @@ app.get('/health', async (req, res) => {
       port: PORT,
       architecture: 'modular',
       server: 'modular',
+      version: '2.0.0',
+      deployment: 'railway',
       modules: modularHealth.modules,
       services: modularHealth.services
     });
   } catch (error) {
-    logger.error('Health check failed:', error);
+    logger.error('Detailed health check failed:', error);
     res.status(500).json({ 
       status: 'ERROR',
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      version: '2.0.0',
+      deployment: 'railway'
     });
   }
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'QuantumLeap Trading Backend API',
+    version: '2.0.0',
+    status: 'running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      test: '/api/test',
+      modules: '/api/modules'
+    }
+  });
 });
 
 // Simple test endpoint to verify deployment
@@ -351,20 +394,29 @@ app.use('*', (req, res) => {
 // Start server
 async function startServer() {
   try {
-    // Initialize core services
-    await initializeCoreServices();
-    
-    // Initialize modules
-    await initializeModules();
-    
-    // Start server
+    // Start server first to make health check available immediately
     const server = app.listen(PORT, '0.0.0.0', () => {
-      logger.info(`WhatsTask Modular backend server running on port ${PORT}`);
+      logger.info(`QuantumLeap Trading Backend server running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`Health check available at: http://0.0.0.0:${PORT}/health`);
-      logger.info(`Module management at: http://0.0.0.0:${PORT}/api/modules`);
-      logger.info(`Main server continues running on port 3000`);
+      logger.info(`Test endpoint available at: http://0.0.0.0:${PORT}/api/test`);
     });
+    
+    // Initialize core services in background
+    try {
+      await initializeCoreServices();
+      logger.info('Core services initialized successfully');
+    } catch (error) {
+      logger.warn('Core services initialization failed, continuing with basic server:', error.message);
+    }
+    
+    // Initialize modules in background
+    try {
+      await initializeModules();
+      logger.info('Modules initialized successfully');
+    } catch (error) {
+      logger.warn('Module initialization failed, continuing with basic server:', error.message);
+    }
     
     // Graceful shutdown
     process.on('SIGTERM', async () => {
