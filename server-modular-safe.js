@@ -165,24 +165,237 @@ app.post('/api/broker/configs', (req, res) => {
   });
 });
 
-// Portfolio endpoints (mock implementation)
-app.get('/api/portfolio/latest/:userId', (req, res) => {
-  logger.info('Portfolio data requested', { userId: req.params.userId });
+// Portfolio endpoints (comprehensive mock implementation)
+const mockPortfolioData = {
+  totalValue: 100000,
+  dayChange: 1250.50,
+  dayChangePercent: 1.27,
+  positions: [
+    { symbol: 'AAPL', quantity: 10, price: 150.25, value: 1502.50, change: 2.5, changePercent: 1.69 },
+    { symbol: 'GOOGL', quantity: 5, price: 2750.80, value: 13754.00, change: -15.20, changePercent: -0.55 },
+    { symbol: 'TSLA', quantity: 8, price: 245.60, value: 1964.80, change: 8.40, changePercent: 3.54 },
+    { symbol: 'MSFT', quantity: 15, price: 420.30, value: 6304.50, change: 12.80, changePercent: 3.14 },
+    { symbol: 'AMZN', quantity: 3, price: 3200.75, value: 9602.25, change: -25.50, changePercent: -0.79 }
+  ],
+  cash: 5000.00,
+  lastUpdated: new Date().toISOString()
+};
+
+// 1. Latest Simple Portfolio
+app.get('/api/portfolio/latest-simple', (req, res) => {
+  const userId = req.query.user_id;
+  logger.info('Simple portfolio data requested', { userId });
   res.json({
     success: true,
     data: {
-      totalValue: 100000,
-      dayChange: 1250.50,
-      dayChangePercent: 1.27,
-      positions: [
-        { symbol: 'AAPL', quantity: 10, price: 150.25, value: 1502.50 },
-        { symbol: 'GOOGL', quantity: 5, price: 2750.80, value: 13754.00 },
-        { symbol: 'TSLA', quantity: 8, price: 245.60, value: 1964.80 }
-      ],
-      cash: 5000.00,
+      totalValue: mockPortfolioData.totalValue,
+      dayChange: mockPortfolioData.dayChange,
+      dayChangePercent: mockPortfolioData.dayChangePercent,
+      cash: mockPortfolioData.cash,
+      lastUpdated: mockPortfolioData.lastUpdated
+    },
+    message: 'Simple portfolio data'
+  });
+});
+
+// 2. Live Portfolio Data
+app.get('/api/portfolio/fetch-live', (req, res) => {
+  const userId = req.query.user_id;
+  logger.info('Live portfolio data requested', { userId });
+  res.json({
+    success: true,
+    data: {
+      ...mockPortfolioData,
+      isLive: true,
+      marketStatus: 'OPEN',
       lastUpdated: new Date().toISOString()
     },
-    message: 'Mock portfolio data'
+    message: 'Live portfolio data'
+  });
+});
+
+// 3. Portfolio History
+app.get('/api/portfolio/history', (req, res) => {
+  const { user_id, time_range } = req.query;
+  logger.info('Portfolio history requested', { userId: user_id, timeRange: time_range });
+  
+  // Generate mock historical data
+  const historyData = [];
+  const days = time_range === '1D' ? 1 : time_range === '1W' ? 7 : time_range === '1M' ? 30 : 90;
+  
+  for (let i = days; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    historyData.push({
+      date: date.toISOString(),
+      value: mockPortfolioData.totalValue + (Math.random() - 0.5) * 5000,
+      change: (Math.random() - 0.5) * 1000
+    });
+  }
+  
+  res.json({
+    success: true,
+    data: historyData,
+    timeRange: time_range,
+    message: 'Portfolio history data'
+  });
+});
+
+// 4. Portfolio Performance
+app.get('/api/portfolio/performance', (req, res) => {
+  const { user_id, time_range } = req.query;
+  logger.info('Portfolio performance requested', { userId: user_id, timeRange: time_range });
+  
+  res.json({
+    success: true,
+    data: {
+      totalReturn: 15250.75,
+      totalReturnPercent: 18.45,
+      dayReturn: mockPortfolioData.dayChange,
+      dayReturnPercent: mockPortfolioData.dayChangePercent,
+      weekReturn: 2850.30,
+      weekReturnPercent: 2.95,
+      monthReturn: 8420.60,
+      monthReturnPercent: 9.12,
+      yearReturn: 15250.75,
+      yearReturnPercent: 18.45,
+      benchmarkComparison: {
+        sp500: { return: 12.5, outperformance: 5.95 },
+        nasdaq: { return: 15.2, outperformance: 3.25 }
+      }
+    },
+    message: 'Portfolio performance data'
+  });
+});
+
+// 5. Portfolio Summary
+app.get('/api/portfolio/summary', (req, res) => {
+  const userId = req.query.user_id;
+  logger.info('Portfolio summary requested', { userId });
+  
+  res.json({
+    success: true,
+    data: {
+      totalValue: mockPortfolioData.totalValue,
+      totalPositions: mockPortfolioData.positions.length,
+      totalCash: mockPortfolioData.cash,
+      dayChange: mockPortfolioData.dayChange,
+      dayChangePercent: mockPortfolioData.dayChangePercent,
+      topPerformer: mockPortfolioData.positions[0],
+      worstPerformer: mockPortfolioData.positions[1],
+      diversificationScore: 85,
+      riskScore: 'MODERATE'
+    },
+    message: 'Portfolio summary data'
+  });
+});
+
+// 6. Portfolio Analysis
+app.get('/api/portfolio/analyze', (req, res) => {
+  logger.info('Portfolio analysis requested');
+  
+  res.json({
+    success: true,
+    data: {
+      healthScore: 82,
+      riskAssessment: {
+        overall: 'MODERATE',
+        concentration: 'LOW',
+        volatility: 'MEDIUM',
+        correlation: 'LOW'
+      },
+      diversification: {
+        score: 85,
+        sectors: {
+          'Technology': 45,
+          'Healthcare': 20,
+          'Finance': 15,
+          'Consumer': 12,
+          'Energy': 8
+        }
+      },
+      recommendations: [
+        {
+          type: 'REBALANCE',
+          priority: 'HIGH',
+          message: 'Consider reducing technology exposure',
+          action: 'Sell 10% of tech positions'
+        },
+        {
+          type: 'DIVERSIFY',
+          priority: 'MEDIUM',
+          message: 'Add international exposure',
+          action: 'Consider emerging market ETFs'
+        }
+      ]
+    },
+    message: 'Portfolio analysis complete'
+  });
+});
+
+// 7. Portfolio Holdings
+app.get('/api/portfolio/holdings', (req, res) => {
+  const userId = req.query.user_id;
+  logger.info('Portfolio holdings requested', { userId });
+  
+  res.json({
+    success: true,
+    data: mockPortfolioData.positions.map(position => ({
+      ...position,
+      sector: position.symbol === 'AAPL' ? 'Technology' : 
+              position.symbol === 'GOOGL' ? 'Technology' :
+              position.symbol === 'TSLA' ? 'Automotive' :
+              position.symbol === 'MSFT' ? 'Technology' : 'E-commerce',
+      marketCap: 'LARGE',
+      dividendYield: Math.random() * 3,
+      peRatio: 15 + Math.random() * 20
+    })),
+    message: 'Portfolio holdings data'
+  });
+});
+
+// 8. Portfolio Allocation
+app.get('/api/portfolio/allocation', (req, res) => {
+  const userId = req.query.user_id;
+  logger.info('Portfolio allocation requested', { userId });
+  
+  res.json({
+    success: true,
+    data: {
+      byAssetType: {
+        'Stocks': 85,
+        'ETFs': 10,
+        'Cash': 5
+      },
+      bySector: {
+        'Technology': 45,
+        'Healthcare': 20,
+        'Finance': 15,
+        'Consumer': 12,
+        'Energy': 8
+      },
+      byMarketCap: {
+        'Large Cap': 70,
+        'Mid Cap': 20,
+        'Small Cap': 10
+      },
+      byGeography: {
+        'US': 80,
+        'International': 15,
+        'Emerging': 5
+      }
+    },
+    message: 'Portfolio allocation data'
+  });
+});
+
+// Legacy endpoint (keep for backward compatibility)
+app.get('/api/portfolio/latest/:userId', (req, res) => {
+  logger.info('Legacy portfolio data requested', { userId: req.params.userId });
+  res.json({
+    success: true,
+    data: mockPortfolioData,
+    message: 'Legacy portfolio endpoint - use /api/portfolio/latest-simple instead'
   });
 });
 
