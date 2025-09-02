@@ -117,6 +117,75 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// Broker endpoints (mock implementation for frontend compatibility)
+app.get('/broker/test-oauth', (req, res) => {
+  logger.info('Broker OAuth test requested', { query: req.query });
+  res.json({
+    success: true,
+    message: 'OAuth test endpoint - mock implementation',
+    timestamp: new Date().toISOString(),
+    query: req.query
+  });
+});
+
+app.post('/broker/test-oauth', (req, res) => {
+  logger.info('Broker OAuth setup requested', { body: req.body });
+  res.json({
+    success: true,
+    message: 'OAuth setup completed - mock implementation',
+    timestamp: new Date().toISOString(),
+    data: {
+      oauth_url: 'https://mock-broker-oauth.example.com/auth',
+      state: 'mock_state_' + Date.now()
+    }
+  });
+});
+
+// Broker config endpoints
+app.get('/api/broker/configs', (req, res) => {
+  logger.info('Broker configs requested');
+  res.json({
+    success: true,
+    data: [],
+    message: 'No broker configurations found - mock implementation'
+  });
+});
+
+app.post('/api/broker/configs', (req, res) => {
+  logger.info('Broker config creation requested', { body: req.body });
+  res.json({
+    success: true,
+    data: {
+      id: 'mock_config_' + Date.now(),
+      ...req.body,
+      created_at: new Date().toISOString(),
+      is_connected: false
+    },
+    message: 'Broker configuration created - mock implementation'
+  });
+});
+
+// Portfolio endpoints (mock implementation)
+app.get('/api/portfolio/latest/:userId', (req, res) => {
+  logger.info('Portfolio data requested', { userId: req.params.userId });
+  res.json({
+    success: true,
+    data: {
+      totalValue: 100000,
+      dayChange: 1250.50,
+      dayChangePercent: 1.27,
+      positions: [
+        { symbol: 'AAPL', quantity: 10, price: 150.25, value: 1502.50 },
+        { symbol: 'GOOGL', quantity: 5, price: 2750.80, value: 13754.00 },
+        { symbol: 'TSLA', quantity: 8, price: 245.60, value: 1964.80 }
+      ],
+      cash: 5000.00,
+      lastUpdated: new Date().toISOString()
+    },
+    message: 'Mock portfolio data'
+  });
+});
+
 // Safe initialization functions
 async function initializeCoreServices() {
   try {
