@@ -5,7 +5,8 @@
   "main": "server-modular.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node railway-debug.js",
+    "start": "node server-modular-safe.js",
+    "start:debug": "node railway-debug.js",
     "start:full": "node server-modular.js",
     "dev": "nodemon server-modular.js",
     "build": "echo 'Backend is ready to run'",
