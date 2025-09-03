@@ -129,12 +129,16 @@ async function mountModuleRoutes(app, modules) {
           if (routes) {
             const mountPath = `/api/modules/${moduleName}`;
             app.use(mountPath, routes);
+            // Set the routes property on the module for debug endpoint
+            moduleInfo.routes = true;
             logger.info(`✅ Mounted routes for module '${moduleName}' at ${mountPath}`);
           } else {
             logger.warn(`   - getRoutes() returned null/undefined for '${moduleName}'`);
+            moduleInfo.routes = false;
           }
         } else {
           logger.warn(`   - Module '${moduleName}' does not have getRoutes method`);
+          moduleInfo.routes = false;
         }
       } catch (error) {
         logger.error(`❌ Failed to mount routes for module '${moduleName}':`, error);
