@@ -80,7 +80,7 @@ module.exports = {
   },
   
   setupEventListeners(container) {
-    const eventBus = container.get('eventBusRouter');
+    const eventBus = container.get('eventBus');
     const authService = container.get('authService');
     
     // Listen for auth events and re-emit them to the central event bus
