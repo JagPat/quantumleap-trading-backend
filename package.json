@@ -34,7 +34,8 @@
     "lodash": "^4.17.21",
     "kiteconnect": "^4.0.3",
     "joi": "^17.11.0",
-    "pg": "^8.11.3"
+    "pg": "^8.11.3",
+    "sequelize": "^6.35.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",
