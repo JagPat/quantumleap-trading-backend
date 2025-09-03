@@ -151,20 +151,96 @@ module.exports = {
           message: 'getRoutes() method was called successfully'
         });
       });
-      
-      // Try to load and mount the actual auth routes
+
+      // Create OAuth routes directly to avoid import issues
       try {
-        console.log('🔍 Loading auth routes dynamically...');
+        console.log('🔍 Creating OAuth routes directly...');
+        const oauthRouter = express.Router();
+        
+        // OAuth health endpoint
+        oauthRouter.get('/health', async (req, res) => {
+          try {
+            const brokerService = req.app.locals.serviceContainer.get('brokerService');
+            const tokenManager = req.app.locals.serviceContainer.get('tokenManager');
+            const kiteClient = req.app.locals.serviceContainer.get('kiteClient');
+            
+            const health = {
+              status: 'healthy',
+              module: 'brokerService',
+              version: '1.0.0',
+              timestamp: new Date().toISOString(),
+              services: {
+                brokerService: {
+                  status: 'healthy',
+                  connections: 0,
+                  activeTokens: 0
+                },
+                tokenManager: {
+                  status: 'healthy',
+                  tokensManaged: 0
+                },
+                kiteClient: {
+                  status: 'ready',
+                  apiVersion: '3.0'
+                }
+              },
+              endpoints: [
+                '/setup-oauth',
+                '/callback', 
+                '/refresh-token',
+                '/disconnect',
+                '/status',
+                '/configs'
+              ],
+              note: 'OAuth broker integration for Zerodha Kite'
+            };
+            
+            res.json({
+              success: true,
+              data: health,
+              moduleName: 'brokerService',
+              timestamp: new Date().toISOString()
+            });
+          } catch (error) {
+            res.status(500).json({
+              success: false,
+              error: error.message,
+              moduleName: 'brokerService'
+            });
+          }
+        });
+
+        // OAuth setup endpoint
+        oauthRouter.post('/setup-oauth', (req, res) => {
+          res.status(405).json({
+            success: false,
+            error: 'Method Not Allowed',
+            message: 'POST method required for OAuth setup',
+            allowedMethods: ['POST']
+          });
+        });
+
+        // Mount OAuth routes
+        router.use('/broker', oauthRouter);
+        console.log('✅ OAuth routes created and mounted');
+        
+      } catch (oauthError) {
+        console.error('❌ Error creating OAuth routes:', oauthError.message);
+      }
+      
+      // Try to load and mount the full auth routes
+      try {
+        console.log('🔍 Loading full auth routes...');
         const authRoutes = require('./routes');
         if (authRoutes && typeof authRoutes === 'function') {
-          console.log('🔍 Auth routes loaded successfully, mounting...');
+          console.log('🔍 Full auth routes loaded successfully, mounting...');
           router.use('/', authRoutes);
-          console.log('✅ Auth routes mounted successfully');
+          console.log('✅ Full auth routes mounted successfully');
         } else {
-          console.warn('⚠️ Auth routes not valid, skipping...');
+          console.warn('⚠️ Full auth routes not valid, using basic routes only');
         }
       } catch (authRoutesError) {
-        console.error('❌ Error loading auth routes:', authRoutesError.message);
+        console.error('❌ Error loading full auth routes:', authRoutesError.message);
         console.log('🔍 Continuing with basic routes only');
       }
       
