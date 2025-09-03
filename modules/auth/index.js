@@ -126,28 +126,37 @@ module.exports = {
   
   getRoutes() {
     try {
-      // Debug: Log the router stack to verify routes are registered
-      const routes = authRoutes;
-      console.log('🔍 Auth getRoutes() called');
-      console.log('🔍 Routes type:', typeof routes);
-      console.log('🔍 Routes defined:', !!routes);
+      console.log('🔍 Auth getRoutes() called - START');
+      console.log('🔍 authRoutes import type:', typeof authRoutes);
+      console.log('🔍 authRoutes defined:', !!authRoutes);
       
-      if (routes && routes.stack) {
-        console.log('🔍 Auth Router Stack Debug:');
-        routes.stack.forEach((layer, index) => {
-          if (layer.route) {
-            const methods = Object.keys(layer.route.methods);
-            console.log(`  ${index}: ${methods.join(',').toUpperCase()} ${layer.route.path}`);
-          } else if (layer.regexp) {
-            console.log(`  ${index}: MIDDLEWARE ${layer.regexp}`);
-          }
-        });
+      // Test if authRoutes can be called
+      if (typeof authRoutes === 'function') {
+        console.log('🔍 authRoutes is a function (Express router)');
+        console.log('🔍 authRoutes.stack exists:', !!authRoutes.stack);
+        console.log('🔍 authRoutes.stack length:', authRoutes.stack ? authRoutes.stack.length : 'N/A');
+        
+        if (authRoutes.stack) {
+          console.log('🔍 Auth Router Stack Debug:');
+          authRoutes.stack.forEach((layer, index) => {
+            if (layer.route) {
+              const methods = Object.keys(layer.route.methods);
+              console.log(`  ${index}: ${methods.join(',').toUpperCase()} ${layer.route.path}`);
+            } else if (layer.regexp) {
+              console.log(`  ${index}: MIDDLEWARE ${layer.regexp}`);
+            }
+          });
+        }
+        
+        console.log('🔍 Returning authRoutes');
+        return authRoutes;
       } else {
-        console.log('🔍 No routes stack found');
+        console.error('❌ authRoutes is not a function:', typeof authRoutes);
+        return null;
       }
-      return routes;
     } catch (error) {
       console.error('❌ Error in auth getRoutes():', error);
+      console.error('❌ Error stack:', error.stack);
       return null;
     }
   },
