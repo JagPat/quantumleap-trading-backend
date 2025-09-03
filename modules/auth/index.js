@@ -126,11 +126,14 @@ module.exports = {
   },
   
   getRoutes() {
+    console.log('🔍 Auth getRoutes() called - START');
+    this._getRoutesCalled = true;
+    
     try {
-      console.log('🔍 Auth getRoutes() called - START');
-      this._getRoutesCalled = true;
       const express = require('express');
       const router = express.Router();
+      
+      console.log('🔍 Creating basic auth routes...');
       
       // Test endpoint to verify routes are working
       router.get('/test', (req, res) => {
@@ -152,104 +155,100 @@ module.exports = {
         });
       });
 
-      // Create OAuth routes directly to avoid import issues
-      try {
-        console.log('🔍 Creating OAuth routes directly...');
-        const oauthRouter = express.Router();
-        
-        // OAuth health endpoint
-        oauthRouter.get('/health', async (req, res) => {
-          try {
-            const brokerService = req.app.locals.serviceContainer.get('brokerService');
-            const tokenManager = req.app.locals.serviceContainer.get('tokenManager');
-            const kiteClient = req.app.locals.serviceContainer.get('kiteClient');
-            
-            const health = {
-              status: 'healthy',
-              module: 'brokerService',
-              version: '1.0.0',
-              timestamp: new Date().toISOString(),
-              services: {
-                brokerService: {
-                  status: 'healthy',
-                  connections: 0,
-                  activeTokens: 0
-                },
-                tokenManager: {
-                  status: 'healthy',
-                  tokensManaged: 0
-                },
-                kiteClient: {
-                  status: 'ready',
-                  apiVersion: '3.0'
-                }
+      console.log('🔍 Creating OAuth routes...');
+      
+      // Create OAuth routes directly
+      const oauthRouter = express.Router();
+      
+      // OAuth health endpoint
+      oauthRouter.get('/health', async (req, res) => {
+        try {
+          const health = {
+            status: 'healthy',
+            module: 'brokerService',
+            version: '1.0.0',
+            timestamp: new Date().toISOString(),
+            services: {
+              brokerService: {
+                status: 'healthy',
+                connections: 0,
+                activeTokens: 0
               },
-              endpoints: [
-                '/setup-oauth',
-                '/callback', 
-                '/refresh-token',
-                '/disconnect',
-                '/status',
-                '/configs'
-              ],
-              note: 'OAuth broker integration for Zerodha Kite'
-            };
-            
-            res.json({
-              success: true,
-              data: health,
-              moduleName: 'brokerService',
-              timestamp: new Date().toISOString()
-            });
-          } catch (error) {
-            res.status(500).json({
-              success: false,
-              error: error.message,
-              moduleName: 'brokerService'
-            });
-          }
-        });
-
-        // OAuth setup endpoint
-        oauthRouter.post('/setup-oauth', (req, res) => {
-          res.status(405).json({
+              tokenManager: {
+                status: 'healthy',
+                tokensManaged: 0
+              },
+              kiteClient: {
+                status: 'ready',
+                apiVersion: '3.0'
+              }
+            },
+            endpoints: [
+              '/setup-oauth',
+              '/callback', 
+              '/refresh-token',
+              '/disconnect',
+              '/status',
+              '/configs'
+            ],
+            note: 'OAuth broker integration for Zerodha Kite'
+          };
+          
+          res.json({
+            success: true,
+            data: health,
+            moduleName: 'brokerService',
+            timestamp: new Date().toISOString()
+          });
+        } catch (error) {
+          res.status(500).json({
             success: false,
-            error: 'Method Not Allowed',
-            message: 'POST method required for OAuth setup',
-            allowedMethods: ['POST']
+            error: error.message,
+            moduleName: 'brokerService'
+          });
+        }
+      });
+
+      // OAuth setup endpoint
+      oauthRouter.post('/setup-oauth', (req, res) => {
+        res.status(405).json({
+          success: false,
+          error: 'Method Not Allowed',
+          message: 'POST method required for OAuth setup',
+          allowedMethods: ['POST']
+        });
+      });
+
+      // Mount OAuth routes
+      router.use('/broker', oauthRouter);
+      console.log('✅ OAuth routes created and mounted');
+      
+      console.log('🔍 Router created with', router.stack.length, 'routes');
+      console.log('🔍 Auth getRoutes() - SUCCESS, returning router');
+      
+      return router;
+      
+    } catch (error) {
+      console.error('❌ CRITICAL ERROR in auth getRoutes():', error);
+      console.error('❌ Error stack:', error.stack);
+      
+      // Return a minimal router even on error to prevent null return
+      try {
+        const express = require('express');
+        const fallbackRouter = express.Router();
+        fallbackRouter.get('/error', (req, res) => {
+          res.status(500).json({
+            success: false,
+            error: 'Auth module failed to initialize routes',
+            timestamp: new Date().toISOString()
           });
         });
-
-        // Mount OAuth routes
-        router.use('/broker', oauthRouter);
-        console.log('✅ OAuth routes created and mounted');
-        
-      } catch (oauthError) {
-        console.error('❌ Error creating OAuth routes:', oauthError.message);
+        console.log('🔍 Returning fallback router due to error');
+        return fallbackRouter;
+      } catch (fallbackError) {
+        console.error('❌ FATAL: Cannot create fallback router:', fallbackError);
+        return null;
       }
-      
-      // Try to load and mount the full auth routes
-      try {
-        console.log('🔍 Loading full auth routes...');
-        const authRoutes = require('./routes');
-        if (authRoutes && typeof authRoutes === 'function') {
-          console.log('🔍 Full auth routes loaded successfully, mounting...');
-          router.use('/', authRoutes);
-          console.log('✅ Full auth routes mounted successfully');
-        } else {
-          console.warn('⚠️ Full auth routes not valid, using basic routes only');
-        }
-      } catch (authRoutesError) {
-        console.error('❌ Error loading full auth routes:', authRoutesError.message);
-        console.log('🔍 Continuing with basic routes only');
-      }
-      
-      console.log('🔍 Returning router with', router.stack.length, 'routes');
-      return router;
-    } catch (error) {
-      console.error('❌ Error in auth getRoutes():', error);
-      console.error('❌ Error stack:', error.stack);
-      return null;
     }
   },
   
