@@ -125,18 +125,31 @@ module.exports = {
   },
   
   getRoutes() {
-    // Debug: Log the router stack to verify routes are registered
-    const routes = authRoutes;
-    if (routes && routes.stack) {
-      console.log('🔍 Auth Router Stack Debug:');
-      routes.stack.forEach((layer, index) => {
-        if (layer.route) {
-          const methods = Object.keys(layer.route.methods);
-          console.log(`  ${index}: ${methods.join(',').toUpperCase()} ${layer.route.path}`);
-        }
-      });
+    try {
+      // Debug: Log the router stack to verify routes are registered
+      const routes = authRoutes;
+      console.log('🔍 Auth getRoutes() called');
+      console.log('🔍 Routes type:', typeof routes);
+      console.log('🔍 Routes defined:', !!routes);
+      
+      if (routes && routes.stack) {
+        console.log('🔍 Auth Router Stack Debug:');
+        routes.stack.forEach((layer, index) => {
+          if (layer.route) {
+            const methods = Object.keys(layer.route.methods);
+            console.log(`  ${index}: ${methods.join(',').toUpperCase()} ${layer.route.path}`);
+          } else if (layer.regexp) {
+            console.log(`  ${index}: MIDDLEWARE ${layer.regexp}`);
+          }
+        });
+      } else {
+        console.log('🔍 No routes stack found');
+      }
+      return routes;
+    } catch (error) {
+      console.error('❌ Error in auth getRoutes():', error);
+      return null;
     }
-    return routes;
   },
   
   getHealthCheck() {
