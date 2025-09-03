@@ -16,6 +16,12 @@ module.exports = {
       container.register('User', User);
       container.register('Otp', Otp);
       
+      // Register OAuth models
+      const BrokerConfig = require('./models/brokerConfig');
+      const OAuthToken = require('./models/oauthToken');
+      container.register('BrokerConfig', BrokerConfig);
+      container.register('OAuthToken', OAuthToken);
+      
       // Register rate limiter
       const rateLimiter = new RateLimiter();
       container.register('rateLimiter', rateLimiter);
@@ -24,22 +30,46 @@ module.exports = {
       const authService = new AuthService(container);
       container.register('authService', authService);
       
+      // Register OAuth services
+      const BrokerService = require('./services/brokerService');
+      const TokenManager = require('./services/tokenManager');
+      const KiteClient = require('./services/kiteClient');
+      
+      const brokerService = new BrokerService();
+      const tokenManager = new TokenManager();
+      const kiteClient = new KiteClient();
+      
+      container.register('brokerService', brokerService);
+      container.register('tokenManager', tokenManager);
+      container.register('kiteClient', kiteClient);
+      
       // Get logger from container
       this.logger = container.get('logger');
       
+      // Initialize OAuth database schema
+      try {
+        const { initialize: initOAuth } = require('../../core/database/initOAuth');
+        await initOAuth();
+        this.logger.info('OAuth database schema initialized');
+      } catch (error) {
+        this.logger.warn('OAuth database initialization failed (continuing):', error.message);
+      }
+      
       this.logger.info('AuthService initialized');
+      this.logger.info('OAuth services initialized');
       
       // Setup event listeners
       this.setupEventListeners(container);
       
       this.logger.info('Auth module initialized successfully');
       this.logger.info('Auth routes registered at /api/modules/auth');
+      this.logger.info('OAuth routes registered at /api/modules/auth/broker');
       
       return {
         status: 'initialized',
         routes: 'registered',
-        services: ['authService', 'rateLimiter'],
-        models: ['User', 'Otp']
+        services: ['authService', 'rateLimiter', 'brokerService', 'tokenManager', 'kiteClient'],
+        models: ['User', 'Otp', 'BrokerConfig', 'OAuthToken']
       };
       
     } catch (error) {

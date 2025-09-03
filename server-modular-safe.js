@@ -117,52 +117,17 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Broker endpoints (mock implementation for frontend compatibility)
-app.get('/broker/test-oauth', (req, res) => {
-  logger.info('Broker OAuth test requested', { query: req.query });
-  res.json({
-    success: true,
-    message: 'OAuth test endpoint - mock implementation',
-    timestamp: new Date().toISOString(),
-    query: req.query
-  });
+// OAuth broker endpoints - redirect to auth module
+app.use('/broker', (req, res, next) => {
+  // Redirect broker endpoints to auth module OAuth routes
+  req.url = '/api/modules/auth/broker' + req.url;
+  next();
 });
 
-app.post('/broker/test-oauth', (req, res) => {
-  logger.info('Broker OAuth setup requested', { body: req.body });
-  res.json({
-    success: true,
-    message: 'OAuth setup completed - mock implementation',
-    timestamp: new Date().toISOString(),
-    data: {
-      oauth_url: 'https://mock-broker-oauth.example.com/auth',
-      state: 'mock_state_' + Date.now()
-    }
-  });
-});
-
-// Broker config endpoints
-app.get('/api/broker/configs', (req, res) => {
-  logger.info('Broker configs requested');
-  res.json({
-    success: true,
-    data: [],
-    message: 'No broker configurations found - mock implementation'
-  });
-});
-
-app.post('/api/broker/configs', (req, res) => {
-  logger.info('Broker config creation requested', { body: req.body });
-  res.json({
-    success: true,
-    data: {
-      id: 'mock_config_' + Date.now(),
-      ...req.body,
-      created_at: new Date().toISOString(),
-      is_connected: false
-    },
-    message: 'Broker configuration created - mock implementation'
-  });
+app.use('/api/broker', (req, res, next) => {
+  // Redirect API broker endpoints to auth module OAuth routes
+  req.url = '/api/modules/auth/broker' + req.url.replace('/api/broker', '');
+  next();
 });
 
 // Portfolio endpoints (comprehensive mock implementation)

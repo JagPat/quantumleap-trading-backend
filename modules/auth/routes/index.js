@@ -1,8 +1,12 @@
 const express = require('express');
 const Joi = require('joi');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const oauthRoutes = require('./oauth');
 
 const router = express.Router();
+
+// Mount OAuth routes
+router.use('/broker', oauthRoutes);
 
 // Validation schemas
 const otpRequestSchema = Joi.object({
