@@ -72,7 +72,8 @@ class ModuleLoader {
       this.logger.info(`Loading module: ${moduleInfo.name}`);
       
       // Load module definition
-      const moduleDefinition = require(moduleInfo.indexPath);
+      const absolutePath = path.resolve(moduleInfo.indexPath);
+      const moduleDefinition = require(absolutePath);
       
       // Validate module structure
       if (!this.validateModuleDefinition(moduleDefinition, moduleInfo.name)) {
