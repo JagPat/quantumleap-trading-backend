@@ -128,130 +128,49 @@ module.exports = {
   },
   
   getRoutes() {
-    console.log('🔍 Auth getRoutes() called - START');
+    // Log to console AND write to a file to ensure we can see this
+    const logMessage = `🔍 Auth getRoutes() called at ${new Date().toISOString()}`;
+    console.log(logMessage);
+    
+    // Try to write to a log file as well
+    try {
+      const fs = require('fs');
+      fs.appendFileSync('/tmp/auth-routes.log', logMessage + '\n');
+    } catch (e) {
+      // Ignore file write errors
+    }
+    
     this._getRoutesCalled = true;
     
-    try {
-      const express = require('express');
-      const router = express.Router();
-      
-      console.log('🔍 Creating basic auth routes...');
-      
-      // Test endpoint to verify routes are working
-      router.get('/test', (req, res) => {
-        res.json({
-          success: true,
-          message: 'Auth module routes are working!',
-          timestamp: new Date().toISOString(),
-          getRoutesCalled: true
-        });
+    // Create the simplest possible router
+    const express = require('express');
+    const router = express.Router();
+    
+    // Absolute minimal test route
+    router.get('/test', (req, res) => {
+      res.json({
+        success: true,
+        message: 'Auth routes working!',
+        timestamp: new Date().toISOString()
       });
-      
-      // Debug endpoint
-      router.get('/debug-routes', (req, res) => {
-        res.json({
-          success: true,
-          getRoutesCalled: this._getRoutesCalled,
+    });
+    
+    // OAuth health route
+    router.get('/broker/health', (req, res) => {
+      res.json({
+        success: true,
+        data: {
+          status: 'healthy',
+          module: 'brokerService',
+          version: '1.0.0',
           timestamp: new Date().toISOString(),
-          message: 'getRoutes() method was called successfully'
-        });
-      });
-
-      console.log('🔍 Creating OAuth routes...');
-      
-      // Create OAuth routes directly
-      const oauthRouter = express.Router();
-      
-      // OAuth health endpoint
-      oauthRouter.get('/health', async (req, res) => {
-        try {
-          const health = {
-            status: 'healthy',
-            module: 'brokerService',
-            version: '1.0.0',
-            timestamp: new Date().toISOString(),
-            services: {
-              brokerService: {
-                status: 'healthy',
-                connections: 0,
-                activeTokens: 0
-              },
-              tokenManager: {
-                status: 'healthy',
-                tokensManaged: 0
-              },
-              kiteClient: {
-                status: 'ready',
-                apiVersion: '3.0'
-              }
-            },
-            endpoints: [
-              '/setup-oauth',
-              '/callback', 
-              '/refresh-token',
-              '/disconnect',
-              '/status',
-              '/configs'
-            ],
-            note: 'OAuth broker integration for Zerodha Kite'
-          };
-          
-          res.json({
-            success: true,
-            data: health,
-            moduleName: 'brokerService',
-            timestamp: new Date().toISOString()
-          });
-        } catch (error) {
-          res.status(500).json({
-            success: false,
-            error: error.message,
-            moduleName: 'brokerService'
-          });
+          note: 'OAuth broker integration for Zerodha Kite'
         }
       });
-
-      // OAuth setup endpoint
-      oauthRouter.post('/setup-oauth', (req, res) => {
-        res.status(405).json({
-          success: false,
-          error: 'Method Not Allowed',
-          message: 'POST method required for OAuth setup',
-          allowedMethods: ['POST']
-        });
-      });
-
-      // Mount OAuth routes
-      router.use('/broker', oauthRouter);
-      console.log('✅ OAuth routes created and mounted');
-      
-      console.log('🔍 Router created with', router.stack.length, 'routes');
-      console.log('🔍 Auth getRoutes() - SUCCESS, returning router');
-      
-      return router;
-      
-    } catch (error) {
-      console.error('❌ CRITICAL ERROR in auth getRoutes():', error);
-      console.error('❌ Error stack:', error.stack);
-      
-      // Return a minimal router even on error to prevent null return
-      try {
-        const express = require('express');
-        const fallbackRouter = express.Router();
-        fallbackRouter.get('/error', (req, res) => {
-          res.status(500).json({
-            success: false,
-            error: 'Auth module failed to initialize routes',
-            timestamp: new Date().toISOString()
-          });
-        });
-        console.log('🔍 Returning fallback router due to error');
-        return fallbackRouter;
-      } catch (fallbackError) {
-        console.error('❌ FATAL: Cannot create fallback router:', fallbackError);
-        return null;
-      }
-    }
+    });
+    
+    console.log('🔍 Auth getRoutes() returning router with', router.stack.length, 'routes');
+    return router;
   },
   
   getHealthCheck() {
