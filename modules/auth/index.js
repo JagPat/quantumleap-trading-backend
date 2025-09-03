@@ -9,6 +9,7 @@ module.exports = {
   name: 'auth',
   version: '2.0.0',
   description: 'OTP-based authentication and user management',
+  _getRoutesCalled: false,
   
   async initialize(container) {
     try {
@@ -127,6 +128,7 @@ module.exports = {
   getRoutes() {
     try {
       console.log('🔍 Auth getRoutes() called - START');
+      this._getRoutesCalled = true;
       
       // Create a simple test router to verify the system works
       const express = require('express');
@@ -136,11 +138,21 @@ module.exports = {
         res.json({
           success: true,
           message: 'Auth module routes are working!',
+          timestamp: new Date().toISOString(),
+          getRoutesCalled: true
+        });
+      });
+      
+      // Add a debug endpoint to check if getRoutes was called
+      testRouter.get('/debug-routes', (req, res) => {
+        res.json({
+          success: true,
+          getRoutesCalled: this._getRoutesCalled,
           timestamp: new Date().toISOString()
         });
       });
       
-      console.log('🔍 Created test router');
+      console.log('🔍 Created test router with 2 routes');
       console.log('🔍 Test router type:', typeof testRouter);
       console.log('🔍 Test router stack length:', testRouter.stack ? testRouter.stack.length : 'N/A');
       
@@ -153,8 +165,8 @@ module.exports = {
         if (typeof authRoutes === 'function' && authRoutes.stack) {
           console.log('🔍 authRoutes is valid, merging with test router');
           
-          // Mount the auth routes under /auth
-          testRouter.use('/auth', authRoutes);
+          // Mount the auth routes
+          testRouter.use('/', authRoutes);
           
           console.log('🔍 Final router stack length:', testRouter.stack.length);
           return testRouter;
