@@ -9,7 +9,7 @@ const winston = require('winston');
 dotenv.config();
 
 // Immediate startup logging
-console.log('🚀 QuantumLeap Trading Backend Starting...');
+console.log('🚀 QuantumLeap Trading Backend Starting... (v2.0.1)');
 console.log(`📊 PORT: ${process.env.PORT || 'not set'}`);
 console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
 console.log(`🐳 Platform: ${process.platform}`);
