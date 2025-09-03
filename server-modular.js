@@ -118,14 +118,23 @@ async function mountModuleRoutes(app, modules) {
     
     for (const [moduleName, moduleInfo] of modules) {
       try {
+        logger.info(`🔍 Checking module '${moduleName}' for routes...`);
+        logger.info(`   - Module keys: ${Object.keys(moduleInfo)}`);
+        logger.info(`   - Has getRoutes: ${!!moduleInfo.getRoutes}`);
+        
         // Check if module has getRoutes method
         if (moduleInfo.getRoutes && typeof moduleInfo.getRoutes === 'function') {
+          logger.info(`   - Calling getRoutes() for '${moduleName}'...`);
           const routes = moduleInfo.getRoutes();
           if (routes) {
             const mountPath = `/api/modules/${moduleName}`;
             app.use(mountPath, routes);
             logger.info(`✅ Mounted routes for module '${moduleName}' at ${mountPath}`);
+          } else {
+            logger.warn(`   - getRoutes() returned null/undefined for '${moduleName}'`);
           }
+        } else {
+          logger.warn(`   - Module '${moduleName}' does not have getRoutes method`);
         }
       } catch (error) {
         logger.error(`❌ Failed to mount routes for module '${moduleName}':`, error);
