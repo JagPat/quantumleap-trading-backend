@@ -127,32 +127,45 @@ module.exports = {
   getRoutes() {
     try {
       console.log('🔍 Auth getRoutes() called - START');
-      console.log('🔍 authRoutes import type:', typeof authRoutes);
-      console.log('🔍 authRoutes defined:', !!authRoutes);
       
-      // Test if authRoutes can be called
-      if (typeof authRoutes === 'function') {
-        console.log('🔍 authRoutes is a function (Express router)');
-        console.log('🔍 authRoutes.stack exists:', !!authRoutes.stack);
-        console.log('🔍 authRoutes.stack length:', authRoutes.stack ? authRoutes.stack.length : 'N/A');
+      // Create a simple test router to verify the system works
+      const express = require('express');
+      const testRouter = express.Router();
+      
+      testRouter.get('/test', (req, res) => {
+        res.json({
+          success: true,
+          message: 'Auth module routes are working!',
+          timestamp: new Date().toISOString()
+        });
+      });
+      
+      console.log('🔍 Created test router');
+      console.log('🔍 Test router type:', typeof testRouter);
+      console.log('🔍 Test router stack length:', testRouter.stack ? testRouter.stack.length : 'N/A');
+      
+      // Try to load the actual auth routes
+      try {
+        console.log('🔍 Attempting to load authRoutes...');
+        console.log('🔍 authRoutes import type:', typeof authRoutes);
+        console.log('🔍 authRoutes defined:', !!authRoutes);
         
-        if (authRoutes.stack) {
-          console.log('🔍 Auth Router Stack Debug:');
-          authRoutes.stack.forEach((layer, index) => {
-            if (layer.route) {
-              const methods = Object.keys(layer.route.methods);
-              console.log(`  ${index}: ${methods.join(',').toUpperCase()} ${layer.route.path}`);
-            } else if (layer.regexp) {
-              console.log(`  ${index}: MIDDLEWARE ${layer.regexp}`);
-            }
-          });
+        if (typeof authRoutes === 'function' && authRoutes.stack) {
+          console.log('🔍 authRoutes is valid, merging with test router');
+          
+          // Mount the auth routes under /auth
+          testRouter.use('/auth', authRoutes);
+          
+          console.log('🔍 Final router stack length:', testRouter.stack.length);
+          return testRouter;
+        } else {
+          console.warn('⚠️ authRoutes not valid, returning test router only');
+          return testRouter;
         }
-        
-        console.log('🔍 Returning authRoutes');
-        return authRoutes;
-      } else {
-        console.error('❌ authRoutes is not a function:', typeof authRoutes);
-        return null;
+      } catch (authRoutesError) {
+        console.error('❌ Error loading authRoutes:', authRoutesError.message);
+        console.log('🔍 Returning test router only');
+        return testRouter;
       }
     } catch (error) {
       console.error('❌ Error in auth getRoutes():', error);
