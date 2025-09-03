@@ -147,6 +147,50 @@ module.exports = {
       });
     });
     
+    // Debug route to check module status
+    router.get('/debug', (req, res) => {
+      res.json({
+        success: true,
+        data: {
+          name: this.name,
+          version: this.version,
+          status: 'initialized',
+          description: this.description,
+          registeredAt: new Date().toISOString(),
+          methods: {
+            hasHealth: typeof this.getHealthCheck === 'function',
+            hasInitialize: typeof this.initialize === 'function',
+            hasStart: typeof this.start === 'function',
+            hasStop: typeof this.stop === 'function'
+          },
+          dependencies: [],
+          provides: [],
+          services: {},
+          routes: 'registered'
+        },
+        moduleName: this.name,
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    // Mount OAuth routes at /broker
+    try {
+      const oauthRoutes = require('./routes/oauth');
+      router.use('/broker', oauthRoutes);
+      console.log('✅ OAuth routes mounted at /broker');
+    } catch (error) {
+      console.error('❌ Failed to load OAuth routes:', error);
+      // Add fallback route to show the error
+      router.get('/broker/error', (req, res) => {
+        res.status(500).json({
+          success: false,
+          error: 'OAuth routes failed to load',
+          message: error.message,
+          timestamp: new Date().toISOString()
+        });
+      });
+    }
+    
     // Add a catch-all route to see what's happening
     router.use('*', (req, res, next) => {
       console.log('🔍 Auth catch-all route hit:', req.method, req.path);

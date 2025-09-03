@@ -183,6 +183,17 @@ async function initializeModules() {
     // Mount module routes
     await mountModuleRoutes(app, modules, serviceContainer);
     
+    // Add 404 handler AFTER module routes are mounted
+    app.use('*', (req, res) => {
+      logger.warn('Route not found', { path: req.originalUrl });
+      res.status(404).json({ 
+        error: 'Route not found',
+        path: req.originalUrl,
+        server: 'modular',
+        port: PORT
+      });
+    });
+    
     logger.info(`Successfully initialized ${modules.size} modules`);
     return modules;
   } catch (error) {
@@ -442,16 +453,7 @@ app.get('/', (req, res) => {
 // Error handling middleware (preserve current setup)
 app.use(errorHandler);
 
-// 404 handler
-app.use('*', (req, res) => {
-  logger.warn('Route not found', { path: req.originalUrl });
-  res.status(404).json({ 
-    error: 'Route not found',
-    path: req.originalUrl,
-    server: 'modular',
-    port: PORT
-  });
-});
+// Note: 404 handler will be added after module routes are mounted
 
 // Start server
 async function startServer() {

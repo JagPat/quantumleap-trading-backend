@@ -3,6 +3,21 @@ const Joi = require('joi');
 
 const router = express.Router();
 
+// Security middleware (temporarily disabled for deployment)
+// TODO: Re-enable after middleware files are deployed
+// const { createOAuthRateLimiter, createTokenRefreshLimiter } = require('../../../middleware/rateLimiter');
+// const csrfProtection = require('../../../middleware/csrfProtection');
+// const secureLogger = require('../../../middleware/secureLogger');
+// const { securityHeaders, validateInput, requestSizeLimit } = require('../../../middleware/securityHeaders');
+
+// Apply basic security headers
+router.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
 // Lazy initialization functions to avoid loading issues
 const getBrokerService = () => {
   const BrokerService = require('../services/brokerService');
