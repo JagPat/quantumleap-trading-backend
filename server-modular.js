@@ -111,6 +111,34 @@ async function initializeCoreServices() {
   }
 }
 
+// Mount module routes
+async function mountModuleRoutes(app, modules) {
+  try {
+    logger.info('Mounting module routes...');
+    
+    for (const [moduleName, moduleInfo] of modules) {
+      try {
+        // Check if module has getRoutes method
+        if (moduleInfo.getRoutes && typeof moduleInfo.getRoutes === 'function') {
+          const routes = moduleInfo.getRoutes();
+          if (routes) {
+            const mountPath = `/api/modules/${moduleName}`;
+            app.use(mountPath, routes);
+            logger.info(`✅ Mounted routes for module '${moduleName}' at ${mountPath}`);
+          }
+        }
+      } catch (error) {
+        logger.error(`❌ Failed to mount routes for module '${moduleName}':`, error);
+      }
+    }
+    
+    logger.info('Module route mounting completed');
+  } catch (error) {
+    logger.error('Failed to mount module routes:', error);
+    throw error;
+  }
+}
+
 // Initialize modules
 async function initializeModules() {
   try {
@@ -129,6 +157,9 @@ async function initializeModules() {
     
     // Initialize all modules
     await serviceContainer.initializeModules(app);
+    
+    // Mount module routes
+    await mountModuleRoutes(app, modules);
     
     logger.info(`Successfully initialized ${modules.size} modules`);
     return modules;
