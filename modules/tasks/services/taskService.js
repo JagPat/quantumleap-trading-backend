@@ -309,7 +309,7 @@ class TaskService {
         service: 'TaskService',
         timestamp: new Date().toISOString(),
         database: 'connected',
-        eventBusRouter: 'available'
+        eventBus: 'available'
       };
     } catch (error) {
       return {

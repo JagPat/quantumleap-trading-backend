@@ -5,7 +5,7 @@ const { Op } = require('sequelize');
 class AuthService {
   constructor(container) {
     this.logger = container.get('logger');
-    this.eventBus = container.get('eventBusRouter');
+    this.eventBus = container.get('eventBus');
     this.User = container.get('User');
     this.Otp = container.get('Otp');
     this.rateLimiter = container.get('rateLimiter');

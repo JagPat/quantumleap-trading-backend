@@ -43,14 +43,14 @@ const TasksModule = ModuleFactory.createModule({
       
       // Get dependencies from container
       const database = container.get('database');
-      const eventBusRouter = container.get('eventBusRouter');
+      const eventBusRouter = container.get('eventBus');
       
       // Defensive guards for required services
       if (!database) {
         throw new Error('Required service "database" not found in container');
       }
       if (!eventBusRouter) {
-        throw new Error('Required service "eventBusRouter" not found in container');
+        throw new Error('Required service "eventBus" not found in container');
       }
       
       // Initialize task service with shared database connection and event bus router
@@ -58,7 +58,7 @@ const TasksModule = ModuleFactory.createModule({
       
       // Register services with container
       container.register('taskService', this.services.taskService, {
-        dependencies: ['database', 'eventBusRouter']
+        dependencies: ['database', 'eventBus']
       });
       
       // Inject TaskService into app.locals so routes can access it
