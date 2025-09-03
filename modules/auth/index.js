@@ -128,48 +128,35 @@ module.exports = {
   },
   
   getRoutes() {
-    // Log to console AND write to a file to ensure we can see this
-    const logMessage = `🔍 Auth getRoutes() called at ${new Date().toISOString()}`;
-    console.log(logMessage);
+    console.log('🔍 Auth getRoutes() called at', new Date().toISOString());
     
-    // Try to write to a log file as well
-    try {
-      const fs = require('fs');
-      fs.appendFileSync('/tmp/auth-routes.log', logMessage + '\n');
-    } catch (e) {
-      // Ignore file write errors
-    }
-    
-    this._getRoutesCalled = true;
-    
-    // Create the simplest possible router
     const express = require('express');
     const router = express.Router();
     
-    // Absolute minimal test route
+    console.log('🔍 Creating router...');
+    
+    // Test route with detailed logging
     router.get('/test', (req, res) => {
+      console.log('🔍 /test route hit!');
       res.json({
         success: true,
         message: 'Auth routes working!',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        path: req.path,
+        method: req.method
       });
     });
     
-    // OAuth health route
-    router.get('/broker/health', (req, res) => {
-      res.json({
-        success: true,
-        data: {
-          status: 'healthy',
-          module: 'brokerService',
-          version: '1.0.0',
-          timestamp: new Date().toISOString(),
-          note: 'OAuth broker integration for Zerodha Kite'
-        }
-      });
+    // Add a catch-all route to see what's happening
+    router.use('*', (req, res, next) => {
+      console.log('🔍 Auth catch-all route hit:', req.method, req.path);
+      next();
     });
     
-    console.log('🔍 Auth getRoutes() returning router with', router.stack.length, 'routes');
+    console.log('🔍 Router created with stack length:', router.stack ? router.stack.length : 'undefined');
+    console.log('🔍 Router type:', typeof router);
+    console.log('🔍 Router constructor:', router.constructor.name);
+    
     return router;
   },
   
