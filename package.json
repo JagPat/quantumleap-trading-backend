@@ -5,9 +5,9 @@
   "main": "server-modular.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server-modular-safe.js",
+    "start": "node server-modular.js",
     "start:debug": "node railway-debug.js",
-    "start:full": "node server-modular.js",
+    "start:safe": "node server-modular-safe.js",
     "dev": "nodemon server-modular.js",
     "build": "echo 'Backend is ready to run'",
     "test": "jest",
