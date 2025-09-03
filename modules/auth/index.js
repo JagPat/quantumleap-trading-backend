@@ -1,7 +1,7 @@
 const express = require('express');
 const AuthService = require('./services/authService');
 const RateLimiter = require('./services/rateLimiter');
-const authRoutes = require('./routes');
+// Remove top-level import to prevent loading issues
 const User = require('./models/user');
 const Otp = require('./models/otp');
 
@@ -129,12 +129,11 @@ module.exports = {
     try {
       console.log('🔍 Auth getRoutes() called - START');
       this._getRoutesCalled = true;
-      
-      // Create a simple test router to verify the system works
       const express = require('express');
-      const testRouter = express.Router();
+      const router = express.Router();
       
-      testRouter.get('/test', (req, res) => {
+      // Test endpoint to verify routes are working
+      router.get('/test', (req, res) => {
         res.json({
           success: true,
           message: 'Auth module routes are working!',
@@ -143,42 +142,34 @@ module.exports = {
         });
       });
       
-      // Add a debug endpoint to check if getRoutes was called
-      testRouter.get('/debug-routes', (req, res) => {
+      // Debug endpoint
+      router.get('/debug-routes', (req, res) => {
         res.json({
           success: true,
           getRoutesCalled: this._getRoutesCalled,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          message: 'getRoutes() method was called successfully'
         });
       });
       
-      console.log('🔍 Created test router with 2 routes');
-      console.log('🔍 Test router type:', typeof testRouter);
-      console.log('🔍 Test router stack length:', testRouter.stack ? testRouter.stack.length : 'N/A');
-      
-      // Try to load the actual auth routes
+      // Try to load and mount the actual auth routes
       try {
-        console.log('🔍 Attempting to load authRoutes...');
-        console.log('🔍 authRoutes import type:', typeof authRoutes);
-        console.log('🔍 authRoutes defined:', !!authRoutes);
-        
-        if (typeof authRoutes === 'function' && authRoutes.stack) {
-          console.log('🔍 authRoutes is valid, merging with test router');
-          
-          // Mount the auth routes
-          testRouter.use('/', authRoutes);
-          
-          console.log('🔍 Final router stack length:', testRouter.stack.length);
-          return testRouter;
+        console.log('🔍 Loading auth routes dynamically...');
+        const authRoutes = require('./routes');
+        if (authRoutes && typeof authRoutes === 'function') {
+          console.log('🔍 Auth routes loaded successfully, mounting...');
+          router.use('/', authRoutes);
+          console.log('✅ Auth routes mounted successfully');
         } else {
-          console.warn('⚠️ authRoutes not valid, returning test router only');
-          return testRouter;
+          console.warn('⚠️ Auth routes not valid, skipping...');
         }
       } catch (authRoutesError) {
-        console.error('❌ Error loading authRoutes:', authRoutesError.message);
-        console.log('🔍 Returning test router only');
-        return testRouter;
+        console.error('❌ Error loading auth routes:', authRoutesError.message);
+        console.log('🔍 Continuing with basic routes only');
       }
+      
+      console.log('🔍 Returning router with', router.stack.length, 'routes');
+      return router;
     } catch (error) {
       console.error('❌ Error in auth getRoutes():', error);
       console.error('❌ Error stack:', error.stack);
