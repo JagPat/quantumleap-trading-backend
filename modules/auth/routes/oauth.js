@@ -1,13 +1,28 @@
 const express = require('express');
 const Joi = require('joi');
-const BrokerService = require('../services/brokerService');
-const SecurityManager = require('../../../core/security');
 
 const router = express.Router();
 
-// Initialize services and security
-const brokerService = new BrokerService();
-const security = new SecurityManager();
+// Lazy initialization functions to avoid loading issues
+const getBrokerService = () => {
+  const BrokerService = require('../services/brokerService');
+  return new BrokerService();
+};
+
+const getSecurity = () => {
+  const SecurityManager = require('../../../core/security');
+  return new SecurityManager();
+};
+
+const getBrokerConfig = () => {
+  const BrokerConfig = require('../models/brokerConfig');
+  return new BrokerConfig();
+};
+
+const getOAuthToken = () => {
+  const OAuthToken = require('../models/oauthToken');
+  return new OAuthToken();
+};
 
 // Validation schemas
 const setupOAuthSchema = Joi.object({
@@ -77,6 +92,10 @@ router.post('/setup-oauth', async (req, res) => {
     }
 
     const { api_key, api_secret, user_id, frontend_url } = value;
+
+    // Initialize services
+    const brokerConfig = getBrokerConfig();
+    const security = getSecurity();
 
     // Check if config already exists
     let config = await brokerConfig.getByUserAndBroker(user_id, 'zerodha');
@@ -173,6 +192,10 @@ router.post('/callback', async (req, res) => {
     }
 
     const { request_token, state, config_id } = value;
+
+    // Initialize services
+    const brokerConfig = getBrokerConfig();
+    const oauthToken = getOAuthToken();
 
     // Verify OAuth state to prevent CSRF
     const isValidState = await brokerConfig.verifyOAuthState(config_id, state);
@@ -283,6 +306,10 @@ router.post('/refresh-token', async (req, res) => {
 
     const { config_id } = value;
 
+    // Initialize services
+    const brokerConfig = getBrokerConfig();
+    const oauthToken = getOAuthToken();
+
     // Get config and tokens
     const config = await brokerConfig.getById(config_id);
     if (!config) {
@@ -365,6 +392,10 @@ router.post('/disconnect', async (req, res) => {
 
     const { config_id } = value;
 
+    // Initialize services
+    const brokerConfig = getBrokerConfig();
+    const oauthToken = getOAuthToken();
+
     // Get config
     const config = await brokerConfig.getById(config_id);
     if (!config) {
@@ -443,6 +474,10 @@ router.get('/status', async (req, res) => {
       });
     }
 
+    // Initialize services
+    const brokerConfig = getBrokerConfig();
+    const oauthToken = getOAuthToken();
+
     let config;
     if (config_id) {
       config = await brokerConfig.getById(config_id);
@@ -503,6 +538,9 @@ router.get('/configs', async (req, res) => {
       });
     }
 
+    // Initialize services
+    const brokerService = getBrokerService();
+
     const result = await brokerService.getAllConfigsByUser(user_id);
 
     res.json({
@@ -534,6 +572,9 @@ router.post('/configs', async (req, res) => {
         error: 'user_id, api_key, and api_secret are required'
       });
     }
+
+    // Initialize services
+    const brokerService = getBrokerService();
 
     const result = await brokerService.createOrUpdateConfig(user_id, {
       brokerName: broker_name || 'zerodha',
@@ -572,6 +613,9 @@ router.delete('/configs/:configId', async (req, res) => {
       });
     }
 
+    // Initialize services
+    const brokerService = getBrokerService();
+
     const result = await brokerService.deleteConfig(configId, user_id);
 
     res.json({
@@ -602,6 +646,9 @@ router.post('/reconnect', async (req, res) => {
         error: 'config_id is required'
       });
     }
+
+    // Initialize services
+    const brokerService = getBrokerService();
 
     const result = await brokerService.reconnectBroker(config_id);
 
@@ -634,6 +681,9 @@ router.post('/reconnect', async (req, res) => {
  */
 router.get('/active', async (req, res) => {
   try {
+    // Initialize services
+    const brokerService = getBrokerService();
+
     const result = await brokerService.getActiveConnections();
 
     res.json({
@@ -658,6 +708,9 @@ router.get('/active', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
+    // Initialize services
+    const brokerService = getBrokerService();
+
     const result = await brokerService.getServiceStats();
 
     res.json({
@@ -681,6 +734,9 @@ router.get('/stats', async (req, res) => {
  */
 router.get('/health', async (req, res) => {
   try {
+    // Initialize services
+    const brokerService = getBrokerService();
+
     const health = await brokerService.healthCheck();
 
     res.json({
