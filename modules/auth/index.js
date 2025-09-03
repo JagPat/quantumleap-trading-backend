@@ -13,7 +13,7 @@ module.exports = {
   
   async initialize(container) {
     try {
-      // Check required environment variables
+      // Check required environment variables (but don't fail initialization)
       const requiredEnvVars = [
         'OAUTH_ENCRYPTION_KEY',
         'JWT_SECRET', 
@@ -23,13 +23,15 @@ module.exports = {
       const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
       
       if (missingVars.length > 0) {
-        console.error('❌ Auth module missing required environment variables:', missingVars);
-        console.error('📋 Please set these environment variables in Railway:');
+        console.warn('⚠️ Auth module missing some environment variables:', missingVars);
+        console.warn('📋 Some features may not work without these variables:');
         missingVars.forEach(varName => {
-          console.error(`   - ${varName}`);
+          console.warn(`   - ${varName}`);
         });
-        console.error('📖 See railway-env-setup.md for configuration details');
-        throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+        console.warn('📖 See railway-env-setup.md for configuration details');
+        // Don't throw error - continue with limited functionality
+      } else {
+        console.log('✅ All required environment variables are present');
       }
       
       // Register models
