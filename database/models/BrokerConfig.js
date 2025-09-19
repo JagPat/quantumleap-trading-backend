@@ -123,7 +123,6 @@ class BrokerConfig {
       id,
       status.state === 'connected',
       JSON.stringify(status)
-      brokerUserType
     ];
 
     const result = await db.query(query, values);
