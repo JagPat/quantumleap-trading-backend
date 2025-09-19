@@ -50,20 +50,16 @@ class BrokerConfig {
 
     const query = `
       INSERT INTO ${this.tableName} (
-        user_id, broker_name, api_key_encrypted, api_secret_encrypted,
-        broker_user_id, broker_user_name, broker_user_type
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        user_id, broker_name, api_key, api_secret_encrypted
+      ) VALUES ($1, $2, $3, $4)
       RETURNING *
     `;
 
     const values = [
       userId,
       brokerName,
-      this.encrypt(apiKey),
-      this.encrypt(apiSecret),
-      brokerUserId,
-      brokerUserName,
-      brokerUserType
+      apiKey, // Store as plain text for now (matches current schema)
+      this.encrypt(apiSecret)
     ];
 
     const result = await db.query(query, values);
@@ -185,7 +181,7 @@ class BrokerConfig {
     // Only decrypt sensitive fields when explicitly requested
     if (includeSensitive) {
       try {
-        config.apiKey = this.decrypt(row.api_key_encrypted);
+        config.apiKey = row.api_key; // Plain text in current schema
         config.apiSecret = this.decrypt(row.api_secret_encrypted);
       } catch (error) {
         console.error('Failed to decrypt broker config:', error.message);
@@ -200,7 +196,7 @@ class BrokerConfig {
   // Get decrypted credentials for OAuth operations
   async getCredentials(id) {
     const query = `
-      SELECT api_key_encrypted, api_secret_encrypted 
+      SELECT api_key, api_secret_encrypted 
       FROM ${this.tableName} 
       WHERE id = $1
     `;
@@ -213,7 +209,7 @@ class BrokerConfig {
     const row = result.rows[0];
     try {
       return {
-        apiKey: this.decrypt(row.api_key_encrypted),
+        apiKey: row.api_key, // Plain text in current schema
         apiSecret: this.decrypt(row.api_secret_encrypted)
       };
     } catch (error) {
