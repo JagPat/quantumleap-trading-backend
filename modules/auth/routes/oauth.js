@@ -30,12 +30,12 @@ const getSecurity = () => {
 };
 
 const getBrokerConfig = () => {
-  const BrokerConfig = require('../../database/models/BrokerConfig');
+  const BrokerConfig = require('../../../database/models/BrokerConfig');
   return BrokerConfig; // This is already a singleton instance
 };
 
 const getOAuthToken = () => {
-  const OAuthToken = require('../../database/models/OAuthToken');
+  const OAuthToken = require('../../../database/models/OAuthToken');
   return OAuthToken; // This is already a singleton instance
 };
 
