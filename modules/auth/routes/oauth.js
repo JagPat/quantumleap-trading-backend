@@ -1,5 +1,6 @@
 const express = require('express');
 const Joi = require('joi');
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -108,9 +109,9 @@ router.post('/setup-oauth', async (req, res) => {
 
     let { api_key, api_secret, user_id, frontend_url } = value;
     
-    // Generate user_id if not provided
+    // Generate user_id if not provided (must be UUID format)
     if (!user_id) {
-      user_id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      user_id = crypto.randomUUID();
     }
 
     // Initialize services
