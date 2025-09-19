@@ -83,7 +83,8 @@ router.post('/setup-oauth', async (req, res) => {
       `${frontend_url}/broker-callback` : 
       `${process.env.ZERODHA_REDIRECT_URI || 'http://localhost:3000/broker-callback'}`;
 
-    const oauthUrl = `https://kite.zerodha.com/connect/login?api_key=${api_key}&v=3&state=${oauthState}`;
+    const encodedRedirect = encodeURIComponent(redirectUri);
+    const oauthUrl = `https://kite.zerodha.com/connect/login?api_key=${api_key}&v=3&state=${oauthState}&redirect_uri=${encodedRedirect}&response_type=code`;
 
     console.log(`✅ OAuth setup successful for user ${user_id}, config ${configId}`);
 

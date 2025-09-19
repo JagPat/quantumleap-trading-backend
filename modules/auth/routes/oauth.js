@@ -1,6 +1,26 @@
 const express = require('express');
 const Joi = require('joi');
 const crypto = require('crypto');
+const { v4: uuidv4, v5: uuidv5, validate: uuidValidate } = require('uuid');
+
+const USER_ID_NAMESPACE = process.env.BROKER_USER_NAMESPACE || 'e7c9b9f4-7a07-49f2-9b75-95f47b8f9b35';
+
+const normalizeUserIdentifier = (incoming) => {
+  if (!incoming) {
+    return null;
+  }
+
+  if (uuidValidate(incoming)) {
+    return incoming;
+  }
+
+  try {
+    return uuidv5(String(incoming), USER_ID_NAMESPACE);
+  } catch (error) {
+    console.warn('⚠️ Unable to normalize user identifier, falling back to raw value:', error);
+    return incoming;
+  }
+};
 
 const router = express.Router();
 
@@ -44,7 +64,7 @@ const getOAuthToken = () => {
 const setupOAuthSchema = Joi.object({
   api_key: Joi.string().required().min(10).max(100),
   api_secret: Joi.string().required().min(10).max(100),
-  user_id: Joi.string().optional(),
+  user_id: Joi.string().allow('', null).optional(),
   frontend_url: Joi.string().uri().optional()
 });
 
@@ -108,11 +128,11 @@ router.post('/setup-oauth', async (req, res) => {
     }
 
     let { api_key, api_secret, user_id, frontend_url } = value;
-    
-    // Generate user_id if not provided (must be UUID format)
-    if (!user_id) {
-      user_id = crypto.randomUUID();
-    }
+
+    const originalUserId = user_id;
+    let normalizedUserId = normalizeUserIdentifier(user_id) || uuidv4();
+
+    console.log('[OAuth] Normalized user identifier', { originalUserId, normalizedUserId });
 
     // Initialize services
     const brokerConfig = getBrokerConfig();
@@ -121,18 +141,22 @@ router.post('/setup-oauth', async (req, res) => {
     // Ensure user exists in users table (create if not exists)
     try {
       const db = require('../../../core/database/connection');
-      await db.query(`
-        INSERT INTO users (id, email, created_at, updated_at) 
-        VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT (id) DO NOTHING
-      `, [user_id, `temp_${user_id}@example.com`]);
+      if (uuidValidate(normalizedUserId)) {
+        await db.query(`
+          INSERT INTO users (id, email, created_at, updated_at) 
+          VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ON CONFLICT (id) DO NOTHING
+        `, [normalizedUserId, `temp_${normalizedUserId}@example.com`]);
+      } else {
+        console.warn('⚠️ Skipping users table upsert for non-UUID user_id:', normalizedUserId);
+      }
     } catch (userError) {
       console.error('Failed to create/verify user:', userError);
       // Continue anyway - user might already exist
     }
 
     // Check if config already exists
-    let config = await brokerConfig.getByUserAndBroker(user_id, 'zerodha');
+    let config = await brokerConfig.getByUserAndBroker(normalizedUserId, 'zerodha');
     
     if (config) {
       // Update existing config
@@ -141,7 +165,7 @@ router.post('/setup-oauth', async (req, res) => {
         // Credentials changed, need to recreate config
         await brokerConfig.delete(config.id);
         config = await brokerConfig.create({
-          userId: user_id,
+          userId: normalizedUserId,
           brokerName: 'zerodha',
           apiKey: api_key,
           apiSecret: api_secret
@@ -150,7 +174,7 @@ router.post('/setup-oauth', async (req, res) => {
     } else {
       // Create new config
       config = await brokerConfig.create({
-        userId: user_id,
+        userId: normalizedUserId,
         brokerName: 'zerodha',
         apiKey: api_key,
         apiSecret: api_secret
@@ -166,7 +190,8 @@ router.post('/setup-oauth', async (req, res) => {
       `${frontend_url}/broker-callback` : 
       `${process.env.ZERODHA_REDIRECT_URI || 'http://localhost:3000/broker-callback'}`;
 
-    const oauthUrl = `https://kite.zerodha.com/connect/login?api_key=${api_key}&v=3&state=${oauthState}`;
+    const encodedRedirect = encodeURIComponent(redirectUri);
+    const oauthUrl = `https://kite.zerodha.com/connect/login?api_key=${api_key}&v=3&state=${oauthState}&redirect_uri=${encodedRedirect}&response_type=code`;
 
     // Update connection status
     await brokerConfig.updateConnectionStatus(config.id, {
@@ -176,7 +201,9 @@ router.post('/setup-oauth', async (req, res) => {
     });
 
     // Log operation
-    await logOAuthOperation(config.id, user_id, 'oauth_initiated', 'success', {
+    const auditUserId = uuidValidate(normalizedUserId) ? normalizedUserId : null;
+
+    await logOAuthOperation(config.id, auditUserId, 'oauth_initiated', 'success', {
       redirectUri,
       apiKey: api_key
     }, req);
@@ -187,7 +214,9 @@ router.post('/setup-oauth', async (req, res) => {
         oauth_url: oauthUrl,
         state: oauthState,
         config_id: config.id,
-        redirect_uri: redirectUri
+        redirect_uri: redirectUri,
+        user_id: normalizedUserId,
+        original_user_id: originalUserId || null
       },
       message: 'OAuth flow initiated successfully'
     });
@@ -563,7 +592,8 @@ router.get('/status', async (req, res) => {
     if (config_id) {
       config = await brokerConfig.getById(config_id);
     } else {
-      config = await brokerConfig.getByUserAndBroker(user_id, 'zerodha');
+      const normalizedLookupId = normalizeUserIdentifier(user_id);
+      config = await brokerConfig.getByUserAndBroker(normalizedLookupId, 'zerodha');
     }
 
     if (!config) {
@@ -622,7 +652,9 @@ router.get('/configs', async (req, res) => {
     // Initialize services
     const brokerService = getBrokerService();
 
-    const result = await brokerService.getAllConfigsByUser(user_id);
+    const normalizedLookupId = normalizeUserIdentifier(user_id);
+
+    const result = await brokerService.getAllConfigsByUser(normalizedLookupId);
 
     res.json({
       success: true,
