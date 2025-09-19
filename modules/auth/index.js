@@ -39,8 +39,8 @@ module.exports = {
       container.register('Otp', Otp);
       
       // Register OAuth models
-      const BrokerConfig = require('./models/brokerConfig');
-      const OAuthToken = require('./models/oauthToken');
+      const BrokerConfig = require('../../database/models/BrokerConfig');
+      const OAuthToken = require('../../database/models/OAuthToken');
       container.register('BrokerConfig', BrokerConfig);
       container.register('OAuthToken', OAuthToken);
       
@@ -173,11 +173,11 @@ module.exports = {
       });
     });
     
-    // Mount OAuth routes at /broker
+    // Mount OAuth routes at /broker (Production version with database)
     try {
       const oauthRoutes = require('./routes/oauth');
       router.use('/broker', oauthRoutes);
-      console.log('✅ OAuth routes mounted at /broker');
+      console.log('✅ OAuth routes (Production) mounted at /broker');
     } catch (error) {
       console.error('❌ Failed to load OAuth routes:', error);
       // Add fallback route to show the error

@@ -1,4 +1,4 @@
-const db = require('./connection');
+const db = require('../../database/connection');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -8,7 +8,7 @@ const path = require('path');
  */
 class OAuthDatabaseInitializer {
   constructor() {
-    this.schemaPath = path.join(__dirname, 'schema.sql');
+    this.schemaPath = path.join(__dirname, '../../database/schema.sql');
   }
 
   /**

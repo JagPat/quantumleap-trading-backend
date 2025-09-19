@@ -84,19 +84,41 @@ async function initializeCoreServices() {
   try {
     logger.info('Initializing core services...');
     
-    // Initialize database connection (optional for Phase-1 testing)
+    // Initialize database connection and run migrations
     try {
-      await databaseConnection.initialize();
-      serviceContainer.register('database', databaseConnection);
-      logger.info('Database connection initialized successfully');
+      const dbInit = require('./core/database/init');
+      const dbConnected = await dbInit.initialize();
+      
+      if (dbConnected) {
+        const db = require('./core/database/connection');
+        serviceContainer.register('database', db);
+        logger.info('✅ Database initialized with all migrations');
+      } else {
+        // Create a limited database service for development
+        const limitedDatabase = {
+          query: async () => { throw new Error('Database not available'); },
+          healthCheck: async () => ({ status: 'disconnected', message: 'Database not available' }),
+          shutdown: async () => logger.info('Limited database service shutdown')
+        };
+        serviceContainer.register('database', limitedDatabase);
+        logger.warn('⚠️ Database not available - running in limited mode');
+      }
     } catch (dbError) {
-      logger.warn('Database connection failed (expected in Phase-1 testing):', dbError.message);
-      // Create a mock database service for Phase-1 testing
+      logger.error('❌ Database initialization failed:', dbError.message);
+      
+      // In production, we might want to fail here
+      if (process.env.NODE_ENV === 'production' && process.env.REQUIRE_DATABASE === 'true') {
+        throw dbError;
+      }
+      
+      // Create a mock database service for development
       const mockDatabase = {
-        healthCheck: async () => ({ status: 'mock', message: 'Database not available in Phase-1 testing' }),
+        query: async () => { throw new Error('Database connection failed'); },
+        healthCheck: async () => ({ status: 'failed', message: 'Database connection failed', error: dbError.message }),
         shutdown: async () => logger.info('Mock database shutdown')
       };
       serviceContainer.register('database', mockDatabase);
+      logger.warn('⚠️ Continuing without database (development mode)');
     }
     
     // Register core services in container

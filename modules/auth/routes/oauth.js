@@ -30,20 +30,20 @@ const getSecurity = () => {
 };
 
 const getBrokerConfig = () => {
-  const BrokerConfig = require('../models/brokerConfig');
-  return new BrokerConfig();
+  const BrokerConfig = require('../../database/models/BrokerConfig');
+  return BrokerConfig; // This is already a singleton instance
 };
 
 const getOAuthToken = () => {
-  const OAuthToken = require('../models/oauthToken');
-  return new OAuthToken();
+  const OAuthToken = require('../../database/models/OAuthToken');
+  return OAuthToken; // This is already a singleton instance
 };
 
 // Validation schemas
 const setupOAuthSchema = Joi.object({
   api_key: Joi.string().required().min(10).max(100),
   api_secret: Joi.string().required().min(10).max(100),
-  user_id: Joi.string().required(),
+  user_id: Joi.string().optional(),
   frontend_url: Joi.string().uri().optional()
 });
 
@@ -106,7 +106,12 @@ router.post('/setup-oauth', async (req, res) => {
       });
     }
 
-    const { api_key, api_secret, user_id, frontend_url } = value;
+    let { api_key, api_secret, user_id, frontend_url } = value;
+    
+    // Generate user_id if not provided
+    if (!user_id) {
+      user_id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
 
     // Initialize services
     const brokerConfig = getBrokerConfig();
