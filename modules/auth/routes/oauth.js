@@ -118,6 +118,19 @@ router.post('/setup-oauth', async (req, res) => {
     const brokerConfig = getBrokerConfig();
     const security = getSecurity();
 
+    // Ensure user exists in users table (create if not exists)
+    try {
+      const db = require('../../../core/database/connection');
+      await db.query(`
+        INSERT INTO users (id, email, created_at, updated_at) 
+        VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (id) DO NOTHING
+      `, [user_id, `temp_${user_id}@example.com`]);
+    } catch (userError) {
+      console.error('Failed to create/verify user:', userError);
+      // Continue anyway - user might already exist
+    }
+
     // Check if config already exists
     let config = await brokerConfig.getByUserAndBroker(user_id, 'zerodha');
     
