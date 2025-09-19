@@ -113,10 +113,7 @@ class BrokerConfig {
       SET 
         is_connected = $2,
         connection_status = $3,
-        broker_user_id = COALESCE($4, broker_user_id),
-        broker_user_name = COALESCE($5, broker_user_name),
-        broker_user_type = COALESCE($6, broker_user_type),
-        last_sync_at = CURRENT_TIMESTAMP,
+        last_sync = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
       RETURNING *
@@ -125,9 +122,7 @@ class BrokerConfig {
     const values = [
       id,
       status.state === 'connected',
-      JSON.stringify(status),
-      brokerUserId,
-      brokerUserName,
+      JSON.stringify(status)
       brokerUserType
     ];
 
@@ -170,9 +165,6 @@ class BrokerConfig {
       brokerName: row.broker_name,
       isConnected: row.is_connected,
       connectionStatus: row.connection_status,
-      brokerUserId: row.broker_user_id,
-      brokerUserName: row.broker_user_name,
-      brokerUserType: row.broker_user_type,
       lastSyncAt: row.last_sync_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at
