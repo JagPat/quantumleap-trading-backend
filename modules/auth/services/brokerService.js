@@ -84,6 +84,88 @@ class BrokerService {
   }
 
   /**
+   * Generate broker session using request token
+   */
+  async generateBrokerSession({ requestToken, apiKey, apiSecret, userId, originalUserId = null, configId = null }) {
+    if (!requestToken || !apiKey || !apiSecret) {
+      throw new Error('Request token, API key, and API secret are required');
+    }
+
+    let targetConfig = null;
+
+    if (configId) {
+      targetConfig = await this.brokerConfig.getById(configId);
+      if (!targetConfig) {
+        throw new Error('Broker configuration not found');
+      }
+
+      await this.createOrUpdateConfig(targetConfig.userId, {
+        brokerName: targetConfig.brokerName || 'zerodha',
+        apiKey,
+        apiSecret
+      });
+
+      targetConfig = await this.brokerConfig.getById(configId);
+    } else {
+      if (!userId) {
+        throw new Error('User identifier is required to create broker configuration');
+      }
+
+      const upsertResult = await this.createOrUpdateConfig(userId, {
+        brokerName: 'zerodha',
+        apiKey,
+        apiSecret
+      });
+
+      targetConfig = upsertResult.config || await this.brokerConfig.getByUserAndBroker(userId, 'zerodha');
+    }
+
+    if (!targetConfig) {
+      throw new Error('Failed to prepare broker configuration');
+    }
+
+    const sessionResponse = await this.kiteClient.generateSession(requestToken, apiKey, apiSecret);
+
+    if (!sessionResponse.success) {
+      throw new Error(sessionResponse.message || 'Failed to generate broker session');
+    }
+
+    await this.tokenManager.storeTokens(targetConfig.id, {
+      accessToken: sessionResponse.accessToken,
+      refreshToken: sessionResponse.refreshToken,
+      expiresIn: sessionResponse.expiresIn,
+      userId: sessionResponse.userId
+    });
+
+    await this.brokerConfig.updateConnectionStatus(targetConfig.id, {
+      state: 'connected',
+      message: 'Broker session established',
+      lastChecked: new Date().toISOString()
+    });
+
+    const userData = {
+      user_id: sessionResponse.userId,
+      user_type: sessionResponse.userType,
+      user_shortname: sessionResponse.userShortname,
+      avatar_url: sessionResponse.avatarUrl,
+      broker: sessionResponse.broker,
+      exchanges: sessionResponse.exchanges,
+      products: sessionResponse.products,
+      order_types: sessionResponse.orderTypes
+    };
+
+    return {
+      status: 'success',
+      config_id: targetConfig.id,
+      user_id: targetConfig.userId,
+      original_user_id: originalUserId,
+      access_token: sessionResponse.accessToken,
+      refresh_token: sessionResponse.refreshToken,
+      user_data: userData
+    };
+  }
+
+  /**
    * Get broker configuration by user ID
    */
   async getConfigByUser(userId, brokerName = 'zerodha') {

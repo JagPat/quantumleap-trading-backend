@@ -74,6 +74,14 @@ const callbackSchema = Joi.object({
   config_id: Joi.string().uuid().required()
 });
 
+const generateSessionSchema = Joi.object({
+  request_token: Joi.string().required().min(8),
+  api_key: Joi.string().required().min(6),
+  api_secret: Joi.string().required().min(6),
+  user_id: Joi.string().allow('', null).optional(),
+  config_id: Joi.string().uuid().optional()
+});
+
 const refreshTokenSchema = Joi.object({
   config_id: Joi.string().uuid().required()
 });
@@ -348,6 +356,50 @@ router.post('/callback', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'OAuth authentication failed',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Exchange request token for access token (direct session generation)
+ * POST /broker/generate-session
+ */
+router.post('/generate-session', async (req, res) => {
+  try {
+    const { error, value } = generateSessionSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request data',
+        details: error.details[0].message
+      });
+    }
+
+    const { request_token, api_key, api_secret, user_id, config_id } = value;
+
+    const normalizedUserId = user_id ? (normalizeUserIdentifier(user_id) || uuidv4()) : (config_id ? null : uuidv4());
+
+    const brokerService = getBrokerService();
+
+    const sessionResult = await brokerService.generateBrokerSession({
+      requestToken: request_token,
+      apiKey: api_key,
+      apiSecret: api_secret,
+      userId: normalizedUserId,
+      originalUserId: user_id || null,
+      configId: config_id || null
+    });
+
+    res.json({
+      success: true,
+      data: sessionResult
+    });
+  } catch (error) {
+    console.error('Generate session error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate broker session',
       message: error.message
     });
   }
