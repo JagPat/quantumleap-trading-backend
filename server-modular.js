@@ -298,6 +298,50 @@ app.get('/', (req, res) => {
   });
 });
 
+// Direct OAuth callback route (for Zerodha redirects)
+app.get('/broker/callback', (req, res) => {
+  try {
+    console.log('🔄 Direct OAuth callback received:', req.query);
+    
+    const { request_token, action, type, status, state } = req.query;
+    
+    // Basic validation
+    if (!request_token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing request_token parameter'
+      });
+    }
+
+    if (status !== 'success') {
+      return res.status(400).json({
+        success: false,
+        error: 'OAuth authentication was not successful',
+        details: { status, action, type }
+      });
+    }
+
+    // Log successful callback
+    console.log('✅ OAuth callback successful:', { request_token, state, action, type, status });
+    
+    // Redirect to frontend with success
+    const frontendUrl = 'https://quantum-leap-frontend-production.up.railway.app';
+    const redirectUrl = `${frontendUrl}/broker-callback?status=success&request_token=${request_token}&state=${state || ''}`;
+    
+    console.log('🔄 Redirecting to frontend:', redirectUrl);
+    res.redirect(redirectUrl);
+
+  } catch (error) {
+    console.error('❌ OAuth callback error:', error);
+    
+    // Redirect to frontend with error
+    const frontendUrl = 'https://quantum-leap-frontend-production.up.railway.app';
+    const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent(error.message)}`;
+    
+    res.redirect(redirectUrl);
+  }
+});
+
 // Simple test endpoint to verify deployment
 app.get('/api/test', (req, res) => {
   res.json({
