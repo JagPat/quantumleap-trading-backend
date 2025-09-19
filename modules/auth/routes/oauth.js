@@ -325,6 +325,53 @@ router.post('/callback', async (req, res) => {
 });
 
 /**
+ * OAuth callback handler (GET version for standard OAuth flow)
+ * GET /broker/callback
+ */
+router.get('/callback', async (req, res) => {
+  try {
+    console.log('OAuth GET callback received:', req.query);
+    
+    const { request_token, action, type, status, state } = req.query;
+    
+    // Basic validation
+    if (!request_token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing request_token parameter'
+      });
+    }
+
+    if (status !== 'success') {
+      return res.status(400).json({
+        success: false,
+        error: 'OAuth authentication was not successful',
+        details: { status, action, type }
+      });
+    }
+
+    // For now, return a success response since we don't have the config_id in the callback
+    // In a full implementation, we'd need to store the state-to-config mapping
+    console.log('OAuth callback successful:', { request_token, state, action, type, status });
+    
+    // Redirect to frontend with success
+    const frontendUrl = 'https://quantum-leap-frontend-production.up.railway.app';
+    const redirectUrl = `${frontendUrl}/broker-callback?status=success&request_token=${request_token}&state=${state || ''}`;
+    
+    res.redirect(redirectUrl);
+
+  } catch (error) {
+    console.error('OAuth GET callback error:', error);
+    
+    // Redirect to frontend with error
+    const frontendUrl = 'https://quantum-leap-frontend-production.up.railway.app';
+    const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent(error.message)}`;
+    
+    res.redirect(redirectUrl);
+  }
+});
+
+/**
  * Refresh OAuth tokens
  * POST /broker/refresh-token
  */
