@@ -9,6 +9,108 @@ const path = require('path');
 class OAuthDatabaseInitializer {
   constructor() {
     this.schemaPath = path.join(__dirname, '../../database/schema.sql');
+    this.maxConnectionAttempts = 5;
+    this.retryDelayMs = 2000;
+  }
+
+  async waitForConnection() {
+    if (db.isConnected) {
+      console.log('✅ OAuth initializer detected active database connection');
+      return;
+    }
+
+    for (let attempt = 1; attempt <= this.maxConnectionAttempts; attempt++) {
+      console.log(`🔄 [OAuthInit] Waiting for database connection (attempt ${attempt}/${this.maxConnectionAttempts})...`);
+      try {
+        await db.initialize();
+      } catch (err) {
+        console.warn(`⚠️ [OAuthInit] Database initialize attempt ${attempt} failed: ${err.message}`);
+      }
+
+      if (db.isConnected) {
+        console.log('✅ [OAuthInit] Database connection established for OAuth schema initialization');
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
+    }
+
+    throw new Error('Database not connected after retries');
+  }
+
+  async ensureCoreObjects() {
+    const statements = [
+      `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`,
+      `CREATE TABLE IF NOT EXISTS oauth_sessions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        config_id UUID NOT NULL REFERENCES broker_configs(id) ON DELETE CASCADE,
+        state VARCHAR(64) NOT NULL,
+        request_token VARCHAR(255),
+        status VARCHAR(20) DEFAULT 'pending',
+        redirect_uri TEXT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE OR REPLACE FUNCTION touch_oauth_sessions_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at := CURRENT_TIMESTAMP;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;`,
+      `DROP TRIGGER IF EXISTS trg_oauth_sessions_updated_at ON oauth_sessions;`,
+      `CREATE TRIGGER trg_oauth_sessions_updated_at
+         BEFORE UPDATE ON oauth_sessions
+         FOR EACH ROW EXECUTE FUNCTION touch_oauth_sessions_updated_at();`,
+      `CREATE OR REPLACE VIEW active_broker_connections AS
+        SELECT 
+          bc.id,
+          bc.user_id,
+          bc.broker_name,
+          bc.api_key,
+          bc.is_connected,
+          bc.connection_status,
+          bc.last_sync,
+          ot.expires_at AS token_expires_at,
+          ot.broker_user_id,
+          CASE
+            WHEN ot.id IS NULL THEN 'no_token'
+            WHEN ot.expires_at < NOW() THEN 'expired'
+            WHEN ot.expires_at < NOW() + INTERVAL '1 hour' THEN 'expiring_soon'
+            ELSE 'valid'
+          END AS token_status
+        FROM broker_configs bc
+        LEFT JOIN oauth_tokens ot ON bc.id = ot.config_id
+        WHERE bc.is_connected = TRUE;`,
+      `CREATE OR REPLACE VIEW oauth_session_status AS
+        SELECT
+          os.id,
+          os.config_id,
+          os.state,
+          os.status,
+          os.expires_at,
+          os.created_at,
+          bc.user_id,
+          bc.broker_name,
+          CASE
+            WHEN os.expires_at < NOW() THEN 'expired'
+            WHEN os.status = 'pending' THEN 'active'
+            ELSE os.status
+          END AS current_status
+        FROM oauth_sessions os
+        JOIN broker_configs bc ON os.config_id = bc.id;`
+    ];
+
+    for (const statement of statements) {
+      try {
+        await db.query(statement);
+        console.log(`✅ [OAuthInit] Executed schema statement: ${statement.substring(0, 60)}...`);
+      } catch (error) {
+        console.error(`❌ [OAuthInit] Failed schema statement: ${statement.substring(0, 60)}...`, error.message);
+        throw error;
+      }
+    }
   }
 
   /**
@@ -17,34 +119,36 @@ class OAuthDatabaseInitializer {
   async initialize() {
     try {
       console.log('🔧 Initializing OAuth database schema...');
+      await this.waitForConnection();
       
-      // Read schema file
-      const schemaSQL = await fs.readFile(this.schemaPath, 'utf8');
-      
-      // Split into individual statements
-      const statements = schemaSQL
-        .split(';')
-        .map(stmt => stmt.trim())
-        .filter(stmt => stmt.length > 0);
+      // Attempt to run legacy schema file for backward compatibility
+      try {
+        const legacySchema = await fs.readFile(this.schemaPath, 'utf8');
+        const statements = legacySchema
+          .split(';')
+          .map(stmt => stmt.trim())
+          .filter(stmt => stmt.length > 0);
 
-      // Execute each statement
-      for (const statement of statements) {
-        try {
-          await db.query(statement);
-          console.log(`✅ Executed: ${statement.substring(0, 50)}...`);
-        } catch (error) {
-          // Log but don't fail on "already exists" errors
-          if (error.message.includes('already exists')) {
-            console.log(`ℹ️ Skipped (exists): ${statement.substring(0, 50)}...`);
-          } else {
-            console.error(`❌ Failed: ${statement.substring(0, 50)}...`);
-            throw error;
+        for (const statement of statements) {
+          try {
+            await db.query(statement);
+            console.log(`✅ [OAuthInit] Legacy schema statement executed: ${statement.substring(0, 50)}...`);
+          } catch (legacyError) {
+            if (legacyError.message && legacyError.message.includes('already exists')) {
+              console.log(`ℹ️ [OAuthInit] Legacy schema already applied: ${statement.substring(0, 50)}...`);
+            } else {
+              console.warn(`⚠️ [OAuthInit] Skipping legacy statement due to error: ${legacyError.message}`);
+            }
           }
         }
+      } catch (fileError) {
+        console.warn('⚠️ [OAuthInit] Legacy schema file not applied:', fileError.message);
       }
 
+      await this.ensureCoreObjects();
+
       console.log('✅ OAuth database schema initialized successfully');
-      
+       
       // Verify tables were created
       await this.verifyTables();
       
