@@ -48,7 +48,10 @@ const serviceContainer = new ServiceContainer();
 const eventBus = new EventBus();
 
 // Middleware (preserve current setup)
-app.use(helmet());
+app.use(helmet({
+  crossOriginOpenerPolicy: false, // Allow popup communication
+  crossOriginEmbedderPolicy: false // Allow popup communication
+}));
 app.use(cors({
   origin: [
     'https://vitan-task-frontend.up.railway.app',
@@ -304,6 +307,10 @@ app.get('/broker/callback', (req, res) => {
     console.log('🔄 Direct OAuth callback received:', req.query);
     
     const { request_token, action, type, status, state } = req.query;
+    
+    // Set headers to allow popup communication
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
     
     // Basic validation
     if (!request_token) {
