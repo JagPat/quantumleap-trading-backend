@@ -210,7 +210,17 @@ class BrokerService {
       accessToken,
       refreshToken: null,
       expiresIn: computedExpiresIn,
-      userId: config.userId
+      userId: config.userId,
+      scope: { source: source || 'automation' }
+    });
+
+    const expiresAt = new Date(Date.now() + computedExpiresIn * 1000);
+    console.info('[Auth][Broker] Access token updated', {
+      configId: config.id,
+      userId: config.userId,
+      source: source || 'automation',
+      expiresAt: expiresAt.toISOString(),
+      expiresIn: computedExpiresIn
     });
 
     await this.brokerConfig.updateConnectionStatus(config.id, {
@@ -222,7 +232,46 @@ class BrokerService {
     return {
       config_id: config.id,
       user_id: config.userId,
-      expires_in: computedExpiresIn
+      expires_in: computedExpiresIn,
+      expires_at: expiresAt.toISOString()
+    };
+  }
+
+  /**
+   * Retrieve token metadata for administrative inspection
+   */
+  async getTokenMetadata({ normalizedUserId = null, originalUserId = null, configId = null }) {
+    let config = null;
+
+    if (configId) {
+      config = await this.brokerConfig.getById(configId);
+    }
+
+    if (!config) {
+      const candidateIds = [normalizedUserId, originalUserId].filter(Boolean);
+      for (const candidate of candidateIds) {
+        config = await this.brokerConfig.getByUserAndBroker(candidate, 'zerodha');
+        if (config) {
+          break;
+        }
+      }
+    }
+
+    if (!config) {
+      throw new Error('Broker configuration not found for supplied identifiers');
+    }
+
+    const tokenRecord = await this.oauthToken.getByConfigId(config.id);
+    const tokenStatus = await this.oauthToken.getTokenStatus(config.id);
+
+    return {
+      config_id: config.id,
+      user_id: config.userId,
+      token_present: !!tokenRecord,
+      expires_at: tokenRecord?.expiresAt || null,
+      updated_at: tokenRecord?.updatedAt || null,
+      source: tokenRecord?.scope?.source || null,
+      status: tokenStatus?.status || 'unknown'
     };
   }
 

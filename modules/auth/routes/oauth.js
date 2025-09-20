@@ -98,6 +98,11 @@ const tokenUpdateSchema = Joi.object({
   source: Joi.string().max(120).optional()
 });
 
+const tokenMetadataQuerySchema = Joi.object({
+  user_id: Joi.string().optional(),
+  config_id: Joi.string().uuid().optional()
+}).or('user_id', 'config_id');
+
 // Get client IP helper
 const getClientIP = (req) => {
   return req.headers['x-forwarded-for'] || 
@@ -908,6 +913,43 @@ router.post('/token/update', async (req, res) => {
       success: false,
       error: 'Failed to persist access token',
       message: err.message
+    });
+  }
+});
+
+/**
+ * Inspect broker token expiry/metadata (admin use)
+ * GET /broker/token/expiry
+ */
+router.get('/token/expiry', async (req, res) => {
+  const { error, value } = tokenMetadataQuerySchema.validate(req.query || {});
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid query parameters',
+      details: error.details?.[0]?.message
+    });
+  }
+
+  const { user_id: userId, config_id: configId } = value;
+  const brokerService = getBrokerService();
+
+  try {
+    const result = await brokerService.getTokenMetadata({
+      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
+      originalUserId: userId,
+      configId
+    });
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    console.error('[Auth][Broker] Token metadata lookup failed:', err);
+    return res.status(404).json({
+      success: false,
+      error: err.message || 'Token metadata not found'
     });
   }
 });
