@@ -371,10 +371,48 @@ class BrokerService {
       const accessToken = await this.tokenManager.getValidAccessToken(configId);
       const credentials = await this.brokerConfig.getCredentials(configId);
       
-      const connectionTest = await this.kiteClient.testConnection(accessToken, credentials.apiKey);
-      
+      let connectionTest = await this.kiteClient.testConnection(accessToken, credentials.apiKey);
+      let autoRefreshAttempted = false;
+
+      if (!connectionTest.success && connectionTest.code === 'INVALID_TOKEN') {
+        console.warn(`[BrokerService] Token invalid for config ${configId}. Attempting automated refresh.`);
+        await this.brokerConfig.updateConnectionStatus(configId, {
+          state: 'refreshing',
+          message: 'Access token invalidated. Attempting automatic refresh…',
+          lastChecked: new Date().toISOString()
+        });
+
+        autoRefreshAttempted = true;
+        const refreshResult = await this.tokenManager.refreshTokens(configId);
+        if (refreshResult.success) {
+          try {
+            const refreshedAccessToken = await this.tokenManager.getValidAccessToken(configId);
+            connectionTest = await this.kiteClient.testConnection(refreshedAccessToken, credentials.apiKey);
+            console.info(`[BrokerService] Auto-refresh succeeded for config ${configId}`);
+          } catch (autoRefreshError) {
+            console.error(`[BrokerService] Auto-refresh validation failed for config ${configId}:`, autoRefreshError);
+            connectionTest = {
+              success: false,
+              connected: false,
+              error: autoRefreshError.message,
+              code: 'AUTO_REFRESH_FAILED',
+              message: 'Automatic token refresh failed'
+            };
+          }
+        } else {
+          console.error(`[BrokerService] Token refresh failed for config ${configId}:`, refreshResult.error);
+          return {
+            valid: false,
+            status: 'token_invalid',
+            error: refreshResult.error || connectionTest.error,
+            message: refreshResult.message || 'Token refresh failed',
+            canReconnect: true,
+            autoRefreshAttempted: true
+          };
+        }
+      }
+
       if (connectionTest.success) {
-        // Update connection status
         await this.brokerConfig.updateConnectionStatus(configId, {
           state: 'connected',
           message: 'Connection validated successfully',
@@ -386,24 +424,25 @@ class BrokerService {
           status: 'connected',
           userId: connectionTest.userId,
           message: 'Connection is active and healthy',
-          lastChecked: new Date().toISOString()
-        };
-      } else {
-        // Update connection status
-        await this.brokerConfig.updateConnectionStatus(configId, {
-          state: 'error',
-          message: `Connection test failed: ${connectionTest.error}`,
-          lastChecked: new Date().toISOString()
-        });
-
-        return {
-          valid: false,
-          status: 'connection_failed',
-          error: connectionTest.error,
-          message: 'Connection test failed',
-          canReconnect: true
+          lastChecked: new Date().toISOString(),
+          autoRefreshAttempted
         };
       }
+
+      await this.brokerConfig.updateConnectionStatus(configId, {
+        state: 'error',
+        message: `Connection test failed: ${connectionTest.error}`,
+        lastChecked: new Date().toISOString()
+      });
+
+      return {
+        valid: false,
+        status: connectionTest.code === 'INVALID_TOKEN' ? 'token_invalid' : 'connection_failed',
+        error: connectionTest.error,
+        message: connectionTest.message || 'Connection test failed',
+        canReconnect: true,
+        autoRefreshAttempted
+      };
 
     } catch (error) {
       // Update connection status

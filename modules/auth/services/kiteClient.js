@@ -240,11 +240,18 @@ class KiteClient {
       };
 
     } catch (error) {
+      const message = error.message || 'Connection test failed';
+      const normalized = message.toLowerCase();
+      const isInvalidToken = normalized.includes('invalid or expired access token')
+        || normalized.includes('tokenexception')
+        || normalized.includes('token is invalid');
+
       return {
         success: false,
         connected: false,
-        error: error.message,
-        message: 'Connection test failed'
+        error: message,
+        code: isInvalidToken ? 'INVALID_TOKEN' : 'CONNECTION_ERROR',
+        message: isInvalidToken ? 'Access token invalid or expired' : 'Connection test failed'
       };
     }
   }
