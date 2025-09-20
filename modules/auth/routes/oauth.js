@@ -626,9 +626,15 @@ router.post('/disconnect', async (req, res) => {
  * GET /broker/status
  */
 router.get('/status', async (req, res) => {
-  try {
-    const { config_id, user_id } = req.query;
+  const { config_id, user_id } = req.query;
+  const requestTimestamp = new Date().toISOString();
+  console.info('[Auth][Broker] %s GET /broker/status %o', requestTimestamp, {
+    configId: config_id || null,
+    userId: user_id || null
+  });
 
+  try {
+    
     if (!config_id && !user_id) {
       return res.status(400).json({
         success: false,
@@ -682,6 +688,175 @@ router.get('/status', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to check status'
+    });
+  }
+});
+
+/**
+ * Get broker session details
+ * GET /broker/session
+ */
+router.get('/session', async (req, res) => {
+  const { config_id, user_id } = req.query;
+  const requestTimestamp = new Date().toISOString();
+  console.info('[Auth][Broker] %s GET /broker/session %o', requestTimestamp, {
+    configId: config_id || null,
+    userId: user_id || null
+  });
+
+  if (!config_id && !user_id) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Either config_id or user_id is required'
+    });
+  }
+
+  try {
+    const brokerConfig = getBrokerConfig();
+    const oauthToken = getOAuthToken();
+    const security = getSecurity();
+
+    let config = null;
+    if (config_id) {
+      config = await brokerConfig.getById(config_id);
+    } else {
+      const normalizedId = normalizeUserIdentifier(user_id);
+      config = await brokerConfig.getByUserAndBroker(normalizedId, 'zerodha');
+    }
+
+    if (!config) {
+      return res.json({
+        status: 'not_found',
+        message: 'Broker session not found for the provided identifier',
+        data: null
+      });
+    }
+
+    const tokenStatus = await oauthToken.getTokenStatus(config.id);
+    const tokenRecord = await oauthToken.getByConfigId(config.id);
+
+    let accessToken = null;
+    let refreshToken = null;
+    let brokerUserId = null;
+    let tokenExpiresAt = null;
+
+    if (tokenRecord) {
+      brokerUserId = tokenRecord.userId || null;
+      tokenExpiresAt = tokenRecord.expiresAt || null;
+
+      try {
+        if (tokenRecord.accessTokenEncrypted) {
+          accessToken = security.decrypt(tokenRecord.accessTokenEncrypted);
+        }
+        if (tokenRecord.refreshTokenEncrypted) {
+          refreshToken = security.decrypt(tokenRecord.refreshTokenEncrypted);
+        }
+      } catch (tokenError) {
+        console.error('[Auth][Broker] Failed to decrypt tokens for config %s: %s', config.id, tokenError.message);
+      }
+    }
+
+    console.info('[Auth][Broker] Session handler decrypts stored tokens', {
+      configId: config.id,
+      userId: brokerUserId,
+      hasTokenRecord: !!tokenRecord,
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken
+    });
+
+    return res.json({
+      status: 'success',
+      data: {
+        id: config.id,
+        broker_name: config.brokerName,
+        api_key: config.apiKey,
+        is_connected: config.isConnected,
+        connection_status: config.connectionStatus,
+        last_sync: config.lastSync,
+        updated_at: config.updatedAt,
+        user_id: config.userId,
+        user_data: brokerUserId ? { user_id: brokerUserId } : null,
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        token_expires_at: tokenExpiresAt,
+        token_status: tokenStatus
+      },
+      meta: {
+        requested_at: requestTimestamp
+      }
+    });
+  } catch (error) {
+    console.error('[Auth][Broker] Session lookup failed:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to retrieve broker session',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Persist broker session metadata from frontend
+ * POST /broker/session/create
+ */
+router.post('/session/create', async (req, res) => {
+  const requestTimestamp = new Date().toISOString();
+  const { broker_name = 'zerodha', user_data = null } = req.body || {};
+  const clientUserId = user_data?.user_id || null;
+
+  console.info('[Auth][Broker] %s POST /broker/session/create %o', requestTimestamp, {
+    brokerName: broker_name,
+    userId: clientUserId
+  });
+
+  if (!clientUserId) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'user_data.user_id is required to persist session metadata'
+    });
+  }
+
+  try {
+    const brokerConfig = getBrokerConfig();
+    const normalizedId = normalizeUserIdentifier(clientUserId);
+
+    const config = await brokerConfig.getByUserAndBroker(normalizedId, broker_name);
+
+    if (!config) {
+      return res.status(404).json({
+        status: 'not_found',
+        message: 'Broker configuration not found for the provided user_id',
+        data: null
+      });
+    }
+
+    const statusPayload = {
+      state: 'connected',
+      message: 'Session confirmed by frontend client',
+      lastChecked: requestTimestamp
+    };
+
+    await brokerConfig.updateConnectionStatus(config.id, statusPayload);
+
+    return res.json({
+      status: 'success',
+      message: 'Broker session metadata recorded',
+      data: {
+        config_id: config.id,
+        broker_name,
+        user_id: normalizedId,
+        connection_status: statusPayload
+      },
+      meta: {
+        recorded_at: requestTimestamp
+      }
+    });
+  } catch (error) {
+    console.error('[Auth][Broker] Failed to record session metadata:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to persist broker session metadata',
+      error: error.message
     });
   }
 });

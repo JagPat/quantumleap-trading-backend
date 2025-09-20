@@ -20,6 +20,7 @@ const ServiceContainer = require('./service-container');
 const EventBus = require('./shared/events/eventBus');
 const ModuleLoader = require('./module-loader');
 const databaseConnection = require('./modules/core/database/connection');
+const oauthRoutes = require('./modules/auth/routes/oauth');
 
 // Import existing middleware (preserve current functionality)
 const { errorHandler } = require('./middleware/errorHandler');
@@ -74,13 +75,22 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Force-Delete']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Force-Delete', 'X-User-ID']
 }));
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Force-Delete, X-User-ID');
+  next();
+});
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(requestId);
 app.use(requestLogger);
+
+// Redirect legacy broker paths to auth module routes
+// Expose broker routes at legacy paths for compatibility
+app.use('/broker', oauthRoutes);
+app.use('/api/broker', oauthRoutes);
 
 // Initialize core services
 async function initializeCoreServices() {
