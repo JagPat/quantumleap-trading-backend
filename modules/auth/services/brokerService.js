@@ -166,6 +166,67 @@ class BrokerService {
   }
 
   /**
+   * Update access token provided by automation (e.g., Selenium + TOTP jobs)
+   */
+  async updateAccessTokenFromAutomation({ normalizedUserId = null, originalUserId = null, accessToken, expiresIn = null, expiresAt = null, source = 'automation' }) {
+    if (!accessToken) {
+      throw new Error('Access token is required');
+    }
+
+    const candidateUserIds = [normalizedUserId, originalUserId].filter(Boolean);
+    if (candidateUserIds.length === 0) {
+      throw new Error('User identifier is required');
+    }
+
+    let config = null;
+    for (const candidate of candidateUserIds) {
+      config = await this.brokerConfig.getByUserAndBroker(candidate, 'zerodha');
+      if (config) {
+        break;
+      }
+    }
+
+    if (!config) {
+      throw new Error('Broker configuration not found for provided user');
+    }
+
+    let computedExpiresIn = Number(expiresIn);
+
+    if ((!computedExpiresIn || !Number.isFinite(computedExpiresIn) || computedExpiresIn <= 0) && expiresAt) {
+      const expiryDate = new Date(expiresAt);
+      if (!Number.isNaN(expiryDate.getTime())) {
+        computedExpiresIn = Math.floor((expiryDate.getTime() - Date.now()) / 1000);
+      }
+    }
+
+    if (!computedExpiresIn || !Number.isFinite(computedExpiresIn) || computedExpiresIn <= 0) {
+      computedExpiresIn = 24 * 60 * 60; // default to 24 hours
+    }
+
+    // Ensure we always have at least 15 minutes to account for buffer subtraction
+    computedExpiresIn = Math.max(computedExpiresIn, 900);
+
+    await this.tokenManager.storeTokens(config.id, {
+      accessToken,
+      refreshToken: null,
+      expiresIn: computedExpiresIn,
+      userId: config.userId
+    });
+
+    await this.brokerConfig.updateConnectionStatus(config.id, {
+      state: 'connected',
+      message: `Access token updated via ${source || 'automation'}`,
+      lastChecked: new Date().toISOString()
+    });
+
+    return {
+      config_id: config.id,
+      user_id: config.userId,
+      expires_in: computedExpiresIn
+    };
+  }
+
+  /**
    * Get broker configuration by user ID
    */
   async getConfigByUser(userId, brokerName = 'zerodha') {

@@ -90,6 +90,14 @@ const disconnectSchema = Joi.object({
   config_id: Joi.string().uuid().required()
 });
 
+const tokenUpdateSchema = Joi.object({
+  user_id: Joi.string().required(),
+  access_token: Joi.string().required(),
+  expires_in: Joi.number().integer().positive().optional(),
+  expires_at: Joi.alternatives().try(Joi.date().iso(), Joi.string()).optional(),
+  source: Joi.string().max(120).optional()
+});
+
 // Get client IP helper
 const getClientIP = (req) => {
   return req.headers['x-forwarded-for'] || 
@@ -857,6 +865,49 @@ router.post('/session/create', async (req, res) => {
       status: 'error',
       message: 'Failed to persist broker session metadata',
       error: error.message
+    });
+  }
+});
+
+/**
+ * Update broker access token from automated jobs
+ * POST /broker/token/update
+ */
+router.post('/token/update', async (req, res) => {
+  const { error, value } = tokenUpdateSchema.validate(req.body || {});
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid token update payload',
+      details: error.details?.[0]?.message
+    });
+  }
+
+  const { user_id, access_token, expires_in, expires_at, source } = value;
+  const normalizedUserId = normalizeUserIdentifier(user_id);
+  const brokerService = getBrokerService();
+
+  try {
+    const result = await brokerService.updateAccessTokenFromAutomation({
+      normalizedUserId,
+      originalUserId: user_id,
+      accessToken: access_token,
+      expiresIn: expires_in,
+      expiresAt: expires_at,
+      source: source || 'automation'
+    });
+
+    return res.json({
+      success: true,
+      message: 'Access token updated successfully',
+      data: result
+    });
+  } catch (err) {
+    console.error('[Auth][Broker] Token update failed:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to persist access token',
+      message: err.message
     });
   }
 });
