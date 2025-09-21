@@ -31,6 +31,12 @@ class BrokerService {
     this.startConnectionMonitoring();
   }
 
+  shouldTriggerReauth(error) {
+    if (!error || !error.code) return false;
+    const code = String(error.code).toUpperCase();
+    return ['TOKEN_EXPIRED', 'TOKEN_INVALID', 'BROKER_UNAUTHORIZED', 'TOKEN_ERROR'].includes(code);
+  }
+
   /**
    * Create or update broker configuration
    */
@@ -57,7 +63,10 @@ class BrokerService {
         
         if (existingCredentials.apiKey !== apiKey || existingCredentials.apiSecret !== apiSecret) {
           // Credentials changed, revoke existing tokens and update config
-          await this.tokenManager.revokeTokens(config.id);
+          await this.tokenManager.revokeTokens(config.id, {
+            userId: config.userId,
+            reason: 'credentials_changed'
+          });
           
           // Delete and recreate config with new credentials
           await this.brokerConfig.delete(config.id);
@@ -69,7 +78,6 @@ class BrokerService {
           });
         }
       } else {
-        // Create new config
         config = await this.brokerConfig.create({
           userId,
           brokerName,
@@ -140,7 +148,21 @@ class BrokerService {
       accessToken: sessionResponse.accessToken,
       refreshToken: sessionResponse.refreshToken,
       expiresIn: sessionResponse.expiresIn,
-      userId: sessionResponse.userId
+      userId: targetConfig.userId,
+      brokerUserId: sessionResponse.userId,
+      scope: {
+        userData: {
+          user_id: sessionResponse.userId,
+          user_type: sessionResponse.userType,
+          user_shortname: sessionResponse.userShortname,
+          avatar_url: sessionResponse.avatarUrl,
+          broker: sessionResponse.broker,
+          exchanges: sessionResponse.exchanges,
+          products: sessionResponse.products,
+          order_types: sessionResponse.orderTypes
+        }
+      },
+      source: 'user_login'
     });
 
     await this.brokerConfig.updateConnectionStatus(targetConfig.id, {
@@ -349,8 +371,8 @@ class BrokerService {
     return err;
   }
 
-  async getHoldingsData({ normalizedUserId = null, originalUserId = null, bypassCache = false } = {}) {
-    const config = await this.resolveConfig({ normalizedUserId, originalUserId });
+  async getHoldingsData({ normalizedUserId = null, originalUserId = null, configId = null, bypassCache = false } = {}) {
+    const config = await this.resolveConfig({ normalizedUserId, originalUserId, configId });
     const cacheKey = config.id;
     const cached = this.getCacheEntry(this.holdingsCache, cacheKey, bypassCache);
     if (cached) {
@@ -361,13 +383,26 @@ class BrokerService {
     console.info('[Broker][DataFetch] Fetching holdings from Zerodha', { configId: cacheKey, bypassCache });
 
     try {
-      const accessToken = await this.tokenManager.getValidAccessToken(config.id);
+      let accessToken;
+      try {
+        accessToken = await this.tokenManager.getValidAccessToken(config.id);
+      } catch (tokenError) {
+        await this.tokenManager.flagReauthRequired(config.id, 'token_error', tokenError.message);
+        const err = new Error('Unable to retrieve valid access token');
+        err.code = 'TOKEN_ERROR';
+        err.needs_reauth = true;
+        throw err;
+      }
       const credentials = await this.brokerConfig.getCredentials(config.id);
       const result = await this.kiteClient.getHoldings(accessToken, credentials.apiKey);
 
       if (!result.success) {
-        const error = new Error('Failed to fetch holdings from broker');
-        error.code = 'BROKER_ERROR';
+        const error = new Error(result.message || 'Failed to fetch holdings from broker');
+        error.code = result.code || 'BROKER_ERROR';
+        if (this.shouldTriggerReauth(error)) {
+          await this.tokenManager.flagReauthRequired(config.id, error.code.toLowerCase(), error.message);
+          error.needs_reauth = true;
+        }
         throw error;
       }
 
@@ -384,8 +419,8 @@ class BrokerService {
     }
   }
 
-  async getPositionsData({ normalizedUserId = null, originalUserId = null, bypassCache = false } = {}) {
-    const config = await this.resolveConfig({ normalizedUserId, originalUserId });
+  async getPositionsData({ normalizedUserId = null, originalUserId = null, configId = null, bypassCache = false } = {}) {
+    const config = await this.resolveConfig({ normalizedUserId, originalUserId, configId });
     const cacheKey = config.id;
     const cached = this.getCacheEntry(this.positionsCache, cacheKey, bypassCache);
     if (cached) {
@@ -396,13 +431,26 @@ class BrokerService {
     console.info('[Broker][DataFetch] Fetching positions from Zerodha', { configId: cacheKey, bypassCache });
 
     try {
-      const accessToken = await this.tokenManager.getValidAccessToken(config.id);
+      let accessToken;
+      try {
+        accessToken = await this.tokenManager.getValidAccessToken(config.id);
+      } catch (tokenError) {
+        await this.tokenManager.flagReauthRequired(config.id, 'token_error', tokenError.message);
+        const err = new Error('Unable to retrieve valid access token');
+        err.code = 'TOKEN_ERROR';
+        err.needs_reauth = true;
+        throw err;
+      }
       const credentials = await this.brokerConfig.getCredentials(config.id);
       const result = await this.kiteClient.getPositions(accessToken, credentials.apiKey);
 
       if (!result.success) {
-        const error = new Error('Failed to fetch positions from broker');
-        error.code = 'BROKER_ERROR';
+        const error = new Error(result.message || 'Failed to fetch positions from broker');
+        error.code = result.code || 'BROKER_ERROR';
+        if (this.shouldTriggerReauth(error)) {
+          await this.tokenManager.flagReauthRequired(config.id, error.code.toLowerCase(), error.message);
+          error.needs_reauth = true;
+        }
         throw error;
       }
 
@@ -423,8 +471,8 @@ class BrokerService {
     }
   }
 
-  async getOrdersData({ normalizedUserId = null, originalUserId = null, bypassCache = false } = {}) {
-    const config = await this.resolveConfig({ normalizedUserId, originalUserId });
+  async getOrdersData({ normalizedUserId = null, originalUserId = null, configId = null, bypassCache = false } = {}) {
+    const config = await this.resolveConfig({ normalizedUserId, originalUserId, configId });
     const cacheKey = config.id;
     const cached = this.getCacheEntry(this.ordersCache, cacheKey, bypassCache);
     if (cached) {
@@ -435,13 +483,26 @@ class BrokerService {
     console.info('[Broker][DataFetch] Fetching orders from Zerodha', { configId: cacheKey, bypassCache });
 
     try {
-      const accessToken = await this.tokenManager.getValidAccessToken(config.id);
+      let accessToken;
+      try {
+        accessToken = await this.tokenManager.getValidAccessToken(config.id);
+      } catch (tokenError) {
+        await this.tokenManager.flagReauthRequired(config.id, 'token_error', tokenError.message);
+        const err = new Error('Unable to retrieve valid access token');
+        err.code = 'TOKEN_ERROR';
+        err.needs_reauth = true;
+        throw err;
+      }
       const credentials = await this.brokerConfig.getCredentials(config.id);
       const result = await this.kiteClient.getOrders(accessToken, credentials.apiKey);
 
       if (!result.success) {
-        const error = new Error('Failed to fetch orders from broker');
-        error.code = 'BROKER_ERROR';
+        const error = new Error(result.message || 'Failed to fetch orders from broker');
+        error.code = result.code || 'BROKER_ERROR';
+        if (this.shouldTriggerReauth(error)) {
+          await this.tokenManager.flagReauthRequired(config.id, error.code.toLowerCase(), error.message);
+          error.needs_reauth = true;
+        }
         throw error;
       }
 
@@ -460,12 +521,13 @@ class BrokerService {
 
   async getPortfolioSnapshot({ normalizedUserId = null, originalUserId = null, bypassCache = false } = {}) {
     try {
-      const holdingsData = await this.getHoldingsData({ normalizedUserId, originalUserId, bypassCache });
-      const positionsData = await this.getPositionsData({ normalizedUserId, originalUserId, bypassCache });
+      const config = await this.resolveConfig({ normalizedUserId, originalUserId });
+      const holdingsData = await this.getHoldingsData({ normalizedUserId, originalUserId, configId: config.id, bypassCache });
+      const positionsData = await this.getPositionsData({ normalizedUserId, originalUserId, configId: config.id, bypassCache });
       let ordersData = null;
 
       try {
-        ordersData = await this.getOrdersData({ normalizedUserId, originalUserId, bypassCache });
+        ordersData = await this.getOrdersData({ normalizedUserId, originalUserId, configId: config.id, bypassCache });
       } catch (error) {
         console.warn('[Broker][DataFetch] Orders fetch failed:', { message: error.message, code: error.code });
         if (error?.code && ['TOKEN_EXPIRED', 'TOKEN_INVALID', 'BROKER_UNAUTHORIZED'].includes(error.code)) {
@@ -506,6 +568,13 @@ class BrokerService {
         last_updated: [holdingsData.lastUpdated, positionsData.lastUpdated].filter(Boolean).sort().slice(-1)[0] || new Date().toISOString()
       };
 
+      let tokenStatus = null;
+      try {
+        tokenStatus = await this.oauthToken.getTokenStatus(config.id);
+      } catch (statusError) {
+        console.warn('[Broker][DataFetch] Token status lookup failed:', statusError.message);
+      }
+
       return {
         summary,
         holdings,
@@ -513,6 +582,15 @@ class BrokerService {
         intraday_positions: positionsData.positions.day,
         orders: ordersData ? ordersData.orders : [],
         lastUpdated: summary.last_updated,
+        session: {
+          configId: config.id,
+          needsReauth: config.needsReauth || tokenStatus?.needsReauth || false,
+          sessionStatus: config.sessionStatus,
+          tokenStatus,
+          lastTokenRefresh: config.lastTokenRefresh,
+          lastStatusCheck: config.lastStatusCheck,
+          connectionStatus: config.connectionStatus
+        },
         cache: {
           holdingsCached: holdingsData.cached,
           positionsCached: positionsData.cached,
@@ -927,7 +1005,8 @@ class BrokerService {
       }
 
       const tokenStatus = await this.oauthToken.getTokenStatus(config.id);
-      const tokenExpiry = await this.tokenManager.getTokenExpiry(config.id);
+      const tokenExpiry = tokenStatus.expiresAt || null;
+      const needsReauth = config.needsReauth || tokenStatus.needsReauth;
 
       return {
         success: true,
@@ -938,7 +1017,10 @@ class BrokerService {
           tokenStatus: tokenStatus,
           tokenExpiry: tokenExpiry,
           lastSync: config.lastSync,
-          brokerName: config.brokerName
+          brokerName: config.brokerName,
+          sessionStatus: config.sessionStatus,
+          lastTokenRefresh: config.lastTokenRefresh,
+          needsReauth
         }
       };
 

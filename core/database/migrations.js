@@ -20,6 +20,12 @@ class DatabaseMigrations {
         name: 'create_portfolio_tables', 
         up: this.createPortfolioTables.bind(this),
         down: this.dropPortfolioTables.bind(this)
+      },
+      {
+        version: '004',
+        name: 'enhance_oauth_status_tracking',
+        up: this.enhanceOAuthStatusTracking.bind(this),
+        down: this.rollbackOAuthStatusTracking.bind(this)
       }
     ];
   }
@@ -264,6 +270,68 @@ class DatabaseMigrations {
     await client.query('DROP TABLE IF EXISTS trades CASCADE');
     await client.query('DROP TABLE IF EXISTS holdings CASCADE');
     await client.query('DROP TABLE IF EXISTS portfolios CASCADE');
+  }
+
+  // Migration 004: Enhance OAuth status/session tracking
+  async enhanceOAuthStatusTracking(client) {
+    await client.query(`
+      ALTER TABLE oauth_tokens
+      ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'connected',
+      ADD COLUMN IF NOT EXISTS source VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS last_refreshed TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS user_id UUID
+    `);
+
+    await client.query(`
+      ALTER TABLE oauth_tokens
+      ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false
+    `);
+
+    await client.query(`
+      ALTER TABLE oauth_tokens
+      ADD CONSTRAINT IF NOT EXISTS oauth_tokens_user_id_fk
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_tokens_user_unique
+      ON oauth_tokens(user_id)
+      WHERE user_id IS NOT NULL
+    `);
+
+    await client.query(`
+      ALTER TABLE broker_configs
+      ADD COLUMN IF NOT EXISTS session_status VARCHAR(20) DEFAULT 'disconnected',
+      ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS last_token_refresh TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS last_status_check TIMESTAMP
+    `);
+  }
+
+  async rollbackOAuthStatusTracking(client) {
+    await client.query('DROP INDEX IF EXISTS idx_oauth_tokens_user_unique');
+
+    await client.query(`
+      ALTER TABLE oauth_tokens
+      DROP CONSTRAINT IF EXISTS oauth_tokens_user_id_fk
+    `);
+
+    await client.query(`
+      ALTER TABLE oauth_tokens
+      DROP COLUMN IF EXISTS needs_reauth,
+      DROP COLUMN IF EXISTS last_refreshed,
+      DROP COLUMN IF EXISTS source,
+      DROP COLUMN IF EXISTS status,
+      DROP COLUMN IF EXISTS user_id
+    `);
+
+    await client.query(`
+      ALTER TABLE broker_configs
+      DROP COLUMN IF EXISTS session_status,
+      DROP COLUMN IF EXISTS needs_reauth,
+      DROP COLUMN IF EXISTS last_token_refresh,
+      DROP COLUMN IF EXISTS last_status_check
+    `);
   }
 
   // Rollback to specific version

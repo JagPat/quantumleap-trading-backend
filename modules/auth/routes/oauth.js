@@ -41,6 +41,7 @@ const mapBrokerErrorStatus = (error) => {
   switch (error.code) {
     case 'TOKEN_EXPIRED':
     case 'TOKEN_INVALID':
+    case 'TOKEN_ERROR':
       return 401;
     case 'BROKER_UNAUTHORIZED':
       return 403;
@@ -51,6 +52,18 @@ const mapBrokerErrorStatus = (error) => {
     default:
       return 500;
   }
+};
+
+const respondWithBrokerError = (res, error) => {
+  const status = mapBrokerErrorStatus(error);
+  return res.status(status).json({
+    success: false,
+    error: error.message,
+    code: error.code || 'BROKER_ERROR',
+    needs_reauth: Boolean(error.needs_reauth || status === 401 || status === 403),
+    details: error.details || null,
+    timestamp: new Date().toISOString()
+  });
 };
 
 // Security middleware (temporarily disabled for deployment)
@@ -701,6 +714,8 @@ router.get('/status', async (req, res) => {
         success: true,
         data: {
           isConnected: false,
+          needsReauth: true,
+          needs_reauth: true,
           connectionStatus: {
             state: 'disconnected',
             message: 'No broker configuration found',
@@ -710,18 +725,25 @@ router.get('/status', async (req, res) => {
       });
     }
 
-    // Check token status
     const tokenStatus = await oauthToken.getTokenStatus(config.id);
+    const needsReauth = Boolean(config.needsReauth || tokenStatus.needsReauth);
 
     res.json({
       success: true,
       data: {
         configId: config.id,
-        isConnected: config.isConnected,
+        userId: config.userId,
+        brokerName: config.brokerName,
+        isConnected: config.isConnected && !needsReauth,
         connectionStatus: config.connectionStatus,
-        tokenStatus: tokenStatus,
+        sessionStatus: config.sessionStatus,
+        needsReauth,
+        needs_reauth: needsReauth,
+        tokenStatus,
+        tokenExpiry: tokenStatus.expiresAt || null,
         lastSync: config.lastSync,
-        brokerName: config.brokerName
+        lastTokenRefresh: config.lastTokenRefresh,
+        lastStatusCheck: config.lastStatusCheck
       }
     });
 
@@ -987,106 +1009,86 @@ router.get('/token/expiry', async (req, res) => {
  * Fetch live holdings from Zerodha via backend
  */
 router.get('/holdings', async (req, res) => {
-  const { user_id: userId, bypass_cache: bypassCache } = req.query;
-  if (!userId) {
-    return res.status(400).json({ success: false, error: 'user_id is required' });
+  const { user_id: userId, config_id: configId, bypass_cache: bypassCache } = req.query;
+  if (!userId && !configId) {
+    return res.status(400).json({ success: false, error: 'user_id or config_id is required' });
   }
 
   try {
     const brokerService = getBrokerService();
     const data = await brokerService.getHoldingsData({
-      normalizedUserId: normalizeUserIdentifier(userId),
+      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
       originalUserId: userId,
+      configId,
       bypassCache: parseBoolean(bypassCache)
     });
     return res.json({ success: true, data });
   } catch (error) {
     console.error('[Broker][DataFetch] Holdings fetch failed:', { message: error.message, code: error.code });
-    const status = mapBrokerErrorStatus(error);
-    return res.status(status).json({
-      success: false,
-      error: error.message,
-      code: error.code || 'BROKER_ERROR',
-      needs_reauth: status === 401 || status === 403
-    });
+    return respondWithBrokerError(res, error);
   }
 });
 
 router.get('/positions', async (req, res) => {
-  const { user_id: userId, bypass_cache: bypassCache } = req.query;
-  if (!userId) {
-    return res.status(400).json({ success: false, error: 'user_id is required' });
+  const { user_id: userId, config_id: configId, bypass_cache: bypassCache } = req.query;
+  if (!userId && !configId) {
+    return res.status(400).json({ success: false, error: 'user_id or config_id is required' });
   }
 
   try {
     const brokerService = getBrokerService();
     const data = await brokerService.getPositionsData({
-      normalizedUserId: normalizeUserIdentifier(userId),
+      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
       originalUserId: userId,
+      configId,
       bypassCache: parseBoolean(bypassCache)
     });
     return res.json({ success: true, data });
   } catch (error) {
     console.error('[Broker][DataFetch] Positions fetch failed:', { message: error.message, code: error.code });
-    const status = mapBrokerErrorStatus(error);
-    return res.status(status).json({
-      success: false,
-      error: error.message,
-      code: error.code || 'BROKER_ERROR',
-      needs_reauth: status === 401 || status === 403
-    });
+    return respondWithBrokerError(res, error);
   }
 });
 
 router.get('/orders', async (req, res) => {
-  const { user_id: userId, bypass_cache: bypassCache } = req.query;
-  if (!userId) {
-    return res.status(400).json({ success: false, error: 'user_id is required' });
+  const { user_id: userId, config_id: configId, bypass_cache: bypassCache } = req.query;
+  if (!userId && !configId) {
+    return res.status(400).json({ success: false, error: 'user_id or config_id is required' });
   }
 
   try {
     const brokerService = getBrokerService();
     const data = await brokerService.getOrdersData({
-      normalizedUserId: normalizeUserIdentifier(userId),
+      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
       originalUserId: userId,
+      configId,
       bypassCache: parseBoolean(bypassCache)
     });
     return res.json({ success: true, data });
   } catch (error) {
     console.error('[Broker][DataFetch] Orders fetch failed:', { message: error.message, code: error.code });
-    const status = mapBrokerErrorStatus(error);
-    return res.status(status).json({
-      success: false,
-      error: error.message,
-      code: error.code || 'BROKER_ERROR',
-      needs_reauth: status === 401 || status === 403
-    });
+    return respondWithBrokerError(res, error);
   }
 });
 
 router.get('/portfolio', async (req, res) => {
-  const { user_id: userId, bypass_cache: bypassCache } = req.query;
-  if (!userId) {
-    return res.status(400).json({ success: false, error: 'user_id is required' });
+  const { user_id: userId, config_id: configId, bypass_cache: bypassCache } = req.query;
+  if (!userId && !configId) {
+    return res.status(400).json({ success: false, error: 'user_id or config_id is required' });
   }
 
   try {
     const brokerService = getBrokerService();
     const data = await brokerService.getPortfolioSnapshot({
-      normalizedUserId: normalizeUserIdentifier(userId),
+      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
       originalUserId: userId,
+      configId,
       bypassCache: parseBoolean(bypassCache)
     });
     return res.json({ success: true, data });
   } catch (error) {
     console.error('[Broker][DataFetch] Portfolio snapshot failed:', { message: error.message, code: error.code });
-    const status = mapBrokerErrorStatus(error);
-    return res.status(status).json({
-      success: false,
-      error: error.message,
-      code: error.code || 'BROKER_ERROR',
-      needs_reauth: status === 401 || status === 403
-    });
+    return respondWithBrokerError(res, error);
   }
 });
 

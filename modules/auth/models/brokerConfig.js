@@ -3,17 +3,13 @@ const SecurityManager = require('../../../core/security');
 
 /**
  * BrokerConfig Model
- * Manages broker configuration data with secure credential storage
- * Following existing model patterns in the auth module
+ * Handles persistence of broker configuration/connection metadata.
  */
 class BrokerConfig {
   constructor() {
     this.security = new SecurityManager();
   }
 
-  /**
-   * Create a new broker configuration
-   */
   async create(data) {
     const {
       userId,
@@ -22,29 +18,34 @@ class BrokerConfig {
       apiSecret
     } = data;
 
-    // Validate required fields
     if (!userId || !apiKey || !apiSecret) {
       throw new Error('Missing required fields: userId, apiKey, apiSecret');
     }
 
-    // Encrypt API secret
     const encryptedSecret = this.security.encrypt(apiSecret);
     const configId = this.security.generateTokenId();
 
-    const query = `
-      INSERT INTO broker_configs (
-        id, user_id, broker_name, api_key, api_secret_encrypted,
-        connection_status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-      RETURNING id, user_id, broker_name, api_key, is_connected, 
-                connection_status, created_at, updated_at
-    `;
-
     const connectionStatus = {
       state: 'disconnected',
-      message: 'Configuration created, ready to connect',
+      message: 'Configuration created, awaiting authentication',
       lastChecked: new Date().toISOString()
     };
+
+    const query = `
+      INSERT INTO broker_configs (
+        id,
+        user_id,
+        broker_name,
+        api_key,
+        api_secret_encrypted,
+        connection_status,
+        session_status,
+        needs_reauth,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, 'disconnected', false, NOW(), NOW())
+      RETURNING *
+    `;
 
     const params = [
       configId,
@@ -59,26 +60,20 @@ class BrokerConfig {
       const result = await db.query(query, params);
       return this.formatConfigResponse(result.rows[0]);
     } catch (error) {
-      if (error.code === '23505') { // Unique constraint violation
+      if (error.code === '23505') {
         throw new Error('Broker configuration already exists for this user');
       }
       throw new Error(`Failed to create broker configuration: ${error.message}`);
     }
   }
 
-  /**
-   * Get broker configuration by ID
-   */
   async getById(configId) {
-    const query = `
-      SELECT id, user_id, broker_name, api_key, is_connected,
-             connection_status, last_sync, created_at, updated_at
-      FROM broker_configs 
+    const result = await db.query(`
+      SELECT *
+      FROM broker_configs
       WHERE id = $1
-    `;
+    `, [configId]);
 
-    const result = await db.query(query, [configId]);
-    
     if (result.rows.length === 0) {
       return null;
     }
@@ -86,19 +81,13 @@ class BrokerConfig {
     return this.formatConfigResponse(result.rows[0]);
   }
 
-  /**
-   * Get broker configuration by user ID and broker name
-   */
   async getByUserAndBroker(userId, brokerName = 'zerodha') {
-    const query = `
-      SELECT id, user_id, broker_name, api_key, is_connected,
-             connection_status, last_sync, created_at, updated_at
-      FROM broker_configs 
+    const result = await db.query(`
+      SELECT *
+      FROM broker_configs
       WHERE user_id = $1 AND broker_name = $2
-    `;
+    `, [userId, brokerName]);
 
-    const result = await db.query(query, [userId, brokerName]);
-    
     if (result.rows.length === 0) {
       return null;
     }
@@ -106,78 +95,63 @@ class BrokerConfig {
     return this.formatConfigResponse(result.rows[0]);
   }
 
-  /**
-   * Get all broker configurations for a user
-   */
   async getByUserId(userId) {
-    const query = `
-      SELECT id, user_id, broker_name, api_key, is_connected,
-             connection_status, last_sync, created_at, updated_at
-      FROM broker_configs 
+    const result = await db.query(`
+      SELECT *
+      FROM broker_configs
       WHERE user_id = $1
       ORDER BY created_at DESC
-    `;
+    `, [userId]);
 
-    const result = await db.query(query, [userId]);
     return result.rows.map(row => this.formatConfigResponse(row));
   }
 
-  /**
-   * Get decrypted API credentials for OAuth operations
-   */
   async getCredentials(configId) {
-    const query = `
+    const result = await db.query(`
       SELECT api_key, api_secret_encrypted
-      FROM broker_configs 
+      FROM broker_configs
       WHERE id = $1
-    `;
+    `, [configId]);
 
-    const result = await db.query(query, [configId]);
-    
     if (result.rows.length === 0) {
       throw new Error('Broker configuration not found');
     }
 
     const { api_key, api_secret_encrypted } = result.rows[0];
-    
-    try {
-      const apiSecret = this.security.decrypt(api_secret_encrypted);
-      return {
-        apiKey: api_key,
-        apiSecret: apiSecret
-      };
-    } catch (error) {
-      throw new Error('Failed to decrypt API credentials');
-    }
+    return {
+      apiKey: api_key,
+      apiSecret: this.security.decrypt(api_secret_encrypted)
+    };
   }
 
-  /**
-   * Update connection status
-   */
   async updateConnectionStatus(configId, status) {
-    const query = `
-      UPDATE broker_configs 
+    const connectionStatus = {
+      ...status,
+      lastChecked: status.lastChecked || new Date().toISOString()
+    };
+
+    const isConnected = status.state === 'connected';
+
+    const result = await db.query(`
+      UPDATE broker_configs
       SET connection_status = $1,
           is_connected = $2,
           last_sync = $3,
+          session_status = COALESCE($4, session_status),
+          needs_reauth = COALESCE($5, needs_reauth),
+          last_status_check = NOW(),
           updated_at = NOW()
-      WHERE id = $4
-      RETURNING id, user_id, broker_name, api_key, is_connected,
-                connection_status, last_sync, updated_at
-    `;
-
-    const isConnected = status.state === 'connected';
-    const lastSync = isConnected ? new Date() : null;
-
-    const params = [
-      JSON.stringify(status),
+      WHERE id = $6
+      RETURNING *
+    `, [
+      JSON.stringify(connectionStatus),
       isConnected,
-      lastSync,
+      isConnected ? new Date() : null,
+      status.sessionStatus || (isConnected ? 'connected' : status.state || 'error'),
+      status.needsReauth ?? false,
       configId
-    ];
+    ]);
 
-    const result = await db.query(query, params);
-    
     if (result.rows.length === 0) {
       throw new Error('Broker configuration not found');
     }
@@ -185,56 +159,74 @@ class BrokerConfig {
     return this.formatConfigResponse(result.rows[0]);
   }
 
-  /**
-   * Update OAuth state for CSRF protection
-   */
+  async updateSessionMetadata(configId, { sessionStatus, needsReauth, lastTokenRefresh, lastStatusCheck }) {
+    const result = await db.query(`
+      UPDATE broker_configs
+      SET session_status = COALESCE($2, session_status),
+          needs_reauth = COALESCE($3, needs_reauth),
+          last_token_refresh = COALESCE($4, last_token_refresh),
+          last_status_check = COALESCE($5, last_status_check),
+          updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `, [
+      configId,
+      sessionStatus,
+      needsReauth,
+      lastTokenRefresh ? new Date(lastTokenRefresh) : null,
+      lastStatusCheck ? new Date(lastStatusCheck) : null
+    ]);
+
+    if (result.rows.length === 0) {
+      throw new Error('Broker configuration not found');
+    }
+
+    return this.formatConfigResponse(result.rows[0]);
+  }
+
   async updateOAuthState(configId, oauthState) {
-    // TODO: Add oauth_state column to database schema
-    // For now, skip database storage until schema is updated
-    console.log(`OAuth state for config ${configId}: ${oauthState}`);
+    console.debug('[BrokerConfig] updateOAuthState', { configId, oauthState });
+    await db.query(
+      'UPDATE broker_configs SET updated_at = NOW() WHERE id = $1',
+      [configId]
+    );
     return true;
   }
 
-  /**
-   * Verify OAuth state
-   */
   async verifyOAuthState(configId, providedState) {
-    // TODO: Add oauth_state column to database schema
-    // For now, skip state verification until schema is updated
-    console.log(`OAuth state verification for config ${configId}: ${providedState}`);
-    return true; // Allow all states for now
+    // Placeholder until oauth_state column is persisted
+    console.debug('[BrokerConfig] verifyOAuthState', { configId, providedState });
+    return true;
   }
 
-  /**
-   * Delete broker configuration
-   */
   async delete(configId) {
-    const query = `
-      DELETE FROM broker_configs 
-      WHERE id = $1
-      RETURNING id
-    `;
-
-    const result = await db.query(query, [configId]);
-    return result.rows.length > 0;
+    await db.query('DELETE FROM broker_configs WHERE id = $1', [configId]);
   }
 
-  /**
-   * Get all active connections
-   */
   async getActiveConnections() {
-    const query = `
-      SELECT * FROM active_broker_connections
-      ORDER BY last_sync DESC
-    `;
-
-    const result = await db.query(query);
+    const result = await db.query(`
+      SELECT *
+      FROM broker_configs
+      WHERE is_connected = true AND (needs_reauth IS NULL OR needs_reauth = false)
+    `);
     return result.rows.map(row => this.formatConfigResponse(row));
   }
 
-  /**
-   * Format configuration response (exclude sensitive data)
-   */
+  async healthCheck() {
+    const [total, connected, needsReauth] = await Promise.all([
+      db.query('SELECT COUNT(*)::int AS count FROM broker_configs'),
+      db.query('SELECT COUNT(*)::int AS count FROM broker_configs WHERE is_connected = true'),
+      db.query('SELECT COUNT(*)::int AS count FROM broker_configs WHERE needs_reauth = true')
+    ]);
+
+    return {
+      configCount: total.rows[0].count,
+      connectedCount: connected.rows[0].count,
+      needsReauthCount: needsReauth.rows[0].count,
+      timestamp: new Date().toISOString()
+    };
+  }
+
   formatConfigResponse(row) {
     return {
       id: row.id,
@@ -242,39 +234,17 @@ class BrokerConfig {
       brokerName: row.broker_name,
       apiKey: row.api_key,
       isConnected: row.is_connected,
-      connectionStatus: typeof row.connection_status === 'string' 
-        ? JSON.parse(row.connection_status) 
+      connectionStatus: typeof row.connection_status === 'string'
+        ? JSON.parse(row.connection_status)
         : row.connection_status,
+      sessionStatus: row.session_status,
+      needsReauth: row.needs_reauth,
       lastSync: row.last_sync,
+      lastTokenRefresh: row.last_token_refresh,
+      lastStatusCheck: row.last_status_check,
       createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      // Include token status if available (from view)
-      tokenStatus: row.token_status || null,
-      tokenExpiresAt: row.token_expires_at || null,
-      brokerUserId: row.broker_user_id || null
+      updatedAt: row.updated_at
     };
-  }
-
-  /**
-   * Health check for broker config operations
-   */
-  async healthCheck() {
-    try {
-      const query = 'SELECT COUNT(*) as config_count FROM broker_configs';
-      const result = await db.query(query);
-      
-      return {
-        status: 'healthy',
-        configCount: parseInt(result.rows[0].config_count),
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
-    }
   }
 }
 

@@ -121,22 +121,29 @@ class SecurityManager {
    * Validate token expiration
    */
   isTokenExpired(expiresAt) {
+    return this.hasTokenExpired(expiresAt);
+  }
+
+  hasTokenExpired(expiresAt) {
     if (!expiresAt) return true;
-    
     const now = new Date();
     const expiry = new Date(expiresAt);
-    
     return now >= expiry;
   }
 
-  /**
-   * Calculate token expiry with buffer
-   */
+  isWithinExpiryBuffer(expiresAt, bufferMinutes = 5) {
+    if (!expiresAt) return true;
+    const expiry = new Date(expiresAt);
+    const now = new Date();
+    const bufferMs = bufferMinutes * 60 * 1000;
+    return expiry.getTime() - now.getTime() <= bufferMs;
+  }
+
   calculateTokenExpiry(expiresIn, bufferMinutes = 5) {
     const now = new Date();
-    const expiryMs = (expiresIn - (bufferMinutes * 60)) * 1000; // Convert to ms with buffer
-    
-    return new Date(now.getTime() + expiryMs);
+    const bufferSeconds = bufferMinutes * 60;
+    const adjustedSeconds = Math.max(0, expiresIn - bufferSeconds);
+    return new Date(now.getTime() + adjustedSeconds * 1000);
   }
 }
 
