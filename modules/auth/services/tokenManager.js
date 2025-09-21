@@ -76,6 +76,11 @@ class TokenManager {
     }
 
     if (status.status === 'expiring_soon') {
+      console.info('[Broker][Session] token expiring soon, refreshing proactively', {
+        configId,
+        expiresAt: status.expiresAt,
+        thresholdMinutes: this.refreshThresholdMinutes
+      });
       const refreshed = await this.refreshTokens(configId);
       if (refreshed.success) {
         return this.oauthToken.getAccessToken(configId);
@@ -214,6 +219,12 @@ class TokenManager {
       try {
         const expiringTokens = await this.oauthToken.getExpiringSoon(this.refreshThresholdMinutes);
         for (const token of expiringTokens) {
+          console.info('[Broker][Session] token expiring soon, refreshing proactively', {
+            configId: token.config_id,
+            expiresAt: token.expires_at,
+            userId: token.user_id || token.config_user_id,
+            thresholdMinutes: this.refreshThresholdMinutes
+          });
           await this.refreshTokens(token.config_id);
         }
       } catch (error) {
