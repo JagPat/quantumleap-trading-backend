@@ -24,6 +24,35 @@ const normalizeUserIdentifier = (incoming) => {
 
 const router = express.Router();
 
+const parseBoolean = (value, defaultValue = false) => {
+  if (value === undefined || value === null) return defaultValue;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true' || value === '1';
+  }
+  return defaultValue;
+};
+
+const mapBrokerErrorStatus = (error) => {
+  if (!error || !error.code) {
+    return 500;
+  }
+
+  switch (error.code) {
+    case 'TOKEN_EXPIRED':
+    case 'TOKEN_INVALID':
+      return 401;
+    case 'BROKER_UNAUTHORIZED':
+      return 403;
+    case 'RATE_LIMIT':
+      return 429;
+    case 'BROKER_ERROR':
+      return 502;
+    default:
+      return 500;
+  }
+};
+
 // Security middleware (temporarily disabled for deployment)
 // TODO: Re-enable after middleware files are deployed
 // const { createOAuthRateLimiter, createTokenRefreshLimiter } = require('../../../middleware/rateLimiter');
@@ -950,6 +979,113 @@ router.get('/token/expiry', async (req, res) => {
     return res.status(404).json({
       success: false,
       error: err.message || 'Token metadata not found'
+    });
+  }
+});
+
+/**
+ * Fetch live holdings from Zerodha via backend
+ */
+router.get('/holdings', async (req, res) => {
+  const { user_id: userId, bypass_cache: bypassCache } = req.query;
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'user_id is required' });
+  }
+
+  try {
+    const brokerService = getBrokerService();
+    const data = await brokerService.getHoldingsData({
+      normalizedUserId: normalizeUserIdentifier(userId),
+      originalUserId: userId,
+      bypassCache: parseBoolean(bypassCache)
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('[Broker][DataFetch] Holdings fetch failed:', { message: error.message, code: error.code });
+    const status = mapBrokerErrorStatus(error);
+    return res.status(status).json({
+      success: false,
+      error: error.message,
+      code: error.code || 'BROKER_ERROR',
+      needs_reauth: status === 401 || status === 403
+    });
+  }
+});
+
+router.get('/positions', async (req, res) => {
+  const { user_id: userId, bypass_cache: bypassCache } = req.query;
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'user_id is required' });
+  }
+
+  try {
+    const brokerService = getBrokerService();
+    const data = await brokerService.getPositionsData({
+      normalizedUserId: normalizeUserIdentifier(userId),
+      originalUserId: userId,
+      bypassCache: parseBoolean(bypassCache)
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('[Broker][DataFetch] Positions fetch failed:', { message: error.message, code: error.code });
+    const status = mapBrokerErrorStatus(error);
+    return res.status(status).json({
+      success: false,
+      error: error.message,
+      code: error.code || 'BROKER_ERROR',
+      needs_reauth: status === 401 || status === 403
+    });
+  }
+});
+
+router.get('/orders', async (req, res) => {
+  const { user_id: userId, bypass_cache: bypassCache } = req.query;
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'user_id is required' });
+  }
+
+  try {
+    const brokerService = getBrokerService();
+    const data = await brokerService.getOrdersData({
+      normalizedUserId: normalizeUserIdentifier(userId),
+      originalUserId: userId,
+      bypassCache: parseBoolean(bypassCache)
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('[Broker][DataFetch] Orders fetch failed:', { message: error.message, code: error.code });
+    const status = mapBrokerErrorStatus(error);
+    return res.status(status).json({
+      success: false,
+      error: error.message,
+      code: error.code || 'BROKER_ERROR',
+      needs_reauth: status === 401 || status === 403
+    });
+  }
+});
+
+router.get('/portfolio', async (req, res) => {
+  const { user_id: userId, bypass_cache: bypassCache } = req.query;
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'user_id is required' });
+  }
+
+  try {
+    const brokerService = getBrokerService();
+    const data = await brokerService.getPortfolioSnapshot({
+      normalizedUserId: normalizeUserIdentifier(userId),
+      originalUserId: userId,
+      bypassCache: parseBoolean(bypassCache)
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('[Broker][DataFetch] Portfolio snapshot failed:', { message: error.message, code: error.code });
+    const status = mapBrokerErrorStatus(error);
+    return res.status(status).json({
+      success: false,
+      error: error.message,
+      code: error.code || 'BROKER_ERROR',
+      needs_reauth: status === 401 || status === 403
     });
   }
 });

@@ -335,6 +335,24 @@ class KiteClient {
   }
 
   /**
+   * Get order history
+   */
+  async getOrders(accessToken, apiKey) {
+    try {
+      const kc = this.createKiteInstance(apiKey, accessToken);
+      const orders = await kc.getOrders();
+
+      return {
+        success: true,
+        orders
+      };
+
+    } catch (error) {
+      throw new Error(`Failed to get orders: ${error.message}`);
+    }
+  }
+
+  /**
    * Validate API credentials (without OAuth)
    */
   validateCredentials(apiKey, apiSecret) {

@@ -20,6 +20,12 @@ class BrokerService {
     // Connection monitoring settings
     this.monitoringInterval = 5 * 60 * 1000; // 5 minutes
     this.connectionTimeout = 10000; // 10 seconds
+
+    // Data cache (per config) to reduce API load
+    this.cacheTtlMs = parseInt(process.env.BROKER_CACHE_TTL_MS || '30000', 10); // default 30s
+    this.holdingsCache = new Map();
+    this.positionsCache = new Map();
+    this.ordersCache = new Map();
     
     // Start connection monitoring
     this.startConnectionMonitoring();
@@ -163,6 +169,360 @@ class BrokerService {
       refresh_token: sessionResponse.refreshToken,
       user_data: userData
     };
+  }
+
+  async resolveConfig({ normalizedUserId = null, originalUserId = null, configId = null }) {
+    if (configId) {
+      const config = await this.brokerConfig.getById(configId);
+      if (config) return config;
+    }
+
+    const candidateIds = [normalizedUserId, originalUserId].filter(Boolean);
+    for (const candidate of candidateIds) {
+      const config = await this.brokerConfig.getByUserAndBroker(candidate, 'zerodha');
+      if (config) return config;
+    }
+
+    throw new Error('Broker configuration not found for provided user');
+  }
+
+  getCacheEntry(cache, key, bypassCache = false) {
+    if (bypassCache) {
+      cache.delete(key);
+      return null;
+    }
+
+    const entry = cache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > this.cacheTtlMs) {
+      cache.delete(key);
+      return null;
+    }
+    return entry;
+  }
+
+  setCacheEntry(cache, key, data) {
+    cache.set(key, {
+      timestamp: Date.now(),
+      data
+    });
+  }
+
+  normalizeHolding(raw) {
+    const tradingsymbol = raw.tradingsymbol || raw.symbol;
+    const quantity = Number(raw.quantity || 0);
+    const lastPrice = Number(raw.lastPrice || raw.last_price || 0);
+    const averagePrice = Number(raw.averagePrice || raw.average_price || 0);
+    const closePrice = Number(raw.closePrice || raw.close_price || 0);
+    const pnl = Number(raw.pnl || 0);
+    const dayChange = Number(raw.dayChange || raw.day_change || 0);
+    const dayChangePercent = Number(raw.dayChangePercentage || raw.day_change_percentage || 0);
+    const averageCost = Number(quantity * averagePrice);
+    const currentValue = Number(quantity * lastPrice);
+    const pnlPercentage = averageCost !== 0 ? Number((pnl / averageCost) * 100) : 0;
+
+    return {
+      tradingsymbol,
+      symbol: tradingsymbol,
+      name: raw.name || tradingsymbol,
+      exchange: raw.exchange,
+      instrument_token: raw.instrumentToken,
+      isin: raw.isin,
+      product: raw.product,
+      quantity,
+      t1_quantity: raw.t1Quantity,
+      average_price: averagePrice,
+      last_price: lastPrice,
+      close_price: closePrice,
+      value: currentValue,
+      current_value: currentValue,
+      average_cost: averageCost,
+      pnl,
+      pnl_percent: pnlPercentage,
+      pnl_percentage: pnlPercentage,
+      day_change: dayChange,
+      day_change_percent: dayChangePercent,
+      day_change_percentage: dayChangePercent,
+      source: 'holdings'
+    };
+  }
+
+  normalizePosition(raw) {
+    const tradingsymbol = raw.tradingsymbol || raw.symbol;
+    const quantity = Number(raw.quantity || raw.net_quantity || 0);
+    const netQuantity = Number(raw.net_quantity ?? quantity);
+    const lastPrice = Number(raw.last_price || raw.lastPrice || 0);
+    const averagePrice = Number(raw.average_price || raw.averagePrice || 0);
+    const pnl = Number(raw.pnl || raw.unrealised || 0);
+    const realised = Number(raw.realised || 0);
+    const unrealised = Number(raw.unrealised || 0);
+    const dayPnl = Number(raw.day_pnl || raw.day_change || 0);
+    const dayChange = Number(raw.day_change || raw.day_pnl || 0);
+    const dayChangePercent = Number(raw.day_change_percentage || raw.day_change_percent || 0);
+    const currentValue = Number(netQuantity * lastPrice);
+    const averageCost = Number(netQuantity * averagePrice);
+    const pnlPercentage = averageCost !== 0 ? Number((pnl / averageCost) * 100) : 0;
+
+    return {
+      tradingsymbol,
+      symbol: tradingsymbol,
+      exchange: raw.exchange,
+      instrument_token: raw.instrument_token,
+      product: raw.product,
+      quantity,
+      net_quantity: netQuantity,
+      average_price: averagePrice,
+      last_price: lastPrice,
+      value: currentValue,
+      current_value: currentValue,
+      average_cost: averageCost,
+      pnl,
+      pnl_percent: pnlPercentage,
+      pnl_percentage: pnlPercentage,
+      realised,
+      unrealised,
+      day_pnl: dayPnl,
+      day_change: dayChange,
+      day_change_percent: dayChangePercent,
+      day_change_percentage: dayChangePercent,
+      m2m: Number(raw.m2m || 0),
+      multiplier: Number(raw.multiplier || 1),
+      overnight_quantity: Number(raw.overnight_quantity || 0),
+      buy_quantity: Number(raw.buy_quantity || 0),
+      sell_quantity: Number(raw.sell_quantity || 0),
+      type: raw.product,
+      source: 'positions'
+    };
+  }
+
+  normalizeOrder(raw) {
+    const filledQuantity = Number(raw.filled_quantity || 0);
+    const quantity = Number(raw.quantity || 0);
+    const pendingQuantity = Number(raw.pending_quantity || quantity - filledQuantity);
+    return {
+      order_id: raw.order_id,
+      parent_order_id: raw.parent_order_id,
+      status: raw.status,
+      status_message: raw.status_message_raw || raw.status_message,
+      tradingsymbol: raw.tradingsymbol,
+      symbol: raw.tradingsymbol,
+      instrument_token: raw.instrument_token,
+      exchange: raw.exchange,
+      transaction_type: raw.transaction_type,
+      side: raw.transaction_type,
+      product: raw.product,
+      quantity,
+      filled_quantity: filledQuantity,
+      pending_quantity: pendingQuantity,
+      disclosed_quantity: Number(raw.disclosed_quantity || 0),
+      price: Number(raw.price || 0),
+      trigger_price: Number(raw.trigger_price || 0),
+      average_price: Number(raw.average_price || 0),
+      order_type: raw.order_type,
+      validity: raw.validity,
+      placed_by: raw.placed_by,
+      timestamp: raw.order_timestamp || raw.exchange_timestamp,
+      order_timestamp: raw.order_timestamp || raw.exchange_timestamp,
+      exchange_timestamp: raw.exchange_timestamp,
+      tag: raw.tag
+    };
+  }
+
+  normalizeKiteError(error, context = 'broker request') {
+    const message = error?.message || 'Unknown broker error';
+    const normalized = message.toLowerCase();
+    const err = new Error(message.startsWith('[Broker]') ? message : `[Broker] ${context}: ${message}`);
+
+    if (normalized.includes('token') && normalized.includes('expire')) {
+      err.code = 'TOKEN_EXPIRED';
+    } else if (normalized.includes('token') && normalized.includes('invalid')) {
+      err.code = 'TOKEN_INVALID';
+    } else if (normalized.includes('unauthorized') || normalized.includes('forbidden')) {
+      err.code = 'BROKER_UNAUTHORIZED';
+    } else if (normalized.includes('rate limit')) {
+      err.code = 'RATE_LIMIT';
+    } else {
+      err.code = 'BROKER_ERROR';
+    }
+
+    err.original = error;
+    return err;
+  }
+
+  async getHoldingsData({ normalizedUserId = null, originalUserId = null, bypassCache = false } = {}) {
+    const config = await this.resolveConfig({ normalizedUserId, originalUserId });
+    const cacheKey = config.id;
+    const cached = this.getCacheEntry(this.holdingsCache, cacheKey, bypassCache);
+    if (cached) {
+      console.info('[Broker][DataFetch] Using cached holdings', { configId: cacheKey });
+      return { ...cached.data, cached: true };
+    }
+
+    console.info('[Broker][DataFetch] Fetching holdings from Zerodha', { configId: cacheKey, bypassCache });
+
+    try {
+      const accessToken = await this.tokenManager.getValidAccessToken(config.id);
+      const credentials = await this.brokerConfig.getCredentials(config.id);
+      const result = await this.kiteClient.getHoldings(accessToken, credentials.apiKey);
+
+      if (!result.success) {
+        const error = new Error('Failed to fetch holdings from broker');
+        error.code = 'BROKER_ERROR';
+        throw error;
+      }
+
+      const holdings = result.holdings.map(h => this.normalizeHolding(h));
+      const payload = {
+        holdings,
+        lastUpdated: new Date().toISOString()
+      };
+
+      this.setCacheEntry(this.holdingsCache, cacheKey, payload);
+      return { ...payload, cached: false };
+    } catch (error) {
+      throw error?.code ? error : this.normalizeKiteError(error, 'holdings fetch failed');
+    }
+  }
+
+  async getPositionsData({ normalizedUserId = null, originalUserId = null, bypassCache = false } = {}) {
+    const config = await this.resolveConfig({ normalizedUserId, originalUserId });
+    const cacheKey = config.id;
+    const cached = this.getCacheEntry(this.positionsCache, cacheKey, bypassCache);
+    if (cached) {
+      console.info('[Broker][DataFetch] Using cached positions', { configId: cacheKey });
+      return { ...cached.data, cached: true };
+    }
+
+    console.info('[Broker][DataFetch] Fetching positions from Zerodha', { configId: cacheKey, bypassCache });
+
+    try {
+      const accessToken = await this.tokenManager.getValidAccessToken(config.id);
+      const credentials = await this.brokerConfig.getCredentials(config.id);
+      const result = await this.kiteClient.getPositions(accessToken, credentials.apiKey);
+
+      if (!result.success) {
+        const error = new Error('Failed to fetch positions from broker');
+        error.code = 'BROKER_ERROR';
+        throw error;
+      }
+
+      const netPositions = (result.positions.net || []).map(p => this.normalizePosition(p));
+      const dayPositions = (result.positions.day || []).map(p => this.normalizePosition(p));
+      const payload = {
+        positions: {
+          net: netPositions,
+          day: dayPositions
+        },
+        lastUpdated: new Date().toISOString()
+      };
+
+      this.setCacheEntry(this.positionsCache, cacheKey, payload);
+      return { ...payload, cached: false };
+    } catch (error) {
+      throw error?.code ? error : this.normalizeKiteError(error, 'positions fetch failed');
+    }
+  }
+
+  async getOrdersData({ normalizedUserId = null, originalUserId = null, bypassCache = false } = {}) {
+    const config = await this.resolveConfig({ normalizedUserId, originalUserId });
+    const cacheKey = config.id;
+    const cached = this.getCacheEntry(this.ordersCache, cacheKey, bypassCache);
+    if (cached) {
+      console.info('[Broker][DataFetch] Using cached orders', { configId: cacheKey });
+      return { ...cached.data, cached: true };
+    }
+
+    console.info('[Broker][DataFetch] Fetching orders from Zerodha', { configId: cacheKey, bypassCache });
+
+    try {
+      const accessToken = await this.tokenManager.getValidAccessToken(config.id);
+      const credentials = await this.brokerConfig.getCredentials(config.id);
+      const result = await this.kiteClient.getOrders(accessToken, credentials.apiKey);
+
+      if (!result.success) {
+        const error = new Error('Failed to fetch orders from broker');
+        error.code = 'BROKER_ERROR';
+        throw error;
+      }
+
+      const orders = (result.orders || []).map(o => this.normalizeOrder(o));
+      const payload = {
+        orders,
+        lastUpdated: new Date().toISOString()
+      };
+
+      this.setCacheEntry(this.ordersCache, cacheKey, payload);
+      return { ...payload, cached: false };
+    } catch (error) {
+      throw error?.code ? error : this.normalizeKiteError(error, 'orders fetch failed');
+    }
+  }
+
+  async getPortfolioSnapshot({ normalizedUserId = null, originalUserId = null, bypassCache = false } = {}) {
+    try {
+      const holdingsData = await this.getHoldingsData({ normalizedUserId, originalUserId, bypassCache });
+      const positionsData = await this.getPositionsData({ normalizedUserId, originalUserId, bypassCache });
+      let ordersData = null;
+
+      try {
+        ordersData = await this.getOrdersData({ normalizedUserId, originalUserId, bypassCache });
+      } catch (error) {
+        console.warn('[Broker][DataFetch] Orders fetch failed:', { message: error.message, code: error.code });
+        if (error?.code && ['TOKEN_EXPIRED', 'TOKEN_INVALID', 'BROKER_UNAUTHORIZED'].includes(error.code)) {
+          throw error;
+        }
+      }
+
+      const holdings = holdingsData.holdings;
+      const netPositions = positionsData.positions.net;
+
+      const holdingsValue = holdings.reduce((sum, item) => sum + (item.value || 0), 0);
+      const holdingsDayPnl = holdings.reduce((sum, item) => sum + (item.day_change || 0), 0);
+      const holdingsTotalPnl = holdings.reduce((sum, item) => sum + (item.pnl || 0), 0);
+      const holdingsCost = holdings.reduce((sum, item) => sum + (item.average_cost || 0), 0);
+
+      const positionsValue = netPositions.reduce((sum, item) => sum + (item.value || 0), 0);
+      const positionsDayPnl = netPositions.reduce((sum, item) => sum + (item.day_pnl || 0), 0);
+      const positionsTotalPnl = netPositions.reduce((sum, item) => sum + (item.pnl || 0), 0);
+      const positionsCost = netPositions.reduce((sum, item) => sum + ((item.average_price || 0) * (item.net_quantity || item.quantity || 0)), 0);
+
+      const currentValue = holdingsValue + positionsValue;
+      const totalPnl = holdingsTotalPnl + positionsTotalPnl;
+      const dayPnl = holdingsDayPnl + positionsDayPnl;
+      const totalInvestment = holdingsCost + positionsCost;
+
+      const summary = {
+        total_value: currentValue,
+        current_value: currentValue,
+        holdings_value: holdingsValue,
+        positions_value: positionsValue,
+        total_investment: totalInvestment,
+        day_pnl: dayPnl,
+        total_pnl: totalPnl,
+        day_change_percent: currentValue ? (dayPnl / currentValue) * 100 : 0,
+        total_pnl_percent: totalInvestment ? (totalPnl / totalInvestment) * 100 : 0,
+        holdings_count: holdings.length,
+        positions_count: netPositions.length,
+        last_updated: [holdingsData.lastUpdated, positionsData.lastUpdated].filter(Boolean).sort().slice(-1)[0] || new Date().toISOString()
+      };
+
+      return {
+        summary,
+        holdings,
+        positions: positionsData.positions.net,
+        intraday_positions: positionsData.positions.day,
+        orders: ordersData ? ordersData.orders : [],
+        lastUpdated: summary.last_updated,
+        cache: {
+          holdingsCached: holdingsData.cached,
+          positionsCached: positionsData.cached,
+          ordersCached: ordersData ? ordersData.cached : false,
+          ttlMs: this.cacheTtlMs
+        }
+      };
+    } catch (error) {
+      throw error?.code ? error : this.normalizeKiteError(error, 'portfolio snapshot failed');
+    }
   }
 
   /**
