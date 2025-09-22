@@ -273,6 +273,8 @@ router.post('/setup-oauth', async (req, res) => {
 
     res.json({
       success: true,
+      config_id: config.id,
+      user_id: normalizedUserId,
       data: {
         oauth_url: oauthUrl,
         state: oauthState,
@@ -384,10 +386,11 @@ router.post('/callback', async (req, res) => {
     res.json({
       success: true,
       data: {
+        config_id,
         user_id: sessionData.user_id,
+        broker_user_id: sessionData.user_id,
         user_type: sessionData.user_type,
-        user_shortname: sessionData.user_shortname,
-        broker_user_id: sessionData.user_id
+        user_shortname: sessionData.user_shortname
       },
       message: 'OAuth authentication completed successfully'
     });
