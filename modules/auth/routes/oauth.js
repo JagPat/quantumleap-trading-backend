@@ -1074,6 +1074,130 @@ router.get('/orders', async (req, res) => {
   }
 });
 
+/**
+ * Get broker user profile
+ * GET /broker/profile
+ * Optional POST alias for compatibility
+ */
+const handleGetProfile = async (req, res, userIdParam, configIdParam) => {
+  const { user_id: qUserId, config_id: qConfigId } = req.query || {};
+  const userId = userIdParam || qUserId;
+  const configId = configIdParam || qConfigId;
+
+  if (!userId && !configId) {
+    return res.status(400).json({ success: false, error: 'user_id or config_id is required' });
+  }
+
+  try {
+    const brokerConfig = getBrokerConfig();
+    const TokenManager = require('../services/tokenManager');
+    const KiteClient = require('../services/kiteClient');
+
+    let config = null;
+    if (configId) {
+      config = await brokerConfig.getById(configId);
+    } else {
+      const normalizedId = normalizeUserIdentifier(userId);
+      config = await brokerConfig.getByUserAndBroker(normalizedId, 'zerodha');
+    }
+
+    if (!config) {
+      return res.status(404).json({ success: false, error: 'Broker configuration not found' });
+    }
+
+    const tokenManager = new TokenManager();
+    let accessToken;
+    try {
+      accessToken = await tokenManager.getValidAccessToken(config.id);
+    } catch (tokenError) {
+      const err = new Error('Unable to retrieve valid access token');
+      err.code = 'TOKEN_ERROR';
+      err.needs_reauth = true;
+      return respondWithBrokerError(res, err);
+    }
+
+    const credentials = await brokerConfig.getCredentials(config.id);
+    const kiteClient = new KiteClient();
+    const result = await kiteClient.getUserProfile(accessToken, credentials.apiKey);
+
+    return res.json({ success: true, data: { profile: result.profile } });
+  } catch (error) {
+    console.error('[Broker][Profile] Fetch failed:', error);
+    return respondWithBrokerError(res, error);
+  }
+};
+
+router.get('/profile', async (req, res) => {
+  return handleGetProfile(req, res);
+});
+
+router.post('/profile', async (req, res) => {
+  const { user_id, config_id } = req.body || {};
+  return handleGetProfile(req, res, user_id, config_id);
+});
+
+/**
+ * Get broker margins
+ * GET /broker/margins
+ * Optional POST alias for compatibility
+ */
+const handleGetMargins = async (req, res, userIdParam, configIdParam) => {
+  const { user_id: qUserId, config_id: qConfigId } = req.query || {};
+  const userId = userIdParam || qUserId;
+  const configId = configIdParam || qConfigId;
+
+  if (!userId && !configId) {
+    return res.status(400).json({ success: false, error: 'user_id or config_id is required' });
+  }
+
+  try {
+    const brokerConfig = getBrokerConfig();
+    const TokenManager = require('../services/tokenManager');
+    const KiteClient = require('../services/kiteClient');
+
+    let config = null;
+    if (configId) {
+      config = await brokerConfig.getById(configId);
+    } else {
+      const normalizedId = normalizeUserIdentifier(userId);
+      config = await brokerConfig.getByUserAndBroker(normalizedId, 'zerodha');
+    }
+
+    if (!config) {
+      return res.status(404).json({ success: false, error: 'Broker configuration not found' });
+    }
+
+    const tokenManager = new TokenManager();
+    let accessToken;
+    try {
+      accessToken = await tokenManager.getValidAccessToken(config.id);
+    } catch (tokenError) {
+      const err = new Error('Unable to retrieve valid access token');
+      err.code = 'TOKEN_ERROR';
+      err.needs_reauth = true;
+      return respondWithBrokerError(res, err);
+    }
+
+    const credentials = await brokerConfig.getCredentials(config.id);
+    const kiteClient = new KiteClient();
+    const result = await kiteClient.getMargins(accessToken, credentials.apiKey);
+
+    return res.json({ success: true, data: { margins: result.margins } });
+  } catch (error) {
+    console.error('[Broker][Margins] Fetch failed:', error);
+    return respondWithBrokerError(res, error);
+  }
+};
+
+router.get('/margins', async (req, res) => {
+  return handleGetMargins(req, res);
+});
+
+router.post('/margins', async (req, res) => {
+  const { user_id, config_id } = req.body || {};
+  return handleGetMargins(req, res, user_id, config_id);
+});
+
 router.get('/portfolio', async (req, res) => {
   const { user_id: userId, config_id: configId, bypass_cache: bypassCache } = req.query;
   if (!userId && !configId) {
