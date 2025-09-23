@@ -652,12 +652,12 @@ class BrokerService {
       scope: { source: source || 'automation' }
     });
 
-    const expiresAt = new Date(Date.now() + computedExpiresIn * 1000);
+    const computedExpiresAt = new Date(Date.now() + computedExpiresIn * 1000);
     console.info('[Auth][Broker] Access token updated', {
       configId: config.id,
       userId: config.userId,
       source: source || 'automation',
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: computedExpiresAt.toISOString(),
       expiresIn: computedExpiresIn
     });
 
@@ -671,7 +671,7 @@ class BrokerService {
       config_id: config.id,
       user_id: config.userId,
       expires_in: computedExpiresIn,
-      expires_at: expiresAt.toISOString()
+      expires_at: computedExpiresAt.toISOString()
     };
   }
 
