@@ -102,6 +102,20 @@ class OAuthDatabaseInitializer {
         JOIN broker_configs bc ON os.config_id = bc.id;`
     ];
 
+    // Non-destructive schema fixes for production drift
+    const safeAlterStatements = [
+      // oauth_tokens expected columns
+      `ALTER TABLE IF NOT EXISTS oauth_tokens ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'connected'`,
+      `ALTER TABLE IF NOT EXISTS oauth_tokens ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
+      `ALTER TABLE IF NOT EXISTS oauth_tokens ADD COLUMN IF NOT EXISTS last_refreshed TIMESTAMP NULL`,
+      `ALTER TABLE IF NOT EXISTS oauth_tokens ADD COLUMN IF NOT EXISTS source VARCHAR(64) NULL`,
+      // broker_configs expected columns
+      `ALTER TABLE IF NOT EXISTS broker_configs ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
+      `ALTER TABLE IF NOT EXISTS broker_configs ADD COLUMN IF NOT EXISTS session_status VARCHAR(32) DEFAULT 'disconnected'`,
+      `ALTER TABLE IF NOT EXISTS broker_configs ADD COLUMN IF NOT EXISTS last_token_refresh TIMESTAMP NULL`,
+      `ALTER TABLE IF NOT EXISTS broker_configs ADD COLUMN IF NOT EXISTS last_status_check TIMESTAMP NULL`
+    ];
+
     for (const statement of statements) {
       try {
         await db.query(statement);
@@ -109,6 +123,16 @@ class OAuthDatabaseInitializer {
       } catch (error) {
         console.error(`❌ [OAuthInit] Failed schema statement: ${statement.substring(0, 60)}...`, error.message);
         throw error;
+      }
+    }
+
+    // Apply safe, idempotent ALTERs
+    for (const statement of safeAlterStatements) {
+      try {
+        await db.query(statement);
+        console.log(`✅ [OAuthInit] Applied safe alter: ${statement.substring(0, 60)}...`);
+      } catch (error) {
+        console.warn(`⚠️ [OAuthInit] Safe alter skipped: ${error.message}`);
       }
     }
   }
