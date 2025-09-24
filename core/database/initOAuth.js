@@ -104,16 +104,17 @@ class OAuthDatabaseInitializer {
 
     // Non-destructive schema fixes for production drift
     const safeAlterStatements = [
+      // Postgres syntax: ALTER TABLE <name> ADD COLUMN IF NOT EXISTS ...
       // oauth_tokens expected columns
-      `ALTER TABLE IF NOT EXISTS oauth_tokens ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'connected'`,
-      `ALTER TABLE IF NOT EXISTS oauth_tokens ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
-      `ALTER TABLE IF NOT EXISTS oauth_tokens ADD COLUMN IF NOT EXISTS last_refreshed TIMESTAMP NULL`,
-      `ALTER TABLE IF NOT EXISTS oauth_tokens ADD COLUMN IF NOT EXISTS source VARCHAR(64) NULL`,
+      `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'connected'`,
+      `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
+      `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS last_refreshed TIMESTAMP NULL`,
+      `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS source VARCHAR(64) NULL`,
       // broker_configs expected columns
-      `ALTER TABLE IF NOT EXISTS broker_configs ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
-      `ALTER TABLE IF NOT EXISTS broker_configs ADD COLUMN IF NOT EXISTS session_status VARCHAR(32) DEFAULT 'disconnected'`,
-      `ALTER TABLE IF NOT EXISTS broker_configs ADD COLUMN IF NOT EXISTS last_token_refresh TIMESTAMP NULL`,
-      `ALTER TABLE IF NOT EXISTS broker_configs ADD COLUMN IF NOT EXISTS last_status_check TIMESTAMP NULL`
+      `ALTER TABLE broker_configs ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
+      `ALTER TABLE broker_configs ADD COLUMN IF NOT EXISTS session_status VARCHAR(32) DEFAULT 'disconnected'`,
+      `ALTER TABLE broker_configs ADD COLUMN IF NOT EXISTS last_token_refresh TIMESTAMP NULL`,
+      `ALTER TABLE broker_configs ADD COLUMN IF NOT EXISTS last_status_check TIMESTAMP NULL`
     ];
 
     for (const statement of statements) {
