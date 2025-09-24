@@ -93,13 +93,12 @@ const getSecurity = () => {
 };
 
 const getBrokerConfig = () => {
-  // Use auth module models for consistency across services and routes
-  const BrokerConfig = require('../models/brokerConfig');
-  return new BrokerConfig.constructor ? new BrokerConfig.constructor() : new (require('../models/brokerConfig'))();
+  // Auth model exports a singleton instance
+  return require('../models/brokerConfig');
 };
 
 const getOAuthToken = () => {
-  // Use auth module models for consistency across services and routes
+  // Auth model exports a class; instantiate per use
   const OAuthToken = require('../models/oauthToken');
   return new OAuthToken();
 };
