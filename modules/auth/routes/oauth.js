@@ -93,13 +93,15 @@ const getSecurity = () => {
 };
 
 const getBrokerConfig = () => {
-  const BrokerConfig = require('../../../database/models/BrokerConfig');
-  return BrokerConfig; // This is already a singleton instance
+  // Use auth module models for consistency across services and routes
+  const BrokerConfig = require('../models/brokerConfig');
+  return new BrokerConfig.constructor ? new BrokerConfig.constructor() : new (require('../models/brokerConfig'))();
 };
 
 const getOAuthToken = () => {
-  const OAuthToken = require('../../../database/models/OAuthToken');
-  return OAuthToken; // This is already a singleton instance
+  // Use auth module models for consistency across services and routes
+  const OAuthToken = require('../models/oauthToken');
+  return new OAuthToken();
 };
 
 // Optional admin key to protect admin endpoints (set ADMIN_CRON_KEY in env)
