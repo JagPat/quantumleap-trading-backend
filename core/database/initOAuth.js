@@ -110,6 +110,17 @@ class OAuthDatabaseInitializer {
       `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
       `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS last_refreshed TIMESTAMP NULL`,
       `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS source VARCHAR(64) NULL`,
+      `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS user_id UUID`,
+      `CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user_id ON oauth_tokens(user_id)`,
+      `DO $$
+      BEGIN
+        ALTER TABLE oauth_tokens
+        ADD CONSTRAINT oauth_tokens_user_id_fk
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+      EXCEPTION
+        WHEN duplicate_object THEN NULL;
+      END;
+      $$`,
       // broker_configs expected columns
       `ALTER TABLE broker_configs ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
       `ALTER TABLE broker_configs ADD COLUMN IF NOT EXISTS session_status VARCHAR(32) DEFAULT 'disconnected'`,
