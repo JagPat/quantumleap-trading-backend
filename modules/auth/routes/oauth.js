@@ -127,13 +127,19 @@ const callbackSchema = Joi.object({
   config_id: Joi.string().uuid().required()
 });
 
+// Allow api_key/api_secret to be omitted when config_id is provided
 const generateSessionSchema = Joi.object({
   request_token: Joi.string().required().min(8),
-  api_key: Joi.string().required().min(6),
-  api_secret: Joi.string().required().min(6),
+  api_key: Joi.string().min(6).optional(),
+  api_secret: Joi.string().min(6).optional(),
   user_id: Joi.string().allow('', null).optional(),
   config_id: Joi.string().uuid().optional()
-});
+}).custom((value, helpers) => {
+  if (!value.config_id && (!value.api_key || !value.api_secret)) {
+    return helpers.error('any.custom', { message: 'api_key and api_secret are required when config_id is not provided' });
+  }
+  return value;
+}, 'conditional api credentials');
 
 const refreshTokenSchema = Joi.object({
   config_id: Joi.string().uuid().required()
@@ -452,15 +458,27 @@ router.post('/generate-session', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Invalid request data',
-        details: error.details[0].message
+        details: error.details?.[0]?.message || error.message
       });
     }
 
-    const { request_token, api_key, api_secret, user_id, config_id } = value;
+    let { request_token, api_key, api_secret, user_id, config_id } = value;
 
     const normalizedUserId = user_id ? (normalizeUserIdentifier(user_id) || uuidv4()) : (config_id ? null : uuidv4());
 
     const brokerService = getBrokerService();
+
+    // If credentials not provided but config_id is, load from DB
+    if ((!api_key || !api_secret) && config_id) {
+      try {
+        const brokerConfig = getBrokerConfig();
+        const creds = await brokerConfig.getCredentials(config_id);
+        api_key = api_key || creds.apiKey;
+        api_secret = api_secret || creds.apiSecret;
+      } catch (credErr) {
+        return res.status(400).json({ success: false, error: 'Missing API credentials and config lookup failed', details: credErr.message });
+      }
+    }
 
     const sessionResult = await brokerService.generateBrokerSession({
       requestToken: request_token,
