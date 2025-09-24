@@ -1,0 +1,17 @@
+name: Refresh All Broker
+
+on:
+  schedule:
+    # 0 0 UTC = 05:30 IST; adjust as needed
+    - cron: '30 0 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call refresh-all
+        run: |
+          curl -sS -X POST \
+            'https://web-production-de0bc.up.railway.app/api/modules/auth/broker/admin/refresh-all' \
+            -H 'X-Admin-Key: ${{ secrets.ADMIN_CRON_KEY }}'
