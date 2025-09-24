@@ -1,40 +1,10 @@
 const db = require('../../core/database/connection');
-const crypto = require('crypto');
+const SecurityManager = require('../../core/security');
 
 class OAuthToken {
   constructor() {
     this.tableName = 'oauth_tokens';
-  }
-
-  // Encrypt token data
-  encrypt(text) {
-    const algorithm = 'aes-256-gcm';
-    const key = Buffer.from(process.env.OAUTH_ENCRYPTION_KEY || 'default-key-32-characters-long!!', 'utf8');
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipher(algorithm, key);
-    
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const authTag = cipher.getAuthTag();
-    
-    return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
-  }
-
-  // Decrypt token data
-  decrypt(encryptedText) {
-    const algorithm = 'aes-256-gcm';
-    const key = Buffer.from(process.env.OAUTH_ENCRYPTION_KEY || 'default-key-32-characters-long!!', 'utf8');
-    const parts = encryptedText.split(':');
-    const iv = Buffer.from(parts[0], 'hex');
-    const authTag = Buffer.from(parts[1], 'hex');
-    const encrypted = parts[2];
-    
-    const decipher = crypto.createDecipher(algorithm, key);
-    decipher.setAuthTag(authTag);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    
-    return decrypted;
+    this.security = new SecurityManager();
   }
 
   async create(data) {
@@ -68,8 +38,8 @@ class OAuthToken {
 
     const values = [
       configId,
-      this.encrypt(accessToken),
-      refreshToken ? this.encrypt(refreshToken) : null,
+      this.security.encrypt(accessToken),
+      refreshToken ? this.security.encrypt(refreshToken) : null,
       tokenType,
       expiresAt,
       scope
@@ -105,8 +75,8 @@ class OAuthToken {
     const row = result.rows[0];
     try {
       return {
-        accessToken: this.decrypt(row.access_token_encrypted),
-        refreshToken: row.refresh_token_encrypted ? this.decrypt(row.refresh_token_encrypted) : null,
+        accessToken: this.security.decrypt(row.access_token_encrypted),
+        refreshToken: row.refresh_token_encrypted ? this.security.decrypt(row.refresh_token_encrypted) : null,
         expiresAt: row.expires_at,
         tokenType: row.token_type,
         isExpired: new Date(row.expires_at) < new Date()
@@ -138,8 +108,8 @@ class OAuthToken {
 
     const values = [
       configId,
-      this.encrypt(accessToken),
-      refreshToken ? this.encrypt(refreshToken) : null,
+      this.security.encrypt(accessToken),
+      refreshToken ? this.security.encrypt(refreshToken) : null,
       expiresAt
     ];
 

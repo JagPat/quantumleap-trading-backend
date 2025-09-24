@@ -1,40 +1,10 @@
 const db = require('../../core/database/connection');
-const crypto = require('crypto');
+const SecurityManager = require('../../core/security');
 
 class BrokerConfig {
   constructor() {
     this.tableName = 'broker_configs';
-  }
-
-  // Encrypt sensitive data
-  encrypt(text) {
-    const algorithm = 'aes-256-gcm';
-    const key = Buffer.from(process.env.OAUTH_ENCRYPTION_KEY || 'default-key-32-characters-long!!', 'utf8');
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipher(algorithm, key);
-    
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const authTag = cipher.getAuthTag();
-    
-    return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
-  }
-
-  // Decrypt sensitive data
-  decrypt(encryptedText) {
-    const algorithm = 'aes-256-gcm';
-    const key = Buffer.from(process.env.OAUTH_ENCRYPTION_KEY || 'default-key-32-characters-long!!', 'utf8');
-    const parts = encryptedText.split(':');
-    const iv = Buffer.from(parts[0], 'hex');
-    const authTag = Buffer.from(parts[1], 'hex');
-    const encrypted = parts[2];
-    
-    const decipher = crypto.createDecipher(algorithm, key);
-    decipher.setAuthTag(authTag);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    
-    return decrypted;
+    this.security = new SecurityManager();
   }
 
   async create(data) {
@@ -59,7 +29,7 @@ class BrokerConfig {
       userId,
       brokerName,
       apiKey, // Store as plain text for now (matches current schema)
-      this.encrypt(apiSecret)
+      this.security.encrypt(apiSecret)
     ];
 
     const result = await db.query(query, values);
@@ -173,7 +143,7 @@ class BrokerConfig {
     if (includeSensitive) {
       try {
         config.apiKey = row.api_key; // Plain text in current schema
-        config.apiSecret = this.decrypt(row.api_secret_encrypted);
+        config.apiSecret = this.security.decrypt(row.api_secret_encrypted);
       } catch (error) {
         console.error('Failed to decrypt broker config:', error.message);
         config.apiKey = null;
@@ -201,7 +171,7 @@ class BrokerConfig {
     try {
       return {
         apiKey: row.api_key, // Plain text in current schema
-        apiSecret: this.decrypt(row.api_secret_encrypted)
+        apiSecret: this.security.decrypt(row.api_secret_encrypted)
       };
     } catch (error) {
       throw new Error('Failed to decrypt broker credentials');

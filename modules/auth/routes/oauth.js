@@ -233,19 +233,30 @@ router.post('/setup-oauth', async (req, res) => {
     let config = await brokerConfig.getByUserAndBroker(normalizedUserId, 'zerodha');
     
     if (config) {
-      // Update existing config
-      const credentials = await brokerConfig.getCredentials(config.id);
-      if (credentials.apiKey !== api_key || credentials.apiSecret !== api_secret) {
-        // Credentials changed, need to recreate config
-        await brokerConfig.delete(config.id);
-        config = await brokerConfig.create({
+      let credentials = null;
+      try {
+        credentials = await brokerConfig.getCredentials(config.id);
+      } catch (decryptError) {
+        console.warn('[OAuth] Failed to decrypt existing broker credentials, recreating config', {
+          configId: config.id,
           userId: normalizedUserId,
-          brokerName: 'zerodha',
-          apiKey: api_key,
-          apiSecret: api_secret
+          error: decryptError.message
         });
+
+        await brokerConfig.delete(config.id);
+        config = null;
       }
-    } else {
+
+      if (config && credentials) {
+        if (credentials.apiKey !== api_key || credentials.apiSecret !== api_secret) {
+          // Credentials changed, need to recreate config
+          await brokerConfig.delete(config.id);
+          config = null;
+        }
+      }
+    }
+
+    if (!config) {
       // Create new config
       config = await brokerConfig.create({
         userId: normalizedUserId,

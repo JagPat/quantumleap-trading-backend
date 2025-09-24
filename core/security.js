@@ -8,9 +8,10 @@ class SecurityManager {
   constructor() {
     this.algorithm = 'aes-256-gcm';
     this.keyLength = 32;
-    this.ivLength = 16;
+    this.ivLength = 16; // keep current length to preserve stored data expectations
     this.tagLength = 16;
-    
+    this.additionalData = Buffer.from('oauth-token', 'utf8');
+
     // Get encryption key from environment or generate one
     this.encryptionKey = this.getOrCreateEncryptionKey();
   }
@@ -40,19 +41,21 @@ class SecurityManager {
    */
   encrypt(plaintext) {
     try {
+      if (plaintext === undefined || plaintext === null) {
+        return '';
+      }
+
       const iv = crypto.randomBytes(this.ivLength);
-      const cipher = crypto.createCipher(this.algorithm, this.encryptionKey);
-      cipher.setAAD(Buffer.from('oauth-token', 'utf8'));
-      
-      let encrypted = cipher.update(plaintext, 'utf8', 'hex');
-      encrypted += cipher.final('hex');
-      
+      const cipher = crypto.createCipheriv(this.algorithm, this.encryptionKey, iv);
+      cipher.setAAD(this.additionalData);
+
+      const encryptedBuffer = Buffer.concat([
+        cipher.update(String(plaintext), 'utf8'),
+        cipher.final()
+      ]);
       const tag = cipher.getAuthTag();
-      
-      // Combine iv + tag + encrypted data
-      const combined = iv.toString('hex') + tag.toString('hex') + encrypted;
-      
-      return combined;
+
+      return Buffer.concat([iv, tag, encryptedBuffer]).toString('hex');
     } catch (error) {
       throw new Error(`Encryption failed: ${error.message}`);
     }
@@ -62,20 +65,35 @@ class SecurityManager {
    * Decrypt sensitive data
    */
   decrypt(encryptedData) {
+    if (!encryptedData) {
+      return '';
+    }
+
     try {
-      // Extract iv, tag, and encrypted data
-      const iv = Buffer.from(encryptedData.slice(0, this.ivLength * 2), 'hex');
-      const tag = Buffer.from(encryptedData.slice(this.ivLength * 2, (this.ivLength + this.tagLength) * 2), 'hex');
-      const encrypted = encryptedData.slice((this.ivLength + this.tagLength) * 2);
-      
-      const decipher = crypto.createDecipher(this.algorithm, this.encryptionKey);
-      decipher.setAAD(Buffer.from('oauth-token', 'utf8'));
+      const buffer = Buffer.from(encryptedData, 'hex');
+
+      if (buffer.length < (this.ivLength + this.tagLength)) {
+        throw new Error('Encrypted payload too short');
+      }
+
+      const iv = buffer.subarray(0, this.ivLength);
+      const tag = buffer.subarray(this.ivLength, this.ivLength + this.tagLength);
+      const ciphertext = buffer.subarray(this.ivLength + this.tagLength);
+
+      if (tag.length !== this.tagLength) {
+        throw new Error(`Invalid authentication tag length: ${tag.length}`);
+      }
+
+      const decipher = crypto.createDecipheriv(this.algorithm, this.encryptionKey, iv);
+      decipher.setAAD(this.additionalData);
       decipher.setAuthTag(tag);
-      
-      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
-      
-      return decrypted;
+
+      const decrypted = Buffer.concat([
+        decipher.update(ciphertext),
+        decipher.final()
+      ]);
+
+      return decrypted.toString('utf8');
     } catch (error) {
       throw new Error(`Decryption failed: ${error.message}`);
     }
