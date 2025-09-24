@@ -102,6 +102,15 @@ const getOAuthToken = () => {
   return OAuthToken; // This is already a singleton instance
 };
 
+// Optional admin key to protect admin endpoints (set ADMIN_CRON_KEY in env)
+const ADMIN_CRON_KEY = process.env.ADMIN_CRON_KEY || null;
+const verifyAdminKey = (req, res, next) => {
+  if (!ADMIN_CRON_KEY) return next(); // if not set, allow (development)
+  const provided = req.get('X-Admin-Key') || req.query.admin_key;
+  if (provided && provided === ADMIN_CRON_KEY) return next();
+  return res.status(403).json({ success: false, error: 'Forbidden' });
+};
+
 // Validation schemas
 const setupOAuthSchema = Joi.object({
   api_key: Joi.string().required().min(10).max(100),
@@ -1196,6 +1205,76 @@ router.get('/margins', async (req, res) => {
 router.post('/margins', async (req, res) => {
   const { user_id, config_id } = req.body || {};
   return handleGetMargins(req, res, user_id, config_id);
+});
+
+/**
+ * Admin: Refresh tokens for all active connections
+ * POST /broker/admin/refresh-all
+ * Header: X-Admin-Key: <ADMIN_CRON_KEY>
+ */
+router.post('/admin/refresh-all', verifyAdminKey, async (req, res) => {
+  try {
+    const brokerService = getBrokerService();
+    const tokenManager = new (require('../services/tokenManager'))();
+    const active = await brokerService.getActiveConnections();
+    const results = [];
+    for (const conn of active.connections || []) {
+      try {
+        const r = await tokenManager.refreshTokens(conn.id);
+        results.push({ configId: conn.id, success: r.success, message: r.message || null, error: r.error || null });
+      } catch (e) {
+        results.push({ configId: conn.id, success: false, error: e.message });
+      }
+    }
+    return res.json({ success: true, count: results.length, results, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('[Admin][RefreshAll] Error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Admin: Inspect session-state for a user/config
+ * GET /broker/admin/session-state?user_id=...&config_id=...
+ * Header: X-Admin-Key: <ADMIN_CRON_KEY>
+ */
+router.get('/admin/session-state', verifyAdminKey, async (req, res) => {
+  try {
+    const { user_id: userId, config_id: configId } = req.query || {};
+    const brokerConfig = getBrokerConfig();
+    const oauthToken = getOAuthToken();
+
+    let config = null;
+    if (configId) {
+      config = await brokerConfig.getById(configId);
+    } else if (userId) {
+      const normalized = normalizeUserIdentifier(userId);
+      config = await brokerConfig.getByUserAndBroker(normalized, 'zerodha');
+    }
+
+    if (!config) {
+      return res.json({ success: true, data: { hasConfig: false } });
+    }
+
+    const tokenStatus = await oauthToken.getTokenStatus(config.id);
+    const tokenRecord = await oauthToken.getByConfigId(config.id);
+    return res.json({
+      success: true,
+      data: {
+        hasConfig: true,
+        configId: config.id,
+        needsReauth: config.needsReauth,
+        sessionStatus: config.sessionStatus,
+        tokenStatus,
+        hasTokenRecord: !!tokenRecord,
+        tokenExpiresAt: tokenRecord?.expiresAt || null,
+        hasRefreshToken: Boolean(tokenRecord?.refreshTokenEncrypted)
+      }
+    });
+  } catch (error) {
+    console.error('[Admin][SessionState] Error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 router.get('/portfolio', async (req, res) => {
