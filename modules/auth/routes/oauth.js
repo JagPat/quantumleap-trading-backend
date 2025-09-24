@@ -703,70 +703,45 @@ router.get('/status', async (req, res) => {
   });
 
   try {
-    
     if (!config_id && !user_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Either config_id or user_id is required'
-      });
+      return res.status(400).json({ success: false, error: 'Either config_id or user_id is required' });
     }
 
-    // Initialize services
-    const brokerConfig = getBrokerConfig();
-    const oauthToken = getOAuthToken();
+    const brokerService = getBrokerService();
+    let configId = config_id || null;
 
-    let config;
-    if (config_id) {
-      config = await brokerConfig.getById(config_id);
-    } else {
+    if (!configId) {
       const normalizedLookupId = normalizeUserIdentifier(user_id);
-      config = await brokerConfig.getByUserAndBroker(normalizedLookupId, 'zerodha');
-    }
-
-    if (!config) {
-      return res.json({
-        success: true,
-        data: {
-          isConnected: false,
-          needsReauth: true,
-          needs_reauth: true,
-          connectionStatus: {
-            state: 'disconnected',
-            message: 'No broker configuration found',
-            lastChecked: new Date().toISOString()
+      const brokerConfig = getBrokerConfig();
+      const cfg = await brokerConfig.getByUserAndBroker(normalizedLookupId, 'zerodha');
+      if (!cfg) {
+        return res.json({
+          success: true,
+          data: {
+            isConnected: false,
+            needsReauth: true,
+            needs_reauth: true,
+            connectionStatus: {
+              state: 'disconnected',
+              message: 'No broker configuration found',
+              lastChecked: new Date().toISOString()
+            }
           }
-        }
-      });
+        });
+      }
+      configId = cfg.id;
     }
 
-    const tokenStatus = await oauthToken.getTokenStatus(config.id);
-    const needsReauth = Boolean(config.needsReauth || tokenStatus.needsReauth);
-
-    res.json({
-      success: true,
-      data: {
-        configId: config.id,
-        userId: config.userId,
-        brokerName: config.brokerName,
-        isConnected: config.isConnected && !needsReauth,
-        connectionStatus: config.connectionStatus,
-        sessionStatus: config.sessionStatus,
-        needsReauth,
-        needs_reauth: needsReauth,
-        tokenStatus,
-        tokenExpiry: tokenStatus.expiresAt || null,
-        lastSync: config.lastSync,
-        lastTokenRefresh: config.lastTokenRefresh,
-        lastStatusCheck: config.lastStatusCheck
-      }
-    });
-
+    // Delegate to service for consistent status evaluation
+    const connection = await brokerService.getConnectionStatus(configId);
+    if (!connection?.success) {
+      // Fallback shape if service returns plain status object
+      return res.json({ success: true, data: connection?.status || connection });
+    }
+    return res.json({ success: true, data: connection.status });
   } catch (error) {
     console.error('Status check error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to check status'
-    });
+    return res.status(500).json({ success: false, error: 'Failed to check status' });
   }
 });
 
