@@ -93,8 +93,9 @@ const getSecurity = () => {
 };
 
 const getBrokerConfig = () => {
-  // Auth model exports a singleton instance
-  return require('../models/brokerConfig');
+  // Auth model exports a class; instantiate per use
+  const BrokerConfig = require('../models/brokerConfig');
+  return new BrokerConfig();
 };
 
 const getOAuthToken = () => {
