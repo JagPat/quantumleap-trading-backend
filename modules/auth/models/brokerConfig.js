@@ -186,17 +186,37 @@ class BrokerConfig {
 
   async updateOAuthState(configId, oauthState) {
     console.debug('[BrokerConfig] updateOAuthState', { configId, oauthState });
-    await db.query(
-      'UPDATE broker_configs SET updated_at = NOW() WHERE id = $1',
-      [configId]
-    );
-    return true;
+    try {
+      // Best-effort persist in oauth_sessions for state verification
+      if (configId && oauthState) {
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+        await db.query(
+          `INSERT INTO oauth_sessions (config_id, state, status, redirect_uri, expires_at)
+           VALUES ($1, $2, 'pending', '', $3)`,
+          [configId, oauthState, expiresAt]
+        ).catch(() => {});
+      }
+      await db.query('UPDATE broker_configs SET updated_at = NOW() WHERE id = $1', [configId]);
+      return true;
+    } catch (err) {
+      console.warn('[BrokerConfig] updateOAuthState failed:', err.message);
+      return false;
+    }
   }
 
   async verifyOAuthState(configId, providedState) {
-    // Placeholder until oauth_state column is persisted
     console.debug('[BrokerConfig] verifyOAuthState', { configId, providedState });
-    return true;
+    try {
+      if (!configId || !providedState) return false;
+      const result = await db.query(
+        `SELECT 1 FROM oauth_sessions WHERE config_id = $1 AND state = $2 AND expires_at > NOW() LIMIT 1`,
+        [configId, providedState]
+      );
+      return result.rows.length > 0;
+    } catch (err) {
+      console.warn('[BrokerConfig] verifyOAuthState failed:', err.message);
+      return false;
+    }
   }
 
   async delete(configId) {
