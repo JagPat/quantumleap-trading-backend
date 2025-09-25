@@ -127,7 +127,7 @@ const callbackSchema = Joi.object({
   config_id: Joi.string().uuid().required()
 });
 
-// Allow api_key/api_secret to be omitted when config_id is provided
+// Allow api_key/api_secret to be omitted when config_id is provided (or resolvable by user_id)
 const generateSessionSchema = Joi.object({
   request_token: Joi.string().required().min(8),
   api_key: Joi.string().min(6).optional(),
@@ -135,8 +135,8 @@ const generateSessionSchema = Joi.object({
   user_id: Joi.string().allow('', null).optional(),
   config_id: Joi.string().uuid().optional()
 }).custom((value, helpers) => {
-  if (!value.config_id && (!value.api_key || !value.api_secret)) {
-    return helpers.error('any.custom', { message: 'api_key and api_secret are required when config_id is not provided' });
+  if (!value.config_id && (!value.api_key || !value.api_secret) && !value.user_id) {
+    return helpers.error('any.custom', { message: 'Provide config_id or (user_id) or (api_key+api_secret)' });
   }
   return value;
 }, 'conditional api credentials');
@@ -480,13 +480,23 @@ router.post('/generate-session', async (req, res) => {
       }
     }
 
+    // If no config_id provided, try to resolve by user_id (existing Zerodha config)
+    let resolvedConfigId = config_id || null;
+    if (!resolvedConfigId && user_id) {
+      try {
+        const brokerConfig = getBrokerConfig();
+        const cfg = await brokerConfig.getByUserAndBroker(normalizeUserIdentifier(user_id), 'zerodha');
+        if (cfg) resolvedConfigId = cfg.id;
+      } catch {}
+    }
+
     const sessionResult = await brokerService.generateBrokerSession({
       requestToken: request_token,
       apiKey: api_key,
       apiSecret: api_secret,
       userId: normalizedUserId,
       originalUserId: user_id || null,
-      configId: config_id || null
+      configId: resolvedConfigId || null
     });
 
     res.json({
