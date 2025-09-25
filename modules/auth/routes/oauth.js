@@ -73,11 +73,24 @@ const respondWithBrokerError = (res, error) => {
 // const secureLogger = require('../../../middleware/secureLogger');
 // const { securityHeaders, validateInput, requestSizeLimit } = require('../../../middleware/securityHeaders');
 
-// Apply basic security headers
+// Apply basic security headers and CORS for production frontend
 router.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  try {
+    const allowedOrigin = process.env.FRONTEND_ORIGIN || 'https://quantum-leap-frontend-production.up.railway.app';
+    const origin = req.headers.origin;
+    if (!origin || origin === allowedOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Key');
+    }
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+  } catch {}
   next();
 });
 
