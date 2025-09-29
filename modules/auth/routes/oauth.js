@@ -73,24 +73,11 @@ const respondWithBrokerError = (res, error) => {
 // const secureLogger = require('../../../middleware/secureLogger');
 // const { securityHeaders, validateInput, requestSizeLimit } = require('../../../middleware/securityHeaders');
 
-// Apply basic security headers and CORS for production frontend
+// Apply basic security headers
 router.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
-  try {
-    const allowedOrigin = process.env.FRONTEND_ORIGIN || 'https://quantum-leap-frontend-production.up.railway.app';
-    const origin = req.headers.origin;
-    if (!origin || origin === allowedOrigin) {
-      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-      res.setHeader('Vary', 'Origin');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Key');
-    }
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(204);
-    }
-  } catch {}
   next();
 });
 
@@ -140,19 +127,13 @@ const callbackSchema = Joi.object({
   config_id: Joi.string().uuid().required()
 });
 
-// Allow api_key/api_secret to be omitted when config_id is provided (or resolvable by user_id)
 const generateSessionSchema = Joi.object({
   request_token: Joi.string().required().min(8),
-  api_key: Joi.string().min(6).optional(),
-  api_secret: Joi.string().min(6).optional(),
+  api_key: Joi.string().required().min(6),
+  api_secret: Joi.string().required().min(6),
   user_id: Joi.string().allow('', null).optional(),
   config_id: Joi.string().uuid().optional()
-}).custom((value, helpers) => {
-  if (!value.config_id && (!value.api_key || !value.api_secret) && !value.user_id) {
-    return helpers.error('any.custom', { message: 'Provide config_id or (user_id) or (api_key+api_secret)' });
-  }
-  return value;
-}, 'conditional api credentials');
+});
 
 const refreshTokenSchema = Joi.object({
   config_id: Joi.string().uuid().required()
@@ -292,10 +273,11 @@ router.post('/setup-oauth', async (req, res) => {
     // Generate OAuth URL
     const redirectUri = frontend_url ? 
       `${frontend_url}/broker-callback` : 
-      `${process.env.ZERODHA_REDIRECT_URI || 'http://localhost:3000/broker-callback'}`;
+      `${process.env.FRONTEND_URL || 'http://localhost:3000'}/broker-callback`;
 
-    const encodedRedirect = encodeURIComponent(redirectUri);
-    const oauthUrl = `https://kite.zerodha.com/connect/login?api_key=${api_key}&v=3&state=${oauthState}&redirect_uri=${encodedRedirect}&response_type=code`;
+    // Zerodha Kite Connect uses the redirect URL configured in the developer console.
+    // Do not pass redirect_uri/response_type in the login URL; keep to official format.
+    const oauthUrl = `https://kite.zerodha.com/connect/login?api_key=${api_key}&v=3&state=${oauthState}`;
 
     // Update connection status
     await brokerConfig.updateConnectionStatus(config.id, {
@@ -471,37 +453,15 @@ router.post('/generate-session', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Invalid request data',
-        details: error.details?.[0]?.message || error.message
+        details: error.details[0].message
       });
     }
 
-    let { request_token, api_key, api_secret, user_id, config_id } = value;
+    const { request_token, api_key, api_secret, user_id, config_id } = value;
 
     const normalizedUserId = user_id ? (normalizeUserIdentifier(user_id) || uuidv4()) : (config_id ? null : uuidv4());
 
     const brokerService = getBrokerService();
-
-    // If credentials not provided but config_id is, load from DB
-    if ((!api_key || !api_secret) && config_id) {
-      try {
-        const brokerConfig = getBrokerConfig();
-        const creds = await brokerConfig.getCredentials(config_id);
-        api_key = api_key || creds.apiKey;
-        api_secret = api_secret || creds.apiSecret;
-      } catch (credErr) {
-        return res.status(400).json({ success: false, error: 'Missing API credentials and config lookup failed', details: credErr.message });
-      }
-    }
-
-    // If no config_id provided, try to resolve by user_id (existing Zerodha config)
-    let resolvedConfigId = config_id || null;
-    if (!resolvedConfigId && user_id) {
-      try {
-        const brokerConfig = getBrokerConfig();
-        const cfg = await brokerConfig.getByUserAndBroker(normalizeUserIdentifier(user_id), 'zerodha');
-        if (cfg) resolvedConfigId = cfg.id;
-      } catch {}
-    }
 
     const sessionResult = await brokerService.generateBrokerSession({
       requestToken: request_token,
@@ -509,7 +469,7 @@ router.post('/generate-session', async (req, res) => {
       apiSecret: api_secret,
       userId: normalizedUserId,
       originalUserId: user_id || null,
-      configId: resolvedConfigId || null
+      configId: config_id || null
     });
 
     res.json({
@@ -533,9 +493,9 @@ router.post('/generate-session', async (req, res) => {
 router.get('/callback', async (req, res) => {
   try {
     console.log('OAuth GET callback received:', req.query);
-    
+
     const { request_token, action, type, status, state } = req.query;
-    
+
     // Basic validation
     if (!request_token) {
       return res.status(400).json({
@@ -552,21 +512,94 @@ router.get('/callback', async (req, res) => {
       });
     }
 
-    // For now, return a success response since we don't have the config_id in the callback
-    // In a full implementation, we'd need to store the state-to-config mapping
-    console.log('OAuth callback successful:', { request_token, state, action, type, status });
-    
-    // Redirect to frontend with success
-    const frontendUrl = 'https://quantum-leap-frontend-production.up.railway.app';
-    const redirectUrl = `${frontendUrl}/broker-callback?status=success&request_token=${request_token}&state=${state || ''}`;
-    
-    res.redirect(redirectUrl);
+    if (!state) {
+      return res.status(400).json({ success: false, error: 'Missing state parameter' });
+    }
+
+    // Resolve config_id from stored oauth state
+    const db = require('../../../core/database/connection');
+    const stateLookup = await db.query(
+      `SELECT config_id FROM oauth_sessions WHERE state = $1 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`,
+      [state]
+    );
+
+    if (stateLookup.rows.length === 0) {
+      console.warn('[OAuth] State not found or expired for callback', { state });
+      const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent('Invalid or expired OAuth state')}`;
+      return res.redirect(redirectUrl);
+    }
+
+    const configId = stateLookup.rows[0].config_id;
+    const brokerConfig = getBrokerConfig();
+    const oauthToken = getOAuthToken();
+
+    const config = await brokerConfig.getById(configId);
+    if (!config) {
+      const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent('Configuration not found')}`;
+      return res.redirect(redirectUrl);
+    }
+
+    try {
+      const credentials = await brokerConfig.getCredentials(configId);
+      const KiteConnect = require('kiteconnect').KiteConnect;
+      const kc = new KiteConnect({ api_key: credentials.apiKey });
+
+      const sessionData = await kc.generateSession(request_token, credentials.apiSecret);
+
+      // Store tokens securely
+      await oauthToken.store({
+        configId: configId,
+        accessToken: sessionData.access_token,
+        refreshToken: sessionData.refresh_token,
+        expiresIn: 86400,
+        tokenType: 'Bearer',
+        userId: sessionData.user_id
+      });
+
+      // Update connection status
+      await brokerConfig.updateConnectionStatus(configId, {
+        state: 'connected',
+        message: 'Successfully connected to Zerodha',
+        lastChecked: new Date().toISOString()
+      });
+
+      // Mark oauth session completed
+      await db.query(
+        `UPDATE oauth_sessions SET request_token = $1, status = 'completed', updated_at = NOW() WHERE config_id = $2 AND state = $3`,
+        [request_token, configId, state]
+      ).catch(() => {});
+
+      // Log success
+      await logOAuthOperation(configId, config.userId, 'token_exchanged', 'success', {
+        brokerUserId: sessionData.user_id,
+        userType: sessionData.user_type
+      }, req);
+
+      const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      const redirectUrl = `${frontendUrl}/broker-callback?status=success&config_id=${encodeURIComponent(configId)}&user_id=${encodeURIComponent(sessionData.user_id)}`;
+      return res.redirect(redirectUrl);
+    } catch (exchangeError) {
+      console.error('OAuth GET callback exchange error:', exchangeError);
+      await db.query(
+        `UPDATE oauth_sessions SET status = 'failed', updated_at = NOW() WHERE config_id = $1 AND state = $2`,
+        [configId, state]
+      ).catch(() => {});
+      await logOAuthOperation(configId, config.userId, 'token_exchanged', 'failed', {
+        error: exchangeError.message
+      }, req).catch(() => {});
+
+      const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent(exchangeError.message)}`;
+      return res.redirect(redirectUrl);
+    }
 
   } catch (error) {
     console.error('OAuth GET callback error:', error);
     
     // Redirect to frontend with error
-    const frontendUrl = 'https://quantum-leap-frontend-production.up.railway.app';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
     const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent(error.message)}`;
     
     res.redirect(redirectUrl);
