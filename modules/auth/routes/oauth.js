@@ -548,7 +548,8 @@ router.get('/callback', async (req, res) => {
       
       if (recentSession.rows.length === 0) {
         console.warn('[OAuth] No pending session found for callback');
-        const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+        const rawFrontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+        const frontendUrl = rawFrontendUrl.trim().replace(/\s+/g, '');
         const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent('No pending OAuth session found. Please try again.')}`;
         return res.redirect(redirectUrl);
       }
@@ -562,7 +563,8 @@ router.get('/callback', async (req, res) => {
 
     const config = await brokerConfig.getById(configId);
     if (!config) {
-      const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      const rawFrontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      const frontendUrl = rawFrontendUrl.trim().replace(/\s+/g, '');
       const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent('Configuration not found')}`;
       return res.redirect(redirectUrl);
     }
@@ -604,8 +606,12 @@ router.get('/callback', async (req, res) => {
         userType: sessionData.user_type
       }, req);
 
-      const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      // Clean and validate frontend URL
+      const rawFrontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      const frontendUrl = rawFrontendUrl.trim().replace(/\s+/g, '');
       const redirectUrl = `${frontendUrl}/broker-callback?status=success&config_id=${encodeURIComponent(configId)}&user_id=${encodeURIComponent(sessionData.user_id)}`;
+      
+      console.log('🔄 Redirecting to frontend:', redirectUrl);
       return res.redirect(redirectUrl);
     } catch (exchangeError) {
       console.error('OAuth GET callback exchange error:', exchangeError);
@@ -617,7 +623,8 @@ router.get('/callback', async (req, res) => {
         error: exchangeError.message
       }, req).catch(() => {});
 
-      const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      const rawFrontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+      const frontendUrl = rawFrontendUrl.trim().replace(/\s+/g, '');
       const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent(exchangeError.message)}`;
       return res.redirect(redirectUrl);
     }
@@ -626,7 +633,8 @@ router.get('/callback', async (req, res) => {
     console.error('OAuth GET callback error:', error);
     
     // Redirect to frontend with error
-    const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+    const rawFrontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+    const frontendUrl = rawFrontendUrl.trim().replace(/\s+/g, '');
     const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent(error.message)}`;
     
     res.redirect(redirectUrl);
