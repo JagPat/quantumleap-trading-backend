@@ -675,3 +675,4 @@ if (require.main === module) {
 }
 
 module.exports = { app, startServer, serviceContainer, eventBus };
+// Force Railway redeploy - Tue Sep 30 17:01:07 IST 2025
