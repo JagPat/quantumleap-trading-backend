@@ -110,17 +110,27 @@ class OAuthDatabaseInitializer {
       `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
       `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS last_refreshed TIMESTAMP NULL`,
       `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS source VARCHAR(64) NULL`,
-      `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS user_id UUID`,
-      `CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user_id ON oauth_tokens(user_id)`,
+      // Fix user_id column type if it was created as UUID (convert to VARCHAR)
       `DO $$
       BEGIN
-        ALTER TABLE oauth_tokens
-        ADD CONSTRAINT oauth_tokens_user_id_fk
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-      EXCEPTION
-        WHEN duplicate_object THEN NULL;
+        -- Drop foreign key constraint if it exists
+        IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
+                   WHERE constraint_name = 'oauth_tokens_user_id_fk') THEN
+          ALTER TABLE oauth_tokens DROP CONSTRAINT oauth_tokens_user_id_fk;
+        END IF;
+        
+        -- Alter column type if it exists as UUID
+        IF EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'oauth_tokens' AND column_name = 'user_id' 
+                   AND data_type = 'uuid') THEN
+          ALTER TABLE oauth_tokens ALTER COLUMN user_id TYPE VARCHAR(255);
+        END IF;
       END;
       $$`,
+      `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS user_id VARCHAR(255)`,
+      `ALTER TABLE oauth_tokens ADD COLUMN IF NOT EXISTS broker_user_id VARCHAR(255)`,
+      `CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user_id ON oauth_tokens(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_oauth_tokens_broker_user_id ON oauth_tokens(broker_user_id)`,
       // broker_configs expected columns
       `ALTER TABLE broker_configs ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false`,
       `ALTER TABLE broker_configs ADD COLUMN IF NOT EXISTS session_status VARCHAR(32) DEFAULT 'disconnected'`,
