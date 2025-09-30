@@ -270,10 +270,19 @@ router.post('/setup-oauth', async (req, res) => {
     const oauthState = security.generateOAuthState();
     await brokerConfig.updateOAuthState(config.id, oauthState);
 
-    // Generate OAuth URL
+    // Store pending OAuth session in database
+    const db = require('../../../core/database/connection');
     const redirectUri = frontend_url ? 
       `${frontend_url}/broker-callback` : 
       `${process.env.FRONTEND_URL || 'http://localhost:3000'}/broker-callback`;
+    
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await db.query(
+      `INSERT INTO oauth_sessions (config_id, state, status, redirect_uri, expires_at)
+       VALUES ($1, $2, 'pending', $3, $4)
+       ON CONFLICT DO NOTHING`,
+      [config.id, oauthState, redirectUri, expiresAt]
+    );
 
     // Zerodha Kite Connect uses the redirect URL configured in the developer console.
     // Do not pass redirect_uri/response_type in the login URL; keep to official format.
@@ -512,16 +521,42 @@ router.get('/callback', async (req, res) => {
       });
     }
 
-    if (!state) {
-      return res.status(400).json({ success: false, error: 'Missing state parameter' });
+    // Zerodha does NOT return state parameter in callback
+    // We need to find the most recent pending oauth_session and use request_token to identify it
+    const db = require('../../../core/database/connection');
+    
+    let configId = null;
+    
+    if (state) {
+      // If state is provided (shouldn't happen with Zerodha but check anyway)
+      const stateLookup = await db.query(
+        `SELECT config_id FROM oauth_sessions WHERE state = $1 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`,
+        [state]
+      );
+      if (stateLookup.rows.length > 0) {
+        configId = stateLookup.rows[0].config_id;
+      }
+    }
+    
+    if (!configId) {
+      // Find the most recent pending session (within last 10 minutes)
+      const recentSession = await db.query(
+        `SELECT config_id FROM oauth_sessions 
+         WHERE status = 'pending' AND expires_at > NOW() 
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      
+      if (recentSession.rows.length === 0) {
+        console.warn('[OAuth] No pending session found for callback');
+        const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
+        const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent('No pending OAuth session found. Please try again.')}`;
+        return res.redirect(redirectUrl);
+      }
+      
+      configId = recentSession.rows[0].config_id;
     }
 
-    // Resolve config_id from stored oauth state
-    const db = require('../../../core/database/connection');
-    const stateLookup = await db.query(
-      `SELECT config_id FROM oauth_sessions WHERE state = $1 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`,
-      [state]
-    );
+    const stateLookup = { rows: [{ config_id: configId }] };
 
     if (stateLookup.rows.length === 0) {
       console.warn('[OAuth] State not found or expired for callback', { state });
@@ -565,10 +600,11 @@ router.get('/callback', async (req, res) => {
         lastChecked: new Date().toISOString()
       });
 
-      // Mark oauth session completed
+      // Mark oauth session completed (update any matching session for this config)
       await db.query(
-        `UPDATE oauth_sessions SET request_token = $1, status = 'completed', updated_at = NOW() WHERE config_id = $2 AND state = $3`,
-        [request_token, configId, state]
+        `UPDATE oauth_sessions SET request_token = $1, status = 'completed', updated_at = NOW() 
+         WHERE config_id = $2 AND status = 'pending'`,
+        [request_token, configId]
       ).catch(() => {});
 
       // Log success
@@ -583,8 +619,8 @@ router.get('/callback', async (req, res) => {
     } catch (exchangeError) {
       console.error('OAuth GET callback exchange error:', exchangeError);
       await db.query(
-        `UPDATE oauth_sessions SET status = 'failed', updated_at = NOW() WHERE config_id = $1 AND state = $2`,
-        [configId, state]
+        `UPDATE oauth_sessions SET status = 'failed', updated_at = NOW() WHERE config_id = $1 AND status = 'pending'`,
+        [configId]
       ).catch(() => {});
       await logOAuthOperation(configId, config.userId, 'token_exchanged', 'failed', {
         error: exchangeError.message
