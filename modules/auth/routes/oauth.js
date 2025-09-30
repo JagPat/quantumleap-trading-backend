@@ -556,16 +556,7 @@ router.get('/callback', async (req, res) => {
       configId = recentSession.rows[0].config_id;
     }
 
-    const stateLookup = { rows: [{ config_id: configId }] };
-
-    if (stateLookup.rows.length === 0) {
-      console.warn('[OAuth] State not found or expired for callback', { state });
-      const frontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
-      const redirectUrl = `${frontendUrl}/broker-callback?status=error&error=${encodeURIComponent('Invalid or expired OAuth state')}`;
-      return res.redirect(redirectUrl);
-    }
-
-    const configId = stateLookup.rows[0].config_id;
+    // At this point we have a valid configId
     const brokerConfig = getBrokerConfig();
     const oauthToken = getOAuthToken();
 
