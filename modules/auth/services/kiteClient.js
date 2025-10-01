@@ -1,4 +1,3 @@
-const { KiteConnect } = require('kiteconnect');
 const SecurityManager = require('../../../core/security');
 
 /**
@@ -26,6 +25,9 @@ class KiteClient {
       config.access_token = accessToken;
     }
 
+    // Lazy-load to avoid adding kiteconnect to cold-start path
+    // eslint-disable-next-line global-require
+    const { KiteConnect } = require('kiteconnect');
     return new KiteConnect(config);
   }
 

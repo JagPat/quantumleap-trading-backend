@@ -8,6 +8,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies using npm ci for faster, reliable builds
+ENV NODE_ENV=production
 RUN npm ci --only=production
 
 # Copy source code

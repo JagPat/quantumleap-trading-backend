@@ -1,24 +1,10 @@
-const winston = require('winston');
-
-// Initialize logger
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'modular-server.log' })
-  ]
-});
-
 // Request logging middleware
 const requestLogger = (req, res, next) => {
   const start = Date.now();
   
   res.on('finish', () => {
     const duration = Date.now() - start;
+    const logger = req.app?.get('logger') || console;
     logger.info('Request completed', {
       method: req.method,
       url: req.originalUrl,

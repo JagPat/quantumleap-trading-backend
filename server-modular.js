@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
 const winston = require('winston');
+const compression = require('compression');
 
 // Load environment variables
 dotenv.config();
@@ -27,17 +28,18 @@ const { errorHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/requestLogger');
 const { requestId } = require('./middleware/requestId');
 
-// Initialize logger
+// Initialize logger (gate file transport in production environments without persistent storage)
+const transports = [new winston.transports.Console()];
+if (process.env.ENABLE_FILE_LOGS === 'true') {
+  transports.push(new winston.transports.File({ filename: 'modular-server.log' }));
+}
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()
   ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'modular-server.log' })
-  ]
+  transports
 });
 
 const app = express();
@@ -48,7 +50,16 @@ const PORT = process.env.PORT || process.env.MODULAR_PORT || 4000;
 const serviceContainer = new ServiceContainer();
 const eventBus = new EventBus();
 
+// Server/app settings for better performance
+app.set('trust proxy', 1);
+app.set('etag', 'strong');
+app.disable('x-powered-by');
+
+// Expose logger to middlewares via app
+app.set('logger', logger);
+
 // Middleware (preserve current setup)
+app.use(compression());
 app.use(helmet({
   crossOriginOpenerPolicy: false, // Allow popup communication
   crossOriginEmbedderPolicy: false // Allow popup communication
@@ -86,6 +97,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(requestId);
 app.use(requestLogger);
+
+// Default no-store for API responses (dynamic)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
 
 // Redirect legacy broker paths to auth module routes
 // Expose broker routes at legacy paths for compatibility
@@ -255,13 +276,7 @@ app.get('/ping', (req, res) => {
   res.status(200).send('pong');
 });
 
-app.get('/', (req, res) => {
-  res.status(200).json({
-    message: 'QuantumLeap Trading Backend',
-    status: 'running',
-    version: '2.0.0'
-  });
-});
+// (removed duplicate simple root route)
 
 // Enhanced health check with modules (for debugging)
 app.get('/health/detailed', async (req, res) => {
@@ -513,25 +528,7 @@ app.get('/api/modules/:moduleName/health', async (req, res) => {
   }
 });
 
-// API info endpoint (preserve current functionality)
-app.get('/', (req, res) => {
-  res.json({
-    message: 'WhatsTask Modular API Server',
-    version: '2.0.0',
-    architecture: 'modular',
-    server: 'modular',
-    port: PORT,
-    endpoints: {
-      health: '/health',
-      modules: '/api/modules',
-      'module-health': '/api/modules/:moduleName/health',
-      'module-debug': '/api/modules/:moduleName/debug'
-    },
-    documentation: 'Frontend should be deployed separately',
-    note: 'This is the modular server running on port 4000. The main server runs on port 3000.',
-    phase: 'Phase-2: Tasks module migrated to modular architecture'
-  });
-});
+// (removed duplicate API info root route)
 
 // Error handling middleware (preserve current setup)
 app.use(errorHandler);
