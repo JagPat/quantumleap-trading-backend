@@ -835,11 +835,15 @@ router.post('/disconnect', async (req, res) => {
  * GET /broker/status
  */
 router.get('/status', async (req, res) => {
-  const { config_id, user_id } = req.query;
+  // Check both query parameters and headers for config_id and user_id
+  const config_id = req.query.config_id || req.headers['x-config-id'];
+  const user_id = req.query.user_id || req.headers['x-user-id'];
   const requestTimestamp = new Date().toISOString();
   console.info('[Auth][Broker] %s GET /broker/status %o', requestTimestamp, {
     configId: config_id || null,
-    userId: user_id || null
+    userId: user_id || null,
+    fromQuery: !!req.query.config_id,
+    fromHeaders: !!req.headers['x-config-id']
   });
 
   try {
