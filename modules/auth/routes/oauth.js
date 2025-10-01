@@ -588,9 +588,14 @@ router.get('/callback', async (req, res) => {
       console.log('🔍 [OAuth] Complete Zerodha session data:', JSON.stringify(sessionData, null, 2));
       
       // Extract user_id from Zerodha response
-      const brokerUserId = sessionData.user_id || sessionData.user_name || 'unknown';
+      // Zerodha typically returns user_name, email, but not user_id
+      // We'll use user_name as the primary identifier, fallback to email, then 'unknown'
+      const brokerUserId = sessionData.user_name || sessionData.email || sessionData.user_id || 'unknown';
       console.log('🔑 [OAuth] Using broker user_id:', brokerUserId);
       console.log('🔍 [OAuth] Available fields in sessionData:', Object.keys(sessionData));
+      console.log('🔍 [OAuth] user_name:', sessionData.user_name);
+      console.log('🔍 [OAuth] email:', sessionData.email);
+      console.log('🔍 [OAuth] user_id:', sessionData.user_id);
 
       // Store tokens securely
       await oauthToken.store({
