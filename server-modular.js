@@ -599,8 +599,8 @@ async function startServer() {
           logger.warn('⚠️ Module initialization failed:', error.message);
         }
         
-        console.log('🚀 Backend fully ready! Version 2.0.9');
-        logger.info('🚀 Backend fully ready! Version 2.0.9');
+        console.log('🚀 Backend fully ready! Version 2.0.10 - User ID extraction fix deployed');
+        logger.info('🚀 Backend fully ready! Version 2.0.10 - User ID extraction fix deployed');
       });
     });
     
