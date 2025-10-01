@@ -246,7 +246,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     port: PORT,
-    version: '2.0.0',
+    version: '2.0.3',
     ready: true
   });
 });
@@ -260,7 +260,7 @@ app.get('/', (req, res) => {
   res.status(200).json({
     message: 'QuantumLeap Trading Backend',
     status: 'running',
-    version: '2.0.0'
+    version: '2.0.3'
   });
 });
 
@@ -280,7 +280,7 @@ app.get('/health/detailed', async (req, res) => {
       port: PORT,
       architecture: 'modular',
       server: 'modular',
-      version: '2.0.0',
+      version: '2.0.3',
       deployment: 'railway',
       modules: modularHealth.modules,
       services: modularHealth.services
@@ -291,7 +291,7 @@ app.get('/health/detailed', async (req, res) => {
       status: 'ERROR',
       error: error.message,
       timestamp: new Date().toISOString(),
-      version: '2.0.0',
+      version: '2.0.3',
       deployment: 'railway'
     });
   }
@@ -301,7 +301,7 @@ app.get('/health/detailed', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'QuantumLeap Trading Backend API',
-    version: '2.0.0',
+    version: '2.0.3',
     status: 'running',
     timestamp: new Date().toISOString(),
     endpoints: {
@@ -365,7 +365,7 @@ app.get('/api/test', (req, res) => {
   res.json({
     message: 'QuantumLeap Trading Backend is running!',
     timestamp: new Date().toISOString(),
-    version: '2.0.0',
+    version: '2.0.3',
     environment: process.env.NODE_ENV || 'development',
     port: PORT,
     deployment: 'railway'
@@ -518,7 +518,7 @@ app.get('/api/modules/:moduleName/health', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'WhatsTask Modular API Server',
-    version: '2.0.0',
+    version: '2.0.3',
     architecture: 'modular',
     server: 'modular',
     port: PORT,
