@@ -9,10 +9,11 @@ const winston = require('winston');
 dotenv.config();
 
 // Immediate startup logging
-console.log('🚀 QuantumLeap Trading Backend Starting... (v2.0.1)');
+console.log('🚀 QuantumLeap Trading Backend Starting... (v2.0.3)');
 console.log(`📊 PORT: ${process.env.PORT || 'not set'}`);
 console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
 console.log(`🐳 Platform: ${process.platform}`);
+console.log(`⏰ Deployment: ${new Date().toISOString()}`);
 console.log(`📦 Node: ${process.version}`);
 
 // Import modular architecture components
