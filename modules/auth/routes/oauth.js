@@ -584,9 +584,13 @@ router.get('/callback', async (req, res) => {
         broker: sessionData.broker
       });
 
+      // Log the complete Zerodha session data for debugging
+      console.log('🔍 [OAuth] Complete Zerodha session data:', JSON.stringify(sessionData, null, 2));
+      
       // Extract user_id from Zerodha response
       const brokerUserId = sessionData.user_id || sessionData.user_name || 'unknown';
       console.log('🔑 [OAuth] Using broker user_id:', brokerUserId);
+      console.log('🔍 [OAuth] Available fields in sessionData:', Object.keys(sessionData));
 
       // Store tokens securely
       await oauthToken.store({
