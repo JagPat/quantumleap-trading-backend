@@ -519,9 +519,9 @@ class BrokerService {
     }
   }
 
-  async getPortfolioSnapshot({ normalizedUserId = null, originalUserId = null, bypassCache = false } = {}) {
+  async getPortfolioSnapshot({ normalizedUserId = null, originalUserId = null, configId = null, bypassCache = false } = {}) {
     try {
-      const config = await this.resolveConfig({ normalizedUserId, originalUserId });
+      const config = await this.resolveConfig({ normalizedUserId, originalUserId, configId });
       const holdingsData = await this.getHoldingsData({ normalizedUserId, originalUserId, configId: config.id, bypassCache });
       const positionsData = await this.getPositionsData({ normalizedUserId, originalUserId, configId: config.id, bypassCache });
       let ordersData = null;
