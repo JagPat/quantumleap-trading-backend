@@ -93,6 +93,11 @@ app.use(requestLogger);
 app.use('/broker', oauthRoutes);
 app.use('/api/broker', oauthRoutes);
 
+// Register AI module routes at /api/ai
+const aiRoutes = require('./modules/ai/routes');
+app.use('/api/ai', aiRoutes);
+logger.info('AI module routes registered at /api/ai');
+
 // Initialize core services
 async function initializeCoreServices() {
   try {
