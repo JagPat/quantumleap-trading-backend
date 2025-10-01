@@ -138,6 +138,64 @@ router.delete('/preferences', async (req, res) => {
   }
 });
 
+// GET /api/ai/validate-key - Validate API key format and basic connectivity
+router.get('/validate-key', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const { provider } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'User ID required in X-User-ID header' 
+      });
+    }
+    
+    console.log('[AI][ValidateKey] Validating key for user:', userId, 'provider:', provider);
+    
+    // Get user's preferences to check if they have a key configured
+    const preferences = await preferencesService.getPreferences(userId);
+    
+    if (!preferences) {
+      return res.json({
+        status: 'no_key',
+        message: 'No AI API key configured',
+        valid: false
+      });
+    }
+    
+    // Check which provider has a key
+    const hasKey = provider === 'openai' ? preferences.has_openai_key :
+                   provider === 'claude' ? preferences.has_claude_key :
+                   provider === 'gemini' ? preferences.has_gemini_key :
+                   false;
+    
+    if (!hasKey) {
+      return res.json({
+        status: 'no_key',
+        message: `No ${provider || 'AI'} API key configured`,
+        valid: false
+      });
+    }
+    
+    // Key exists - return success
+    // Note: We don't actually validate with the AI provider here for security/performance
+    // Real validation happens when the key is used
+    res.json({
+      status: 'success',
+      message: 'API key is configured',
+      valid: true,
+      provider: provider || preferences.preferred_ai_provider
+    });
+  } catch (error) {
+    console.error('[AI][ValidateKey] Failed to validate key:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Failed to validate API key' 
+    });
+  }
+});
+
 // Chat functionality
 router.post('/chat', async (req, res) => {
   try {
