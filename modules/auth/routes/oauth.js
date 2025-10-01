@@ -575,6 +575,18 @@ router.get('/callback', async (req, res) => {
       const kc = new KiteConnect({ api_key: credentials.apiKey });
 
       const sessionData = await kc.generateSession(request_token, credentials.apiSecret);
+      
+      console.log('📊 [OAuth] Zerodha session data received:', {
+        user_id: sessionData.user_id,
+        user_type: sessionData.user_type,
+        email: sessionData.email,
+        user_name: sessionData.user_name,
+        broker: sessionData.broker
+      });
+
+      // Extract user_id from Zerodha response
+      const brokerUserId = sessionData.user_id || sessionData.user_name || 'unknown';
+      console.log('🔑 [OAuth] Using broker user_id:', brokerUserId);
 
       // Store tokens securely
       await oauthToken.store({
@@ -583,8 +595,14 @@ router.get('/callback', async (req, res) => {
         refreshToken: sessionData.refresh_token,
         expiresIn: 86400,
         tokenType: 'Bearer',
-        userId: sessionData.user_id
+        userId: brokerUserId
       });
+      
+      // Update broker_configs with user_id
+      await db.query(
+        `UPDATE broker_configs SET user_id = $1, updated_at = NOW() WHERE id = $2`,
+        [brokerUserId, configId]
+      ).catch(err => console.error('Failed to update broker_configs user_id:', err));
 
       // Update connection status
       await brokerConfig.updateConnectionStatus(configId, {
@@ -602,16 +620,17 @@ router.get('/callback', async (req, res) => {
 
       // Log success
       await logOAuthOperation(configId, config.userId, 'token_exchanged', 'success', {
-        brokerUserId: sessionData.user_id,
+        brokerUserId: brokerUserId,
         userType: sessionData.user_type
       }, req);
 
       // Clean and validate frontend URL
       const rawFrontendUrl = process.env.FRONTEND_URL || 'https://quantum-leap-frontend-production.up.railway.app';
       const frontendUrl = rawFrontendUrl.trim().replace(/\s+/g, '');
-      const redirectUrl = `${frontendUrl}/broker-callback?status=success&config_id=${encodeURIComponent(configId)}&user_id=${encodeURIComponent(sessionData.user_id)}`;
+      const redirectUrl = `${frontendUrl}/broker-callback?status=success&config_id=${encodeURIComponent(configId)}&user_id=${encodeURIComponent(brokerUserId)}`;
       
       console.log('🔄 Redirecting to frontend:', redirectUrl);
+      console.log('🔑 Redirect includes user_id:', brokerUserId);
       return res.redirect(redirectUrl);
     } catch (exchangeError) {
       console.error('OAuth GET callback exchange error:', exchangeError);
