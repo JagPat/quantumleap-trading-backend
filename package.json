@@ -1,6 +1,6 @@
 {
   "name": "quantumleap-trading-backend",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "Backend API for Vitan Task platform with modular architecture",
   "main": "server-modular.js",
   "type": "commonjs",
