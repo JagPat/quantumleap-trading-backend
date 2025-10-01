@@ -598,11 +598,12 @@ router.get('/callback', async (req, res) => {
         userId: brokerUserId
       });
       
-      // Update broker_configs with user_id
-      await db.query(
-        `UPDATE broker_configs SET user_id = $1, updated_at = NOW() WHERE id = $2`,
-        [brokerUserId, configId]
-      ).catch(err => console.error('Failed to update broker_configs user_id:', err));
+      // Update broker_configs with user_id (skip for now - column type issue)
+      // TODO: Fix broker_configs.user_id column type (currently UUID, should be VARCHAR)
+      // await db.query(
+      //   `UPDATE broker_configs SET user_id = $1, updated_at = NOW() WHERE id = $2`,
+      //   [brokerUserId, configId]
+      // ).catch(err => console.error('Failed to update broker_configs user_id:', err));
 
       // Update connection status
       await brokerConfig.updateConnectionStatus(configId, {

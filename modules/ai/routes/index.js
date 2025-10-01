@@ -138,11 +138,11 @@ router.delete('/preferences', async (req, res) => {
   }
 });
 
-// GET /api/ai/validate-key - Validate API key format and basic connectivity
-router.get('/validate-key', async (req, res) => {
+// Validate API key - GET and POST support
+const validateKeyHandler = async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
-    const { provider } = req.query;
+    const provider = req.query.provider || req.body?.provider;
     
     if (!userId) {
       return res.status(400).json({ 
@@ -194,7 +194,13 @@ router.get('/validate-key', async (req, res) => {
       message: 'Failed to validate API key' 
     });
   }
-});
+};
+
+// GET /api/ai/validate-key - Validate API key format and basic connectivity
+router.get('/validate-key', validateKeyHandler);
+
+// POST /api/ai/validate-key - Validate API key (same as GET, for compatibility)
+router.post('/validate-key', validateKeyHandler);
 
 // Chat functionality
 router.post('/chat', async (req, res) => {
