@@ -849,6 +849,16 @@ router.get('/status', async (req, res) => {
     const brokerService = getBrokerService();
     let configId = config_id || null;
 
+    // Validate UUID format if config_id is provided
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (configId && !uuidRegex.test(configId)) {
+      console.warn('[Auth][Broker] Invalid UUID format for config_id:', configId);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid config_id format (must be valid UUID)' 
+      });
+    }
+
     if (!configId) {
       const normalizedLookupId = normalizeUserIdentifier(user_id);
       const brokerConfig = getBrokerConfig();
