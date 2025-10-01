@@ -77,6 +77,15 @@ module.exports = {
         this.logger.warn('OAuth database initialization failed (continuing):', error.message);
       }
       
+      // Initialize AI Preferences database schema
+      try {
+        const { initAIPreferences } = require('../../core/database/initAIPreferences');
+        await initAIPreferences();
+        this.logger.info('AI Preferences database schema initialized');
+      } catch (error) {
+        this.logger.warn('AI Preferences database initialization failed (continuing):', error.message);
+      }
+      
       this.logger.info('AuthService initialized');
       this.logger.info('OAuth services initialized');
       

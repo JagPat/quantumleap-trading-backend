@@ -1,7 +1,9 @@
 const express = require('express');
 const aiService = require('../services');
+const AIPreferencesService = require('../services/preferences');
 
 const router = express.Router();
+const preferencesService = new AIPreferencesService();
 
 // Health check
 router.get('/health', async (req, res) => {
@@ -10,6 +12,129 @@ router.get('/health', async (req, res) => {
     res.json(health);
   } catch (error) {
     res.status(500).json({ error: 'AI service health check failed' });
+  }
+});
+
+// AI Preferences Management
+// GET /api/ai/preferences - Get user's AI API key preferences
+router.get('/preferences', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const configId = req.headers['x-config-id'];
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'User ID required in X-User-ID header' 
+      });
+    }
+    
+    console.log('[AI][Preferences] GET request from user:', userId);
+    
+    // Get preferences from database
+    const preferences = await preferencesService.getPreferences(userId);
+    
+    if (!preferences) {
+      // No preferences exist yet - return defaults
+      return res.json({
+        status: 'no_key',
+        preferences: {
+          preferred_ai_provider: 'auto',
+          has_openai_key: false,
+          has_claude_key: false,
+          has_gemini_key: false,
+          openai_key_preview: '',
+          claude_key_preview: '',
+          gemini_key_preview: ''
+        }
+      });
+    }
+    
+    res.json({
+      status: 'success',
+      preferences
+    });
+  } catch (error) {
+    console.error('[AI][Preferences] Failed to get preferences:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Failed to retrieve AI preferences' 
+    });
+  }
+});
+
+// POST /api/ai/preferences - Save user's AI API keys
+router.post('/preferences', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const configId = req.headers['x-config-id'];
+    const { preferred_ai_provider, openai_api_key, claude_api_key, gemini_api_key } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'User ID required in X-User-ID header' 
+      });
+    }
+    
+    console.log('[AI][Preferences] POST request from user:', userId);
+    console.log('[AI][Preferences] Saving preferences:', {
+      preferred_ai_provider,
+      has_openai: !!openai_api_key,
+      has_claude: !!claude_api_key,
+      has_gemini: !!gemini_api_key
+    });
+    
+    // Save preferences to database
+    const result = await preferencesService.savePreferences(userId, configId, {
+      preferred_ai_provider: preferred_ai_provider || 'auto',
+      openai_api_key,
+      claude_api_key,
+      gemini_api_key
+    });
+    
+    console.log('✅ [AI][Preferences] Saved successfully for user:', userId);
+    
+    res.json({
+      status: 'success',
+      preferences: result,
+      message: 'AI preferences saved successfully'
+    });
+  } catch (error) {
+    console.error('[AI][Preferences] Failed to save preferences:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: error.message || 'Failed to save AI preferences' 
+    });
+  }
+});
+
+// DELETE /api/ai/preferences - Delete user's AI preferences
+router.delete('/preferences', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'User ID required in X-User-ID header' 
+      });
+    }
+    
+    console.log('[AI][Preferences] DELETE request from user:', userId);
+    
+    await preferencesService.deletePreferences(userId);
+    
+    res.json({
+      status: 'success',
+      message: 'AI preferences deleted successfully'
+    });
+  } catch (error) {
+    console.error('[AI][Preferences] Failed to delete preferences:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Failed to delete AI preferences' 
+    });
   }
 });
 
