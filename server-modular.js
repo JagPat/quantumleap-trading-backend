@@ -76,10 +76,10 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Force-Delete', 'X-User-ID']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Force-Delete', 'X-User-ID', 'X-Config-ID']
 }));
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Force-Delete, X-User-ID');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Force-Delete, X-User-ID, X-Config-ID');
   next();
 });
 app.use(express.json({ limit: '10mb' }));
