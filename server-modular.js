@@ -599,8 +599,8 @@ async function startServer() {
           logger.warn('⚠️ Module initialization failed:', error.message);
         }
         
-        console.log('🚀 Backend fully ready!');
-        logger.info('🚀 Backend fully ready!');
+        console.log('🚀 Backend fully ready! Version 2.0.8');
+        logger.info('🚀 Backend fully ready! Version 2.0.8');
       });
     });
     
