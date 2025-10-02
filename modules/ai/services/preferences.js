@@ -3,7 +3,7 @@
  * Handles storage and retrieval of user AI API keys
  */
 
-const { pool: db } = require('../../../core/database/pool');
+const { pool: db } = require('../../../core/database/connection');
 const SecurityManager = require('../../../core/security');
 
 class AIPreferencesService {
@@ -172,6 +172,110 @@ class AIPreferencesService {
     } catch (error) {
       console.error('[AIPreferences] Error getting decrypted key:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Validate an API key by making a test request to the provider
+   */
+  async validateApiKey(provider, apiKey) {
+    try {
+      console.log(`[AIPreferences] Validating ${provider} API key...`);
+      
+      switch (provider.toLowerCase()) {
+        case 'openai':
+          return await this.validateOpenAIKey(apiKey);
+        case 'claude':
+          return await this.validateClaudeKey(apiKey);
+        case 'gemini':
+          return await this.validateGeminiKey(apiKey);
+        default:
+          return { valid: false, message: `Unsupported provider: ${provider}` };
+      }
+    } catch (error) {
+      console.error(`[AIPreferences] Validation error for ${provider}:`, error);
+      return { valid: false, message: error.message || 'Validation failed' };
+    }
+  }
+
+  /**
+   * Validate OpenAI API key
+   */
+  async validateOpenAIKey(apiKey) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/models', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+
+      if (response.ok) {
+        return { valid: true, message: 'OpenAI API key is valid' };
+      } else if (response.status === 401) {
+        return { valid: false, message: 'Invalid OpenAI API key' };
+      } else {
+        return { valid: false, message: `OpenAI API error: ${response.status}` };
+      }
+    } catch (error) {
+      console.error('[AIPreferences] OpenAI validation error:', error);
+      return { valid: false, message: 'Failed to validate OpenAI key' };
+    }
+  }
+
+  /**
+   * Validate Claude API key
+   */
+  async validateClaudeKey(apiKey) {
+    try {
+      // Test Claude API key with a minimal request
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 10,
+          messages: [{ role: 'user', content: 'test' }]
+        })
+      });
+
+      if (response.ok) {
+        return { valid: true, message: 'Claude API key is valid' };
+      } else if (response.status === 401) {
+        return { valid: false, message: 'Invalid Claude API key' };
+      } else {
+        return { valid: false, message: `Claude API error: ${response.status}` };
+      }
+    } catch (error) {
+      console.error('[AIPreferences] Claude validation error:', error);
+      return { valid: false, message: 'Failed to validate Claude key' };
+    }
+  }
+
+  /**
+   * Validate Gemini API key
+   */
+  async validateGeminiKey(apiKey) {
+    try {
+      // Test Gemini API key
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`, {
+        method: 'GET'
+      });
+
+      if (response.ok) {
+        return { valid: true, message: 'Gemini API key is valid' };
+      } else if (response.status === 401 || response.status === 403) {
+        return { valid: false, message: 'Invalid Gemini API key' };
+      } else {
+        return { valid: false, message: `Gemini API error: ${response.status}` };
+      }
+    } catch (error) {
+      console.error('[AIPreferences] Gemini validation error:', error);
+      return { valid: false, message: 'Failed to validate Gemini key' };
     }
   }
 

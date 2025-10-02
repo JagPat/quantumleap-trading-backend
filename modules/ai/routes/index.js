@@ -63,6 +63,37 @@ router.get('/preferences', async (req, res) => {
   }
 });
 
+// POST /api/ai/validate-key - Validate an AI API key
+router.post('/validate-key', async (req, res) => {
+  try {
+    const { provider, api_key } = req.body;
+    
+    if (!provider || !api_key) {
+      return res.status(400).json({ 
+        valid: false,
+        message: 'Provider and API key are required' 
+      });
+    }
+    
+    console.log(`[AI][Validate] Validating ${provider} API key...`);
+    
+    // Validate the API key by making a test request
+    const validation = await preferencesService.validateApiKey(provider, api_key);
+    
+    res.json({
+      valid: validation.valid,
+      provider: provider,
+      message: validation.message || (validation.valid ? 'API key is valid' : 'API key is invalid')
+    });
+  } catch (error) {
+    console.error('[AI][Validate] Validation error:', error);
+    res.status(500).json({ 
+      valid: false,
+      message: error.message || 'Failed to validate API key' 
+    });
+  }
+});
+
 // POST /api/ai/preferences - Save user's AI API keys
 router.post('/preferences', async (req, res) => {
   try {
