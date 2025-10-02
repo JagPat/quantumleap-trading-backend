@@ -587,15 +587,42 @@ router.get('/callback', async (req, res) => {
       // Log the complete Zerodha session data for debugging
       console.log('🔍 [OAuth] Complete Zerodha session data:', JSON.stringify(sessionData, null, 2));
       
-      // Extract user_id from Zerodha response
-      // Zerodha typically returns user_name, email, but not user_id
-      // We'll use user_name as the primary identifier, fallback to email, then 'unknown'
-      const brokerUserId = sessionData.user_name || sessionData.email || sessionData.user_id || 'unknown';
-      console.log('🔑 [OAuth] Using broker user_id:', brokerUserId);
-      console.log('🔍 [OAuth] Available fields in sessionData:', Object.keys(sessionData));
-      console.log('🔍 [OAuth] user_name:', sessionData.user_name);
-      console.log('🔍 [OAuth] email:', sessionData.email);
-      console.log('🔍 [OAuth] user_id:', sessionData.user_id);
+      // According to Zerodha Kite Connect API documentation:
+      // The token exchange only returns access_token, not user details
+      // We need to make a separate API call to /user/profile to get user_id
+      
+      let brokerUserId = 'unknown';
+      
+      try {
+        // Fetch user profile from Zerodha API to get user_id
+        console.log('🔍 [OAuth] Fetching user profile from Zerodha API...');
+        const profileResponse = await fetch('https://api.kite.trade/user/profile', {
+          method: 'GET',
+          headers: {
+            'Authorization': `token ${sessionData.access_token}`,
+            'X-Kite-Version': '3'
+          }
+        });
+        
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          console.log('🔍 [OAuth] Zerodha profile response:', JSON.stringify(profileData, null, 2));
+          
+          // Extract user_id from profile response
+          brokerUserId = profileData.data?.user_id || profileData.data?.user_name || 'unknown';
+          console.log('🔑 [OAuth] Using broker user_id from profile:', brokerUserId);
+        } else {
+          console.warn('⚠️ [OAuth] Failed to fetch user profile:', profileResponse.status, profileResponse.statusText);
+          // Fallback to session data if available
+          brokerUserId = sessionData.user_name || sessionData.email || 'unknown';
+        }
+      } catch (error) {
+        console.error('❌ [OAuth] Error fetching user profile:', error.message);
+        // Fallback to session data if available
+        brokerUserId = sessionData.user_name || sessionData.email || 'unknown';
+      }
+      
+      console.log('🔑 [OAuth] Final broker user_id:', brokerUserId);
 
       // Store tokens securely
       await oauthToken.store({
