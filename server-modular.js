@@ -92,18 +92,17 @@ app.use(requestLogger);
 app.use('/broker', oauthRoutes);
 app.use('/api/broker', oauthRoutes);
 
+// Rock solid audit enforcement - Version endpoint
+const versionRoutes = require('./routes/version');
+app.use('/api', versionRoutes);
+console.log('🔍 [RockSolid] Version endpoint registered at /api/version');
+
 // Initialize core services
 async function initializeCoreServices() {
   try {
     logger.info('Initializing core services...');
     
     // Initialize database connection and run migrations
-
-// Rock solid audit enforcement - Version endpoint
-const versionRoutes = require('./routes/version');
-app.use('/api', versionRoutes);
-console.log('🔍 [RockSolid] Version endpoint registered at /api/version');
-
     try {
       const dbInit = require('./core/database/init');
       const dbConnected = await dbInit.initialize();
