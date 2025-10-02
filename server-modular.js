@@ -21,6 +21,7 @@ const EventBus = require('./shared/events/eventBus');
 const ModuleLoader = require('./module-loader');
 const databaseConnection = require('./modules/core/database/connection');
 const oauthRoutes = require('./modules/auth/routes/oauth');
+const aiRoutes = require('./modules/ai/routes');
 
 // Import existing middleware (preserve current functionality)
 const { errorHandler } = require('./middleware/errorHandler');
@@ -96,6 +97,10 @@ app.use('/api/broker', oauthRoutes);
 const versionRoutes = require('./routes/version');
 app.use('/api', versionRoutes);
 console.log('🔍 [RockSolid] Version endpoint registered at /api/version');
+
+// Register AI module routes
+app.use('/api/ai', aiRoutes);
+console.log('🤖 [AI] AI routes registered at /api/ai/*');
 
 // Initialize core services
 async function initializeCoreServices() {
