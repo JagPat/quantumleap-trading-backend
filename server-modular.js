@@ -245,13 +245,14 @@ async function initializeModules() {
 // Railway health check endpoint - MUST respond immediately
 app.get('/health', (req, res) => {
   // Immediate response - no async operations
+  const commitSha = process.env.COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 'unknown';
   res.status(200).json({ 
     status: 'ok',
-    commit: process.env.COMMIT_SHA || process.env.VITE_COMMIT_SHA || 'unknown',
+    commit: commitSha.substring(0, 7),
     time: new Date().toISOString(),
     uptime: process.uptime(),
     port: PORT,
-    version: '2.0.0',
+    version: '2.1.0',
     ready: true
   });
 });
@@ -552,8 +553,10 @@ async function startServer() {
     
     // Start server first to make health check available immediately
     const server = app.listen(PORT, '0.0.0.0', async () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      const commitSha = process.env.COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 'unknown';
+      console.log(`🚀 Server running on port ${PORT} (commit=${commitSha.substring(0, 7)})`);
       logger.info(`✅ QuantumLeap Trading Backend server running on port ${PORT}`);
+      logger.info(`📝 Commit SHA: ${commitSha.substring(0, 7)}`);
       logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`❤️ Health check: http://0.0.0.0:${PORT}/health`);
       logger.info(`🧪 Test endpoint: http://0.0.0.0:${PORT}/api/test`);
