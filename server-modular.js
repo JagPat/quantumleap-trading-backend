@@ -246,8 +246,9 @@ async function initializeModules() {
 app.get('/health', (req, res) => {
   // Immediate response - no async operations
   res.status(200).json({ 
-    status: 'OK',
-    timestamp: new Date().toISOString(),
+    status: 'ok',
+    commit: process.env.COMMIT_SHA || process.env.VITE_COMMIT_SHA || 'unknown',
+    time: new Date().toISOString(),
     uptime: process.uptime(),
     port: PORT,
     version: '2.0.0',
@@ -551,7 +552,7 @@ async function startServer() {
     
     // Start server first to make health check available immediately
     const server = app.listen(PORT, '0.0.0.0', async () => {
-      console.log(`✅ Server listening on port ${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
       logger.info(`✅ QuantumLeap Trading Backend server running on port ${PORT}`);
       logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`❤️ Health check: http://0.0.0.0:${PORT}/health`);

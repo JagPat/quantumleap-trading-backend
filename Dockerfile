@@ -21,10 +21,11 @@ RUN adduser -S backend -u 1001
 RUN chown -R backend:nodejs /app
 USER backend
 
-# Expose port (Railway will set PORT env var)
-EXPOSE 4000
+# Railway will set PORT env var dynamically
+# Don't hardcode port - Railway manages this
+ENV PORT=4000
 
-# Health check - give more time for startup
+# Health check - use dynamic PORT
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 4000) + '/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
