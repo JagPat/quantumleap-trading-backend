@@ -9,11 +9,10 @@ const winston = require('winston');
 dotenv.config();
 
 // Immediate startup logging
-console.log('🚀 QuantumLeap Trading Backend Starting... (v2.0.11)');
+console.log('🚀 QuantumLeap Trading Backend Starting... (v2.0.1)');
 console.log(`📊 PORT: ${process.env.PORT || 'not set'}`);
 console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
 console.log(`🐳 Platform: ${process.platform}`);
-console.log(`⏰ Deployment: ${new Date().toISOString()}`);
 console.log(`📦 Node: ${process.version}`);
 
 // Import modular architecture components
@@ -76,10 +75,10 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Force-Delete', 'X-User-ID', 'X-Config-ID']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Force-Delete', 'X-User-ID']
 }));
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Force-Delete, X-User-ID, X-Config-ID');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Force-Delete, X-User-ID');
   next();
 });
 app.use(express.json({ limit: '10mb' }));
@@ -93,17 +92,18 @@ app.use(requestLogger);
 app.use('/broker', oauthRoutes);
 app.use('/api/broker', oauthRoutes);
 
-// Register AI module routes at /api/ai
-const aiRoutes = require('./modules/ai/routes');
-app.use('/api/ai', aiRoutes);
-logger.info('AI module routes registered at /api/ai');
-
 // Initialize core services
 async function initializeCoreServices() {
   try {
     logger.info('Initializing core services...');
     
     // Initialize database connection and run migrations
+
+// Rock solid audit enforcement - Version endpoint
+const versionRoutes = require('./routes/version');
+app.use('/api', versionRoutes);
+console.log('🔍 [RockSolid] Version endpoint registered at /api/version');
+
     try {
       const dbInit = require('./core/database/init');
       const dbConnected = await dbInit.initialize();
@@ -251,7 +251,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     port: PORT,
-    version: '2.0.11',
+    version: '2.0.0',
     ready: true
   });
 });
@@ -265,7 +265,7 @@ app.get('/', (req, res) => {
   res.status(200).json({
     message: 'QuantumLeap Trading Backend',
     status: 'running',
-    version: '2.0.11'
+    version: '2.0.0'
   });
 });
 
@@ -285,7 +285,7 @@ app.get('/health/detailed', async (req, res) => {
       port: PORT,
       architecture: 'modular',
       server: 'modular',
-      version: '2.0.11',
+      version: '2.0.0',
       deployment: 'railway',
       modules: modularHealth.modules,
       services: modularHealth.services
@@ -296,7 +296,7 @@ app.get('/health/detailed', async (req, res) => {
       status: 'ERROR',
       error: error.message,
       timestamp: new Date().toISOString(),
-      version: '2.0.11',
+      version: '2.0.0',
       deployment: 'railway'
     });
   }
@@ -306,7 +306,7 @@ app.get('/health/detailed', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'QuantumLeap Trading Backend API',
-    version: '2.0.11',
+    version: '2.0.0',
     status: 'running',
     timestamp: new Date().toISOString(),
     endpoints: {
@@ -370,7 +370,7 @@ app.get('/api/test', (req, res) => {
   res.json({
     message: 'QuantumLeap Trading Backend is running!',
     timestamp: new Date().toISOString(),
-    version: '2.0.11',
+    version: '2.0.0',
     environment: process.env.NODE_ENV || 'development',
     port: PORT,
     deployment: 'railway'
@@ -523,7 +523,7 @@ app.get('/api/modules/:moduleName/health', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'WhatsTask Modular API Server',
-    version: '2.0.11',
+    version: '2.0.0',
     architecture: 'modular',
     server: 'modular',
     port: PORT,
@@ -599,8 +599,8 @@ async function startServer() {
           logger.warn('⚠️ Module initialization failed:', error.message);
         }
         
-        console.log('🚀 Backend fully ready! Version 2.0.11 - Zerodha API compliance fix deployed');
-        logger.info('🚀 Backend fully ready! Version 2.0.11 - Zerodha API compliance fix deployed');
+        console.log('🚀 Backend fully ready!');
+        logger.info('🚀 Backend fully ready!');
       });
     });
     

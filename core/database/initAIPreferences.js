@@ -3,7 +3,7 @@
  * Stores user AI API keys (encrypted) and preferences
  */
 
-const db = require('./connection');
+const { pool: db } = require('./pool');
 
 const initAIPreferences = async () => {
   console.log('[AIPreferences] Initializing AI preferences schema...');
