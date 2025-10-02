@@ -9,7 +9,7 @@ const winston = require('winston');
 dotenv.config();
 
 // Immediate startup logging
-console.log('🚀 QuantumLeap Trading Backend Starting... (v2.0.4)');
+console.log('🚀 QuantumLeap Trading Backend Starting... (v2.0.10)');
 console.log(`📊 PORT: ${process.env.PORT || 'not set'}`);
 console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
 console.log(`🐳 Platform: ${process.platform}`);
@@ -251,7 +251,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     port: PORT,
-    version: '2.0.7',
+    version: '2.0.10',
     ready: true
   });
 });
@@ -265,7 +265,7 @@ app.get('/', (req, res) => {
   res.status(200).json({
     message: 'QuantumLeap Trading Backend',
     status: 'running',
-    version: '2.0.7'
+    version: '2.0.10'
   });
 });
 
@@ -285,7 +285,7 @@ app.get('/health/detailed', async (req, res) => {
       port: PORT,
       architecture: 'modular',
       server: 'modular',
-      version: '2.0.7',
+      version: '2.0.10',
       deployment: 'railway',
       modules: modularHealth.modules,
       services: modularHealth.services
@@ -296,7 +296,7 @@ app.get('/health/detailed', async (req, res) => {
       status: 'ERROR',
       error: error.message,
       timestamp: new Date().toISOString(),
-      version: '2.0.7',
+      version: '2.0.10',
       deployment: 'railway'
     });
   }
@@ -306,7 +306,7 @@ app.get('/health/detailed', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'QuantumLeap Trading Backend API',
-    version: '2.0.7',
+    version: '2.0.10',
     status: 'running',
     timestamp: new Date().toISOString(),
     endpoints: {
@@ -370,7 +370,7 @@ app.get('/api/test', (req, res) => {
   res.json({
     message: 'QuantumLeap Trading Backend is running!',
     timestamp: new Date().toISOString(),
-    version: '2.0.7',
+    version: '2.0.10',
     environment: process.env.NODE_ENV || 'development',
     port: PORT,
     deployment: 'railway'
@@ -523,7 +523,7 @@ app.get('/api/modules/:moduleName/health', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'WhatsTask Modular API Server',
-    version: '2.0.7',
+    version: '2.0.10',
     architecture: 'modular',
     server: 'modular',
     port: PORT,
