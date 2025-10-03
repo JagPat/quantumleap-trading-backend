@@ -1026,6 +1026,29 @@ class BrokerService {
         }
       }
 
+      // FALLBACK: If userId is still null, try to fetch from broker_configs or ai_preferences
+      if (!userId) {
+        console.warn(`[BrokerService] userId is null for config ${config.id}, attempting fallback...`);
+        
+        try {
+          // Try to get from ai_preferences table (which has user_id)
+          const db = require('../../../core/database/connection');
+          const aiPrefResult = await db.query(
+            'SELECT user_id FROM ai_preferences WHERE config_id = $1 LIMIT 1',
+            [config.id]
+          );
+          
+          if (aiPrefResult.rows.length > 0 && aiPrefResult.rows[0].user_id) {
+            userId = aiPrefResult.rows[0].user_id;
+            console.log(`[BrokerService] ✅ Fallback: Retrieved user_id from ai_preferences: ${userId}`);
+          } else {
+            console.warn(`[BrokerService] ⚠️ No user_id found in ai_preferences for config ${config.id}`);
+          }
+        } catch (fallbackError) {
+          console.error('[BrokerService] Fallback user_id fetch failed:', fallbackError.message);
+        }
+      }
+
       return {
         success: true,
         status: {
