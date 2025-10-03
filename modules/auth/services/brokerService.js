@@ -1008,6 +1008,24 @@ class BrokerService {
       const tokenExpiry = tokenStatus.expiresAt || null;
       const needsReauth = config.needsReauth || tokenStatus.needsReauth;
 
+      // Fetch token record to get user_id and access_token
+      const tokenRecord = await this.oauthToken.getByConfigId(config.id);
+      let userId = null;
+      let accessToken = null;
+      
+      if (tokenRecord) {
+        userId = tokenRecord.userId || null;
+        
+        // Decrypt access_token if available
+        try {
+          if (tokenRecord.accessTokenEncrypted) {
+            accessToken = this.security.decrypt(tokenRecord.accessTokenEncrypted);
+          }
+        } catch (decryptError) {
+          console.warn('[BrokerService] Failed to decrypt access_token:', decryptError.message);
+        }
+      }
+
       return {
         success: true,
         status: {
@@ -1020,7 +1038,11 @@ class BrokerService {
           brokerName: config.brokerName,
           sessionStatus: config.sessionStatus,
           lastTokenRefresh: config.lastTokenRefresh,
-          needsReauth
+          needsReauth,
+          userId: userId,              // ✅ Include user_id
+          user_id: userId,             // ✅ Include snake_case for frontend compatibility
+          accessToken: accessToken,    // ✅ Include access_token for broker API calls
+          access_token: accessToken    // ✅ Include snake_case for frontend compatibility
         }
       };
 
