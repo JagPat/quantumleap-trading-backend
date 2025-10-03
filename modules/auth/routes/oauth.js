@@ -576,16 +576,18 @@ router.get('/callback', async (req, res) => {
 
       const sessionData = await kc.generateSession(request_token, credentials.apiSecret);
       
-      console.log('📊 [OAuth] Zerodha session data received:', {
+      // Log the complete Zerodha session data for debugging
+      console.log('🔍 [OAuth] Complete Zerodha session data:', JSON.stringify(sessionData, null, 2));
+      
+      console.log('📊 [OAuth] Zerodha session data fields:', {
         user_id: sessionData.user_id,
         user_type: sessionData.user_type,
         email: sessionData.email,
         user_name: sessionData.user_name,
-        broker: sessionData.broker
+        user_shortname: sessionData.user_shortname,
+        broker: sessionData.broker,
+        has_user_id: !!sessionData.user_id
       });
-
-      // Log the complete Zerodha session data for debugging
-      console.log('🔍 [OAuth] Complete Zerodha session data:', JSON.stringify(sessionData, null, 2));
       
       // According to Zerodha Kite Connect API documentation:
       // The token exchange only returns access_token, not user details
@@ -609,17 +611,25 @@ router.get('/callback', async (req, res) => {
           console.log('🔍 [OAuth] Zerodha profile response:', JSON.stringify(profileData, null, 2));
           
           // Extract user_id from profile response
-          brokerUserId = profileData.data?.user_id || profileData.data?.user_name || 'unknown';
-          console.log('🔑 [OAuth] Using broker user_id from profile:', brokerUserId);
+          // Zerodha returns: { data: { user_id: "ABC123", user_name: "John Doe", email: "..." } }
+          // We need the user_id (client code), NOT user_name (full name)
+          if (profileData.data?.user_id) {
+            brokerUserId = profileData.data.user_id;
+            console.log('✅ [OAuth] Got user_id from profile API:', brokerUserId);
+          } else {
+            console.warn('⚠️ [OAuth] user_id not found in profile response, using email as fallback');
+            brokerUserId = profileData.data?.email || sessionData.user_name || 'unknown';
+          }
         } else {
           console.warn('⚠️ [OAuth] Failed to fetch user profile:', profileResponse.status, profileResponse.statusText);
-          // Fallback to session data if available
-          brokerUserId = sessionData.user_name || sessionData.email || 'unknown';
+          // Fallback: try to extract from session data
+          // sessionData from generateSession() might have user_id directly
+          brokerUserId = sessionData.user_id || sessionData.email || 'unknown';
         }
       } catch (error) {
         console.error('❌ [OAuth] Error fetching user profile:', error.message);
         // Fallback to session data if available
-        brokerUserId = sessionData.user_name || sessionData.email || 'unknown';
+        brokerUserId = sessionData.user_id || sessionData.email || 'unknown';
       }
       
       console.log('🔑 [OAuth] Final broker user_id:', brokerUserId);
