@@ -3,7 +3,7 @@
  * Handles storage and retrieval of user AI API keys
  */
 
-const { pool: db } = require('../../../core/database/connection');
+const db = require('../../../core/database/connection');
 const SecurityManager = require('../../../core/security');
 
 class AIPreferencesService {
