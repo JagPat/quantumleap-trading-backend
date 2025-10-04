@@ -199,10 +199,11 @@ router.get('/realtime', async (req, res) => {
   try {
     const realtimeData = {
       timestamp: new Date().toISOString(),
-      activeUsers: Math.floor(Math.random() * 100) + 50,
-      currentLoad: (Math.random() * 0.5 + 0.3).toFixed(2),
-      responseTime: Math.floor(Math.random() * 200) + 50,
-      errorRate: (Math.random() * 0.02).toFixed(4)
+      activeUsers: 0, // REAL DATA REQUIRED: Query active sessions from database
+      currentLoad: '0.00', // REAL DATA REQUIRED: Use os.loadavg() for real load
+      responseTime: 0, // REAL DATA REQUIRED: Integrate APM tool for real response time
+      errorRate: '0.0000', // REAL DATA REQUIRED: Query error logs from database
+      note: 'Real-time metrics require database and monitoring integration'
     };
     
     res.json(realtimeData);

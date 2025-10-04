@@ -1,3 +1,12 @@
+/**
+ * Analytics Service - Production Version
+ * 
+ * Provides real system metrics using Node.js 'os' module.
+ * Mock data and Math.random() have been removed.
+ */
+
+const os = require('os');
+
 class AnalyticsService {
   constructor() {
     this.metrics = {
@@ -8,73 +17,56 @@ class AnalyticsService {
     };
     this.reports = [];
     this.dataPoints = [];
+    this.startTime = Date.now();
   }
 
-  // Performance metrics
+  // Performance metrics - REAL DATA
   async getPerformanceMetrics(timeRange = '30d') {
     const now = new Date();
-    const startDate = this.getStartDate(now, timeRange);
     
     return {
       timeRange,
       timestamp: now.toISOString(),
       metrics: {
-        responseTime: {
-          average: Math.floor(Math.random() * 200) + 50,
-          p95: Math.floor(Math.random() * 500) + 200,
-          p99: Math.floor(Math.random() * 1000) + 500
-        },
-        throughput: {
-          requestsPerSecond: Math.floor(Math.random() * 100) + 20,
-          totalRequests: Math.floor(Math.random() * 1000000) + 500000
-        },
-        errors: {
-          rate: (Math.random() * 0.05).toFixed(4),
-          total: Math.floor(Math.random() * 1000) + 100
-        },
         uptime: {
-          percentage: (99.5 + Math.random() * 0.5).toFixed(2),
-          lastDowntime: this.getRandomDate(startDate, now)
-        }
+          seconds: Math.floor((Date.now() - this.startTime) / 1000),
+          percentage: '100.00',
+          lastRestart: new Date(this.startTime).toISOString()
+        },
+        note: 'Full performance metrics require APM integration (e.g. New Relic, DataDog)'
       }
     };
   }
 
-  // User behavior analytics
+  // User behavior analytics - REQUIRES DATABASE INTEGRATION
   async getUserBehaviorAnalytics(timeRange = '30d') {
     const now = new Date();
-    const startDate = this.getStartDate(now, timeRange);
     
     return {
       timeRange,
       timestamp: now.toISOString(),
       metrics: {
-        activeUsers: {
-          daily: Math.floor(Math.random() * 500) + 200,
-          weekly: Math.floor(Math.random() * 2000) + 1000,
-          monthly: Math.floor(Math.random() * 8000) + 5000
-        },
-        sessionDuration: {
-          average: Math.floor(Math.random() * 1800) + 600, // 10-40 minutes
-          median: Math.floor(Math.random() * 1500) + 500
-        },
-        pageViews: {
-          total: Math.floor(Math.random() * 100000) + 50000,
-          perSession: Math.floor(Math.random() * 10) + 3
-        },
-        userRetention: {
-          day1: (Math.random() * 0.3 + 0.6).toFixed(3),
-          day7: (Math.random() * 0.2 + 0.4).toFixed(3),
-          day30: (Math.random() * 0.1 + 0.2).toFixed(3)
-        }
+        note: 'User behavior analytics require database query integration',
+        status: 'not_implemented',
+        instructions: 'Integrate with user activity logs in database'
       }
     };
   }
 
-  // System analytics
+  // System analytics - REAL SYSTEM METRICS
   async getSystemAnalytics(timeRange = '30d') {
     const now = new Date();
-    const startDate = this.getStartDate(now, timeRange);
+    
+    // Get real system metrics
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const cpus = os.cpus();
+    const loadAvg = os.loadavg(); // 1, 5, 15 minute load averages
+    
+    // Calculate CPU usage (load average relative to CPU count)
+    const cpuCount = cpus.length;
+    const cpuUsagePercent = ((loadAvg[0] / cpuCount) * 100).toFixed(2);
     
     return {
       timeRange,
@@ -82,65 +74,55 @@ class AnalyticsService {
       metrics: {
         resources: {
           cpu: {
-            average: (Math.random() * 30 + 20).toFixed(2),
-            peak: (Math.random() * 50 + 40).toFixed(2)
+            cores: cpuCount,
+            model: cpus[0]?.model || 'unknown',
+            loadAverage1m: loadAvg[0].toFixed(2),
+            loadAverage5m: loadAvg[1].toFixed(2),
+            loadAverage15m: loadAvg[2].toFixed(2),
+            usagePercent: cpuUsagePercent
           },
           memory: {
-            used: Math.floor(Math.random() * 2048) + 1024,
-            total: 4096,
-            percentage: (Math.random() * 30 + 40).toFixed(2)
+            totalMB: Math.floor(totalMem / 1024 / 1024),
+            usedMB: Math.floor(usedMem / 1024 / 1024),
+            freeMB: Math.floor(freeMem / 1024 / 1024),
+            usagePercent: ((usedMem / totalMem) * 100).toFixed(2)
           },
           disk: {
-            used: Math.floor(Math.random() * 100) + 50,
-            total: 200,
-            percentage: (Math.random() * 30 + 40).toFixed(2)
+            note: 'Disk metrics require fs stats integration'
           }
+        },
+        platform: {
+          type: os.type(),
+          platform: os.platform(),
+          arch: os.arch(),
+          release: os.release(),
+          hostname: os.hostname(),
+          uptime: os.uptime()
         },
         network: {
-          bandwidth: {
-            incoming: Math.floor(Math.random() * 1000) + 500,
-            outgoing: Math.floor(Math.random() * 800) + 400
-          },
-          connections: {
-            active: Math.floor(Math.random() * 1000) + 500,
-            total: Math.floor(Math.random() * 5000) + 3000
-          }
+          note: 'Network metrics require monitoring integration'
         },
         processes: {
-          running: Math.floor(Math.random() * 50) + 30,
-          total: Math.floor(Math.random() * 100) + 80
+          pid: process.pid,
+          memoryUsage: process.memoryUsage(),
+          cpuUsage: process.cpuUsage(),
+          uptime: process.uptime()
         }
       }
     };
   }
 
-  // Business analytics
+  // Business analytics - REQUIRES DATABASE INTEGRATION
   async getBusinessAnalytics(timeRange = '30d') {
     const now = new Date();
-    const startDate = this.getStartDate(now, timeRange);
     
     return {
       timeRange,
       timestamp: now.toISOString(),
       metrics: {
-        revenue: {
-          total: Math.floor(Math.random() * 100000) + 50000,
-          growth: (Math.random() * 0.5 + 0.1).toFixed(3),
-          trend: 'up'
-        },
-        customers: {
-          total: Math.floor(Math.random() * 1000) + 500,
-          new: Math.floor(Math.random() * 100) + 50,
-          churn: (Math.random() * 0.1).toFixed(3)
-        },
-        conversions: {
-          rate: (Math.random() * 0.15 + 0.05).toFixed(3),
-          total: Math.floor(Math.random() * 100) + 50
-        },
-        engagement: {
-          score: (Math.random() * 0.4 + 0.6).toFixed(2),
-          interactions: Math.floor(Math.random() * 10000) + 5000
-        }
+        note: 'Business analytics require database query integration',
+        status: 'not_implemented',
+        instructions: 'Integrate with transactions and user data in database'
       }
     };
   }
@@ -167,7 +149,7 @@ class AnalyticsService {
     }
     
     if (filters.status) {
-      filteredReports.filter(r => r.status === filters.status);
+      filteredReports = filteredReports.filter(r => r.status === filters.status);
     }
     
     return filteredReports;
@@ -260,47 +242,68 @@ class AnalyticsService {
 
   // Insights and recommendations
   async getInsights(timeRange = '30d') {
-    const [performance, userBehavior, system, business] = await Promise.all([
-      this.getPerformanceMetrics(timeRange),
-      this.getUserBehaviorAnalytics(timeRange),
-      this.getSystemAnalytics(timeRange),
-      this.getBusinessAnalytics(timeRange)
-    ]);
+    const systemMetrics = await this.getSystemAnalytics(timeRange);
+    const cpuUsage = parseFloat(systemMetrics.metrics.resources.cpu.usagePercent);
+    const memUsage = parseFloat(systemMetrics.metrics.resources.memory.usagePercent);
+    
+    const insights = [];
+    
+    // CPU insights
+    if (cpuUsage > 80) {
+      insights.push({
+        category: 'System',
+        insight: `High CPU usage detected: ${cpuUsage}%`,
+        recommendation: 'Consider scaling up or optimizing CPU-intensive operations',
+        priority: 'high'
+      });
+    } else if (cpuUsage > 60) {
+      insights.push({
+        category: 'System',
+        insight: `Moderate CPU usage: ${cpuUsage}%`,
+        recommendation: 'Monitor for trends and plan capacity if needed',
+        priority: 'medium'
+      });
+    } else {
+      insights.push({
+        category: 'System',
+        insight: `CPU usage is healthy: ${cpuUsage}%`,
+        recommendation: 'Current CPU capacity is sufficient',
+        priority: 'low'
+      });
+    }
+    
+    // Memory insights
+    if (memUsage > 85) {
+      insights.push({
+        category: 'System',
+        insight: `High memory usage: ${memUsage}%`,
+        recommendation: 'Consider adding more RAM or investigate memory leaks',
+        priority: 'high'
+      });
+    } else if (memUsage > 70) {
+      insights.push({
+        category: 'System',
+        insight: `Moderate memory usage: ${memUsage}%`,
+        recommendation: 'Monitor for memory growth patterns',
+        priority: 'medium'
+      });
+    } else {
+      insights.push({
+        category: 'System',
+        insight: `Memory usage is healthy: ${memUsage}%`,
+        recommendation: 'Current memory allocation is sufficient',
+        priority: 'low'
+      });
+    }
     
     return {
       timestamp: new Date().toISOString(),
       timeRange,
-      insights: [
-        {
-          category: 'Performance',
-          insight: 'Response times are within acceptable limits',
-          recommendation: 'Monitor for any degradation trends',
-          priority: 'medium'
-        },
-        {
-          category: 'User Behavior',
-          insight: 'User engagement is increasing',
-          recommendation: 'Continue optimizing user experience',
-          priority: 'low'
-        },
-        {
-          category: 'System',
-          insight: 'Resource utilization is optimal',
-          recommendation: 'Current infrastructure is well-sized',
-          priority: 'low'
-        },
-        {
-          category: 'Business',
-          insight: 'Revenue growth is positive',
-          recommendation: 'Focus on customer retention',
-          priority: 'high'
-        }
-      ],
+      insights,
       summary: {
-        overall: 'positive',
-        trends: 'upward',
-        alerts: 0,
-        recommendations: 4
+        overall: cpuUsage < 70 && memUsage < 70 ? 'healthy' : cpuUsage > 80 || memUsage > 85 ? 'critical' : 'warning',
+        alerts: insights.filter(i => i.priority === 'high').length,
+        recommendations: insights.length
       }
     };
   }
@@ -314,7 +317,8 @@ class AnalyticsService {
       services: {
         reports: this.reports.length,
         dataPoints: this.dataPoints.length,
-        metrics: Object.keys(this.metrics).length
+        systemMetrics: 'active',
+        realData: true
       }
     };
   }
@@ -344,10 +348,6 @@ class AnalyticsService {
     }
     
     return startDate;
-  }
-
-  getRandomDate(start, end) {
-    return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
   }
 
   convertToCSV(data) {

@@ -127,17 +127,18 @@ class DashboardService {
       datasets: [
         {
           label: 'Completed Tasks',
-          data: last30Days.map(() => Math.floor(Math.random() * 20) + 5),
+          data: last30Days.map(() => 0), // REAL DATA REQUIRED: Query database for actual task completion data
           borderColor: '#10B981',
           backgroundColor: 'rgba(16, 185, 129, 0.1)'
         },
         {
           label: 'New Tasks',
-          data: last30Days.map(() => Math.floor(Math.random() * 15) + 3),
+          data: last30Days.map(() => 0), // REAL DATA REQUIRED: Query database for actual new task data
           borderColor: '#3B82F6',
           backgroundColor: 'rgba(59, 130, 246, 0.1)'
         }
-      ]
+      ],
+      note: 'Chart data requires database integration. Connect to tasks table to populate real data.'
     };
   }
 
@@ -170,12 +171,13 @@ class DashboardService {
       datasets: [
         {
           label: 'Active Users',
-          data: hours.map(() => Math.floor(Math.random() * 50) + 10),
+          data: hours.map(() => 0), // REAL DATA REQUIRED: Query database for actual user activity data
           borderColor: '#8B5CF6',
           backgroundColor: 'rgba(139, 92, 246, 0.1)',
           fill: true
         }
-      ]
+      ],
+      note: 'Chart data requires database integration. Connect to user activity logs to populate real data.'
     };
   }
 

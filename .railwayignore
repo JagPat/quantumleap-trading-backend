@@ -1,10 +1,58 @@
-node_modules
+# Railway Ignore File
+# Prevent deployment of test, mock, and development files
+
+# Test directories
+tests/
+test-data/
+__tests__/
+coverage/
+
+# Documentation (deploy only production docs)
+docs/
+*.md
+!README.md
+!DEPLOYMENT_VERIFICATION_GUIDE.md
+
+# Development files
+.env.local
+.env.development
+.env.test
 *.log
-.env
+*.swp
+*.swo
+*~
 .DS_Store
-*.pyc
-__pycache__
-*.py
-requirements.txt
-venv
-.venv
+
+# Version control
+.git/
+.gitignore
+.github/
+
+# Node modules (Railway rebuilds)
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Mock/Sample data
+*mock*.js
+*sample*.js
+*dummy*.js
+*fake*.js
+oauth-phase1.js
+
+# CI/CD artifacts
+.husky/
+playwright-report/
+test-results/
+
+# Scripts (unless explicitly needed)
+scripts/
+automation/
