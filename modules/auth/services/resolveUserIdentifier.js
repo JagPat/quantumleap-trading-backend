@@ -4,8 +4,8 @@
  * Supports both config_id (UUID) and external broker user_id (e.g. EBW183)
  */
 
-const db = require('../../core/database/connection');
-const { isUUID } = require('../../core/utils');
+const db = require('../../../core/database/connection');
+const { isUUID } = require('../../../core/utils');
 
 /**
  * Resolves an incoming identifier into a broker config object.
