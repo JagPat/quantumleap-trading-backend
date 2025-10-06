@@ -96,6 +96,7 @@ class BrokerConfig {
   }
 
   async getByUserId(userId) {
+    // First try the traditional query (for internal UUIDs)
     const result = await db.query(`
       SELECT *
       FROM broker_configs
@@ -103,7 +104,21 @@ class BrokerConfig {
       ORDER BY created_at DESC
     `, [userId]);
 
-    return result.rows.map(row => this.formatConfigResponse(row));
+    if (result.rows.length > 0) {
+      return result.rows.map(row => this.formatConfigResponse(row));
+    }
+
+    // If no results, try querying by broker_user_id from oauth_tokens
+    // This handles cases where frontend sends Zerodha user_id (e.g., 'EBW183')
+    const brokerResult = await db.query(`
+      SELECT bc.*
+      FROM broker_configs bc
+      JOIN oauth_tokens ot ON bc.id = ot.config_id
+      WHERE ot.broker_user_id = $1
+      ORDER BY bc.created_at DESC
+    `, [userId]);
+
+    return brokerResult.rows.map(row => this.formatConfigResponse(row));
   }
 
   async getCredentials(configId) {

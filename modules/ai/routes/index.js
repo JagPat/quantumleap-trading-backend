@@ -513,4 +513,83 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// Missing AI routes - return "not implemented" responses
+router.post('/strategy', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const configId = req.headers['x-config-id'];
+    
+    console.log('[AI][Strategy] POST request from user:', userId);
+    
+    res.status(200).json({
+      success: false,
+      status: 'not_implemented',
+      message: 'Route not found',
+      endpoint: 'strategy',
+      timestamp: new Date().toISOString(),
+      instructions: 'This feature is coming soon. Configure AI providers in Settings first.'
+    });
+  } catch (error) {
+    console.error('[AI][Strategy] Error:', error);
+    res.status(500).json({
+      success: false,
+      status: 'error',
+      message: 'Internal server error',
+      endpoint: 'strategy'
+    });
+  }
+});
+
+router.get('/signals', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const configId = req.headers['x-config-id'];
+    
+    console.log('[AI][Signals] GET request from user:', userId);
+    
+    res.status(200).json({
+      success: false,
+      status: 'not_implemented',
+      message: 'Route not found',
+      endpoint: 'signals',
+      timestamp: new Date().toISOString(),
+      instructions: 'This feature is coming soon. Configure AI providers in Settings first.'
+    });
+  } catch (error) {
+    console.error('[AI][Signals] Error:', error);
+    res.status(500).json({
+      success: false,
+      status: 'error',
+      message: 'Internal server error',
+      endpoint: 'signals'
+    });
+  }
+});
+
+router.post('/message', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const configId = req.headers['x-config-id'];
+    
+    console.log('[AI][Message] POST request from user:', userId);
+    
+    res.status(200).json({
+      success: false,
+      status: 'not_implemented',
+      message: 'Route not found',
+      endpoint: 'message',
+      timestamp: new Date().toISOString(),
+      instructions: 'This feature is coming soon. Configure AI providers in Settings first.'
+    });
+  } catch (error) {
+    console.error('[AI][Message] Error:', error);
+    res.status(500).json({
+      success: false,
+      status: 'error',
+      message: 'Internal server error',
+      endpoint: 'message'
+    });
+  }
+});
+
 module.exports = router;

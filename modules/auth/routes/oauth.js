@@ -1288,8 +1288,26 @@ const handleGetProfile = async (req, res, userIdParam, configIdParam) => {
     if (configId) {
       config = await brokerConfig.getById(configId);
     } else {
+      // First try traditional query (for internal UUIDs)
       const normalizedId = normalizeUserIdentifier(userId);
       config = await brokerConfig.getByUserAndBroker(normalizedId, 'zerodha');
+      
+      // If no config found, try querying by broker_user_id from oauth_tokens
+      if (!config) {
+        const db = require('../../../core/database/connection');
+        const brokerResult = await db.query(`
+          SELECT bc.*
+          FROM broker_configs bc
+          JOIN oauth_tokens ot ON bc.id = ot.config_id
+          WHERE ot.broker_user_id = $1 AND bc.broker_name = 'zerodha'
+          ORDER BY bc.created_at DESC
+          LIMIT 1
+        `, [userId]);
+        
+        if (brokerResult.rows.length > 0) {
+          config = brokerConfig.formatConfigResponse(brokerResult.rows[0]);
+        }
+      }
     }
 
     if (!config) {
