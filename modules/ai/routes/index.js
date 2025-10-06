@@ -518,24 +518,62 @@ router.post('/strategy', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
     const configId = req.headers['x-config-id'];
-    
+    const { goals, risk_tolerance, market_conditions, portfolio_context } = req.body;
+
     console.log('[AI][Strategy] POST request from user:', userId);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: 'user_id is required in headers (X-User-ID)',
+        endpoint: 'strategy'
+      });
+    }
+
+    // Get user's AI preferences
+    const preferences = await preferencesService.getPreferences(userId);
     
+    if (!preferences || !preferences.openai_api_key) {
+      return res.status(400).json({
+        success: false,
+        status: 'not_configured',
+        message: 'OpenAI API key not configured. Please add it in AI Settings.',
+        endpoint: 'strategy',
+        instructions: 'Go to Settings → AI Configuration to add your OpenAI API key'
+      });
+    }
+
+    // Import OpenAI provider
+    const OpenAIProvider = require('../services/providers/openai');
+    const aiProvider = new OpenAIProvider(preferences.openai_api_key);
+
+    // Generate strategy using the existing analysis endpoint logic
+    const strategy = await aiProvider.generateStrategy(
+      goals || { objective: 'growth', timeframe: 'medium_term' },
+      risk_tolerance || 'moderate',
+      market_conditions || { trend: 'neutral', volatility: 'normal' }
+    );
+
     res.status(200).json({
-      success: false,
-      status: 'not_implemented',
-      message: 'Route not found',
-      endpoint: 'strategy',
-      timestamp: new Date().toISOString(),
-      instructions: 'This feature is coming soon. Configure AI providers in Settings first.'
+      success: true,
+      status: 'success',
+      data: {
+        ...strategy,
+        user_id: userId,
+        generated_at: new Date().toISOString()
+      },
+      endpoint: 'strategy'
     });
+
   } catch (error) {
     console.error('[AI][Strategy] Error:', error);
     res.status(500).json({
       success: false,
       status: 'error',
-      message: 'Internal server error',
-      endpoint: 'strategy'
+      message: 'Failed to generate strategy',
+      endpoint: 'strategy',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -544,24 +582,61 @@ router.get('/signals', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
     const configId = req.headers['x-config-id'];
-    
+
     console.log('[AI][Signals] GET request from user:', userId);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: 'user_id is required in headers (X-User-ID)',
+        endpoint: 'signals'
+      });
+    }
+
+    // Get user's AI preferences
+    const preferences = await preferencesService.getPreferences(userId);
     
-    res.status(200).json({
-      success: false,
-      status: 'not_implemented',
-      message: 'Route not found',
-      endpoint: 'signals',
-      timestamp: new Date().toISOString(),
-      instructions: 'This feature is coming soon. Configure AI providers in Settings first.'
+    if (!preferences || !preferences.openai_api_key) {
+      return res.status(400).json({
+        success: false,
+        status: 'not_configured',
+        message: 'OpenAI API key not configured. Please add it in AI Settings.',
+        endpoint: 'signals',
+        instructions: 'Go to Settings → AI Configuration to add your OpenAI API key'
+      });
+    }
+
+    // Import OpenAI provider
+    const OpenAIProvider = require('../services/providers/openai');
+    const aiProvider = new OpenAIProvider(preferences.openai_api_key);
+
+    // Generate trading signals using market analysis
+    const signals = await aiProvider.generateTradingSignals({
+      user_id: userId,
+      market_conditions: 'current',
+      risk_level: 'moderate'
     });
+
+    res.status(200).json({
+      success: true,
+      status: 'success',
+      data: {
+        signals: signals.signals || [],
+        market_analysis: signals.market_analysis || {},
+        generated_at: new Date().toISOString()
+      },
+      endpoint: 'signals'
+    });
+
   } catch (error) {
     console.error('[AI][Signals] Error:', error);
     res.status(500).json({
       success: false,
       status: 'error',
-      message: 'Internal server error',
-      endpoint: 'signals'
+      message: 'Failed to generate trading signals',
+      endpoint: 'signals',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -570,24 +645,72 @@ router.post('/message', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
     const configId = req.headers['x-config-id'];
-    
+    const { message, context, thread_id } = req.body;
+
     console.log('[AI][Message] POST request from user:', userId);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: 'user_id is required in headers (X-User-ID)',
+        endpoint: 'message'
+      });
+    }
+
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: 'message is required in request body',
+        endpoint: 'message'
+      });
+    }
+
+    // Get user's AI preferences
+    const preferences = await preferencesService.getPreferences(userId);
     
-    res.status(200).json({
-      success: false,
-      status: 'not_implemented',
-      message: 'Route not found',
-      endpoint: 'message',
-      timestamp: new Date().toISOString(),
-      instructions: 'This feature is coming soon. Configure AI providers in Settings first.'
+    if (!preferences || !preferences.openai_api_key) {
+      return res.status(400).json({
+        success: false,
+        status: 'not_configured',
+        message: 'OpenAI API key not configured. Please add it in AI Settings.',
+        endpoint: 'message',
+        instructions: 'Go to Settings → AI Configuration to add your OpenAI API key'
+      });
+    }
+
+    // Import OpenAI provider
+    const OpenAIProvider = require('../services/providers/openai');
+    const aiProvider = new OpenAIProvider(preferences.openai_api_key);
+
+    // Send message to AI assistant
+    const response = await aiProvider.sendMessage(message, {
+      user_id: userId,
+      context: context || {},
+      thread_id: thread_id
     });
+
+    res.status(200).json({
+      success: true,
+      status: 'success',
+      data: {
+        reply: response.reply,
+        message_id: response.message_id,
+        thread_id: response.thread_id,
+        timestamp: new Date().toISOString()
+      },
+      endpoint: 'message'
+    });
+
   } catch (error) {
     console.error('[AI][Message] Error:', error);
     res.status(500).json({
       success: false,
       status: 'error',
-      message: 'Internal server error',
-      endpoint: 'message'
+      message: 'Failed to process message',
+      endpoint: 'message',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

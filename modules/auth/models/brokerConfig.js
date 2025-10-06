@@ -82,17 +82,33 @@ class BrokerConfig {
   }
 
   async getByUserAndBroker(userId, brokerName = 'zerodha') {
+    // First try the traditional query (for internal UUIDs)
     const result = await db.query(`
       SELECT *
       FROM broker_configs
       WHERE user_id = $1 AND broker_name = $2
     `, [userId, brokerName]);
 
-    if (result.rows.length === 0) {
-      return null;
+    if (result.rows.length > 0) {
+      return this.formatConfigResponse(result.rows[0]);
     }
 
-    return this.formatConfigResponse(result.rows[0]);
+    // If no results, try querying by broker_user_id from oauth_tokens
+    // This handles cases where frontend sends Zerodha user_id (e.g., 'EBW183')
+    const brokerResult = await db.query(`
+      SELECT bc.*
+      FROM broker_configs bc
+      JOIN oauth_tokens ot ON bc.id = ot.config_id
+      WHERE ot.broker_user_id = $1 AND bc.broker_name = $2
+      ORDER BY bc.created_at DESC
+      LIMIT 1
+    `, [userId, brokerName]);
+
+    if (brokerResult.rows.length > 0) {
+      return this.formatConfigResponse(brokerResult.rows[0]);
+    }
+
+    return null;
   }
 
   async getByUserId(userId) {

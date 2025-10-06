@@ -1518,7 +1518,15 @@ router.get('/configs', async (req, res) => {
 
     const normalizedLookupId = normalizeUserIdentifier(user_id);
 
-    const result = await brokerService.getAllConfigsByUser(normalizedLookupId);
+    // Try both normalized and original user IDs to handle broker_user_id fallback
+    let result;
+    try {
+      result = await brokerService.getAllConfigsByUser(normalizedLookupId);
+    } catch (error) {
+      // If normalized lookup fails, try with original user_id for broker_user_id fallback
+      console.log('[Broker][Configs] Normalized lookup failed, trying original user_id:', user_id);
+      result = await brokerService.getAllConfigsByUser(user_id);
+    }
 
     res.json({
       success: true,
@@ -1702,6 +1710,129 @@ router.get('/stats', async (req, res) => {
       success: false,
       error: 'Failed to get service statistics'
     });
+  }
+});
+
+/**
+ * Get broker holdings
+ * GET /broker/holdings
+ */
+router.get('/holdings', async (req, res) => {
+  try {
+    const { user_id: qUserId, config_id: qConfigId } = req.query || {};
+    const userId = req.headers['x-user-id'] || qUserId;
+    const configId = req.headers['x-config-id'] || qConfigId;
+
+    if (!userId && !configId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'user_id or config_id is required' 
+      });
+    }
+
+    console.log('[Broker][Holdings] GET request:', { userId, configId });
+
+    const brokerService = getBrokerService();
+    
+    const result = await brokerService.getHoldingsData({
+      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
+      originalUserId: userId,
+      configId: configId,
+      bypassCache: req.query.bypass_cache === 'true'
+    });
+
+    res.json({
+      success: true,
+      data: result.holdings,
+      summary: result.summary,
+      timestamp: result.timestamp
+    });
+
+  } catch (error) {
+    console.error('[Broker][Holdings] Error:', error);
+    return respondWithBrokerError(res, error);
+  }
+});
+
+/**
+ * Get broker positions
+ * GET /broker/positions
+ */
+router.get('/positions', async (req, res) => {
+  try {
+    const { user_id: qUserId, config_id: qConfigId } = req.query || {};
+    const userId = req.headers['x-user-id'] || qUserId;
+    const configId = req.headers['x-config-id'] || qConfigId;
+
+    if (!userId && !configId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'user_id or config_id is required' 
+      });
+    }
+
+    console.log('[Broker][Positions] GET request:', { userId, configId });
+
+    const brokerService = getBrokerService();
+    
+    const result = await brokerService.getPositionsData({
+      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
+      originalUserId: userId,
+      configId: configId,
+      bypassCache: req.query.bypass_cache === 'true'
+    });
+
+    res.json({
+      success: true,
+      data: result.positions,
+      summary: result.summary,
+      timestamp: result.timestamp
+    });
+
+  } catch (error) {
+    console.error('[Broker][Positions] Error:', error);
+    return respondWithBrokerError(res, error);
+  }
+});
+
+/**
+ * Get broker orders
+ * GET /broker/orders
+ */
+router.get('/orders', async (req, res) => {
+  try {
+    const { user_id: qUserId, config_id: qConfigId } = req.query || {};
+    const userId = req.headers['x-user-id'] || qUserId;
+    const configId = req.headers['x-config-id'] || qConfigId;
+
+    if (!userId && !configId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'user_id or config_id is required' 
+      });
+    }
+
+    console.log('[Broker][Orders] GET request:', { userId, configId });
+
+    const brokerService = getBrokerService();
+    
+    const result = await brokerService.getOrdersData({
+      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
+      originalUserId: userId,
+      configId: configId,
+      bypassCache: req.query.bypass_cache === 'true'
+    });
+
+    res.json({
+      success: true,
+      data: result.orders,
+      summary: result.summary,
+      timestamp: result.timestamp
+    });
+
+  } catch (error) {
+    console.error('[Broker][Orders] Error:', error);
+    return respondWithBrokerError(res, error);
   }
 });
 

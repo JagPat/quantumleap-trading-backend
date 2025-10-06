@@ -234,6 +234,134 @@ Include:
   }
 
   /**
+   * Generate trading signals based on market conditions
+   * @param {Object} params - Parameters for signal generation
+   * @returns {Object} Trading signals and market analysis
+   */
+  async generateTradingSignals(params = {}) {
+    const prompt = this._buildTradingSignalsPrompt(params);
+    
+    const messages = [
+      {
+        role: 'system',
+        content: `You are an expert quantitative analyst specializing in algorithmic trading signals. 
+Your task is to generate actionable trading signals based on market analysis.
+
+Response Format (JSON):
+{
+  "signals": [
+    {
+      "symbol": "RELIANCE",
+      "action": "BUY|SELL|HOLD",
+      "confidence": 0.0-1.0,
+      "reason": "Brief reason for signal",
+      "entry_price": 2500,
+      "target_price": 2600,
+      "stop_loss": 2400,
+      "timeframe": "1D|1W|1M"
+    }
+  ],
+  "market_analysis": {
+    "trend": "Bullish|Bearish|Sideways",
+    "volatility": "Low|Medium|High",
+    "sentiment": "Positive|Negative|Neutral",
+    "key_levels": ["Support: 2400", "Resistance: 2600"]
+  },
+  "summary": "Brief market overview"
+}`
+      },
+      {
+        role: 'user',
+        content: prompt
+      }
+    ];
+
+    try {
+      const response = await this.chat(messages, { maxTokens: 2000 });
+      
+      // Try to parse JSON response
+      try {
+        const parsed = JSON.parse(response.content);
+        return {
+          signals: parsed.signals || [],
+          market_analysis: parsed.market_analysis || {},
+          summary: parsed.summary || 'Market analysis completed',
+          timestamp: new Date().toISOString()
+        };
+      } catch (parseError) {
+        // Fallback to text response
+        return {
+          signals: [],
+          market_analysis: { trend: 'neutral', volatility: 'medium' },
+          summary: response.content,
+          timestamp: new Date().toISOString()
+        };
+      }
+    } catch (error) {
+      console.error('[OpenAI] Trading signals error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send message to AI assistant
+   * @param {string} message - User message
+   * @param {Object} context - Additional context
+   * @returns {Object} AI response
+   */
+  async sendMessage(message, context = {}) {
+    const messages = [
+      {
+        role: 'system',
+        content: `You are Quantum Trading AI, an expert financial advisor and trading assistant. 
+You help users with:
+- Portfolio analysis and optimization
+- Trading strategy development
+- Market insights and analysis
+- Risk management
+- Investment education
+
+Be helpful, accurate, and provide actionable advice. Always consider risk management in your recommendations.`
+      },
+      {
+        role: 'user',
+        content: message
+      }
+    ];
+
+    try {
+      const response = await this.chat(messages, { maxTokens: 1500 });
+      
+      return {
+        reply: response.content,
+        message_id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        thread_id: context.thread_id || `thread_${Date.now()}`,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('[OpenAI] Send message error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Build prompt for trading signals
+   * @private
+   */
+  _buildTradingSignalsPrompt(params) {
+    const { user_id, market_conditions, risk_level } = params;
+    
+    return `Generate trading signals for the current market conditions.
+
+User Context:
+- User ID: ${user_id || 'Unknown'}
+- Market Conditions: ${market_conditions || 'Current market'}
+- Risk Level: ${risk_level || 'Moderate'}
+
+Please analyze the market and provide 3-5 actionable trading signals with specific entry/exit points, confidence levels, and reasoning. Focus on liquid stocks and ETFs.`;
+  }
+
+  /**
    * Validate API key
    * @returns {Promise<boolean>}
    */
