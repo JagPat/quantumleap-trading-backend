@@ -49,7 +49,7 @@ async function resolveUserIdentifier(input, brokerName = 'zerodha') {
         
         const resolved = {
           configId: config.id,
-          brokerUserId: token?.user_id || config.user_id || null,
+          brokerUserId: token?.broker_user_id || config.user_id || null,
           oauthTokenRow: token,
           brokerConfigRow: config
         };
@@ -87,7 +87,7 @@ async function resolveUserIdentifier(input, brokerName = 'zerodha') {
       
       const resolved = {
         configId: config.id,
-        brokerUserId: token?.user_id || config.user_id || null,
+        brokerUserId: token?.broker_user_id || config.user_id || null,
         oauthTokenRow: token,
         brokerConfigRow: config
       };
@@ -100,14 +100,14 @@ async function resolveUserIdentifier(input, brokerName = 'zerodha') {
       return resolved;
     }
 
-    // 3) Fallback: search oauth_tokens.user_id -> join broker_configs
-    console.debug('[resolveUserIdentifier] Trying oauth_tokens.user_id fallback');
+    // 3) Fallback: search oauth_tokens.broker_user_id -> join broker_configs
+    console.debug('[resolveUserIdentifier] Trying oauth_tokens.broker_user_id fallback');
     
     const joinedResult = await db.query(`
       SELECT bc.*, ot.*
       FROM oauth_tokens ot
       JOIN broker_configs bc ON bc.id = ot.config_id
-      WHERE ot.user_id = $1 AND bc.broker_name = $2
+      WHERE ot.broker_user_id = $1 AND bc.broker_name = $2
       ORDER BY ot.updated_at DESC
       LIMIT 1
     `, [input, brokerName]);
@@ -141,19 +141,19 @@ async function resolveUserIdentifier(input, brokerName = 'zerodha') {
         expires_at: row.expires_at,
         token_type: row.token_type,
         scope: row.scope,
-        user_id: row.user_id,
+        broker_user_id: row.broker_user_id,
         created_at: row.created_at,
         updated_at: row.updated_at
       };
       
       const resolved = {
         configId: brokerConfigRow.id,
-        brokerUserId: oauthTokenRow.user_id || brokerConfigRow.user_id || null,
+        brokerUserId: oauthTokenRow.broker_user_id || brokerConfigRow.user_id || null,
         oauthTokenRow: oauthTokenRow,
         brokerConfigRow: brokerConfigRow
       };
       
-      console.debug('[resolveUserIdentifier] Resolved via oauth_tokens.user_id:', { 
+      console.debug('[resolveUserIdentifier] Resolved via oauth_tokens.broker_user_id:', { 
         configId: resolved.configId, 
         brokerUserId: resolved.brokerUserId 
       });
