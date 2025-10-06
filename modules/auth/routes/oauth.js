@@ -1516,17 +1516,8 @@ router.get('/configs', async (req, res) => {
     // Initialize services
     const brokerService = getBrokerService();
 
-    const normalizedLookupId = normalizeUserIdentifier(user_id);
-
-    // Try both normalized and original user IDs to handle broker_user_id fallback
-    let result;
-    try {
-      result = await brokerService.getAllConfigsByUser(normalizedLookupId);
-    } catch (error) {
-      // If normalized lookup fails, try with original user_id for broker_user_id fallback
-      console.log('[Broker][Configs] Normalized lookup failed, trying original user_id:', user_id);
-      result = await brokerService.getAllConfigsByUser(user_id);
-    }
+    // Use the centralized resolver - no need for normalizeUserIdentifier
+    const result = await brokerService.getAllConfigsByUser(user_id);
 
     res.json({
       success: true,
@@ -1735,7 +1726,6 @@ router.get('/holdings', async (req, res) => {
     const brokerService = getBrokerService();
     
     const result = await brokerService.getHoldingsData({
-      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
       originalUserId: userId,
       configId: configId,
       bypassCache: req.query.bypass_cache === 'true'
@@ -1776,7 +1766,6 @@ router.get('/positions', async (req, res) => {
     const brokerService = getBrokerService();
     
     const result = await brokerService.getPositionsData({
-      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
       originalUserId: userId,
       configId: configId,
       bypassCache: req.query.bypass_cache === 'true'
@@ -1817,7 +1806,6 @@ router.get('/orders', async (req, res) => {
     const brokerService = getBrokerService();
     
     const result = await brokerService.getOrdersData({
-      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
       originalUserId: userId,
       configId: configId,
       bypassCache: req.query.bypass_cache === 'true'

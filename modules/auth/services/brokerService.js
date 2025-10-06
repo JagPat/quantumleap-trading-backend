@@ -3,6 +3,7 @@ const OAuthToken = require('../models/oauthToken');
 const TokenManager = require('./tokenManager');
 const KiteClient = require('./kiteClient');
 const SecurityManager = require('../../../core/security');
+const resolveUserIdentifier = require('./resolveUserIdentifier');
 
 /**
  * Broker Service
@@ -193,19 +194,47 @@ class BrokerService {
     };
   }
 
-  async resolveConfig({ normalizedUserId = null, originalUserId = null, configId = null }) {
-    if (configId) {
-      const config = await this.brokerConfig.getById(configId);
-      if (config) return config;
+  async resolveConfig({ normalizedUserId = null, originalUserId = null, configId = null, brokerName = 'zerodha' }) {
+    // Prefer explicit configId, then try normalizedUserId, then originalUserId
+    const lookup = configId || normalizedUserId || originalUserId;
+    
+    if (!lookup) {
+      throw new Error('No user identifier provided for broker config resolution');
     }
 
-    const candidateIds = [normalizedUserId, originalUserId].filter(Boolean);
-    for (const candidate of candidateIds) {
-      const config = await this.brokerConfig.getByUserAndBroker(candidate, 'zerodha');
-      if (config) return config;
+    console.debug('[BrokerService] Resolving config for lookup:', lookup);
+    
+    const resolved = await resolveUserIdentifier(lookup, brokerName);
+    
+    if (!resolved) {
+      throw new Error('Broker configuration not found for provided user');
     }
 
-    throw new Error('Broker configuration not found for provided user');
+    // Return the object expected by existing callers
+    // This maintains backward compatibility with the existing API
+    return {
+      id: resolved.configId,
+      user_id: resolved.brokerUserId,
+      broker_name: resolved.brokerConfigRow.broker_name,
+      api_key: resolved.brokerConfigRow.api_key,
+      api_secret_encrypted: resolved.brokerConfigRow.api_secret_encrypted,
+      is_connected: resolved.brokerConfigRow.is_connected,
+      connection_status: resolved.brokerConfigRow.connection_status,
+      oauth_state: resolved.brokerConfigRow.oauth_state,
+      broker_user_id: resolved.brokerConfigRow.broker_user_id,
+      broker_user_name: resolved.brokerConfigRow.broker_user_name,
+      broker_user_type: resolved.brokerConfigRow.broker_user_type,
+      last_sync_at: resolved.brokerConfigRow.last_sync_at,
+      created_at: resolved.brokerConfigRow.created_at,
+      updated_at: resolved.brokerConfigRow.updated_at,
+      // Additional resolved data for internal use
+      _resolved: {
+        configId: resolved.configId,
+        brokerUserId: resolved.brokerUserId,
+        oauthTokenRow: resolved.oauthTokenRow,
+        brokerConfigRow: resolved.brokerConfigRow
+      }
+    };
   }
 
   getCacheEntry(cache, key, bypassCache = false) {
@@ -753,23 +782,53 @@ class BrokerService {
    */
   async getAllConfigsByUser(userId) {
     try {
-      const configs = await this.brokerConfig.getByUserId(userId);
+      console.debug('[BrokerService] Getting all configs for user:', userId);
       
-      // Enhance each config with token and connection status
+      // Use the centralized resolver to find the config
+      const resolved = await resolveUserIdentifier(userId, 'zerodha');
+      
+      if (!resolved) {
+        console.debug('[BrokerService] No config found for user:', userId);
+        return {
+          success: true,
+          configs: [],
+          count: 0
+        };
+      }
+
+      // Get the config object in the expected format
+      const config = {
+        id: resolved.configId,
+        user_id: resolved.brokerUserId,
+        broker_name: resolved.brokerConfigRow.broker_name,
+        api_key: resolved.brokerConfigRow.api_key,
+        api_secret_encrypted: resolved.brokerConfigRow.api_secret_encrypted,
+        is_connected: resolved.brokerConfigRow.is_connected,
+        connection_status: resolved.brokerConfigRow.connection_status,
+        oauth_state: resolved.brokerConfigRow.oauth_state,
+        broker_user_id: resolved.brokerConfigRow.broker_user_id,
+        broker_user_name: resolved.brokerConfigRow.broker_user_name,
+        broker_user_type: resolved.brokerConfigRow.broker_user_type,
+        last_sync_at: resolved.brokerConfigRow.last_sync_at,
+        created_at: resolved.brokerConfigRow.created_at,
+        updated_at: resolved.brokerConfigRow.updated_at
+      };
+      
+      // Enhance config with token and connection status
       const enhancedConfigs = await Promise.all(
-        configs.map(async (config) => {
+        [config].map(async (configItem) => {
           try {
-            const tokenStatus = await this.oauthToken.getTokenStatus(config.id);
-            const connectionStatus = await this.validateConnection(config.id);
+            const tokenStatus = await this.oauthToken.getTokenStatus(configItem.id);
+            const connectionStatus = await this.validateConnection(configItem.id);
             
             return {
-              ...config,
+              ...configItem,
               tokenStatus,
               connectionValidation: connectionStatus
             };
           } catch (error) {
             return {
-              ...config,
+              ...configItem,
               tokenStatus: { status: 'error', error: error.message },
               connectionValidation: { valid: false, error: error.message }
             };
@@ -784,6 +843,7 @@ class BrokerService {
       };
 
     } catch (error) {
+      console.error('[BrokerService] Error in getAllConfigsByUser:', error);
       throw new Error(`Failed to get broker configurations: ${error.message}`);
     }
   }
