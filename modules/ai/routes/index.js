@@ -14,16 +14,49 @@ router.get('/health', async (req, res) => {
   try {
     console.log('[AI] Health check requested');
     
-    // Return safe response - AI service is in "not configured" state
-    // This is NOT an error - it's the expected state until users add API keys
-    const health = {
-      status: 'not_configured',
-      message: 'AI service is ready but not yet configured. Add API keys in Settings to enable AI features.',
-      module: 'ai',
-      timestamp: new Date().toISOString(),
-      ready: false,
-      instructions: 'Go to Settings → AI Configuration to add OpenAI, Claude, or Gemini API keys'
-    };
+    const userId = req.headers['x-user-id'];
+    const configId = req.headers['x-config-id'];
+    
+    let health;
+    
+    if (userId) {
+      // Check if user has AI preferences configured
+      const preferences = await preferencesService.getPreferences(userId);
+      
+      if (preferences && (preferences.openai_api_key || preferences.claude_api_key || preferences.gemini_api_key)) {
+        health = {
+          status: 'configured',
+          message: 'AI service is configured and ready',
+          module: 'ai',
+          timestamp: new Date().toISOString(),
+          ready: true,
+          providers: {
+            openai: !!preferences.openai_api_key,
+            claude: !!preferences.claude_api_key,
+            gemini: !!preferences.gemini_api_key
+          }
+        };
+      } else {
+        health = {
+          status: 'not_configured',
+          message: 'AI service is ready but not yet configured. Add API keys in Settings to enable AI features.',
+          module: 'ai',
+          timestamp: new Date().toISOString(),
+          ready: false,
+          instructions: 'Go to Settings → AI Configuration to add OpenAI, Claude, or Gemini API keys'
+        };
+      }
+    } else {
+      // No user context - return general status
+      health = {
+        status: 'ready',
+        message: 'AI service is ready for configuration',
+        module: 'ai',
+        timestamp: new Date().toISOString(),
+        ready: true,
+        instructions: 'Add user context to check specific AI configuration'
+      };
+    }
     
     res.status(200).json(health);
   } catch (error) {

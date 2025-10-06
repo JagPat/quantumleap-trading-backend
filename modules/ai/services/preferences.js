@@ -12,13 +12,16 @@ class AIPreferencesService {
   }
 
   /**
-   * Get user's AI preferences
+   * Get user's AI preferences (with decrypted API keys)
    */
   async getPreferences(userId) {
     try {
       const result = await db.query(
         `SELECT 
           preferred_ai_provider,
+          openai_api_key_encrypted,
+          claude_api_key_encrypted,
+          gemini_api_key_encrypted,
           openai_key_preview,
           claude_key_preview,
           gemini_key_preview,
@@ -36,7 +39,33 @@ class AIPreferencesService {
         return null;
       }
 
-      return result.rows[0];
+      const row = result.rows[0];
+      
+      // Decrypt API keys if they exist
+      const preferences = {
+        preferred_ai_provider: row.preferred_ai_provider,
+        openai_key_preview: row.openai_key_preview,
+        claude_key_preview: row.claude_key_preview,
+        gemini_key_preview: row.gemini_key_preview,
+        has_openai_key: row.has_openai_key,
+        has_claude_key: row.has_claude_key,
+        has_gemini_key: row.has_gemini_key,
+        created_at: row.created_at,
+        updated_at: row.updated_at
+      };
+
+      // Decrypt API keys for internal use
+      if (row.openai_api_key_encrypted) {
+        preferences.openai_api_key = this.security.decrypt(row.openai_api_key_encrypted);
+      }
+      if (row.claude_api_key_encrypted) {
+        preferences.claude_api_key = this.security.decrypt(row.claude_api_key_encrypted);
+      }
+      if (row.gemini_api_key_encrypted) {
+        preferences.gemini_api_key = this.security.decrypt(row.gemini_api_key_encrypted);
+      }
+
+      return preferences;
     } catch (error) {
       console.error('[AIPreferences] Error getting preferences:', error);
       throw error;
