@@ -641,7 +641,8 @@ router.get('/callback', async (req, res) => {
         refreshToken: sessionData.refresh_token,
         expiresIn: 86400,
         tokenType: 'Bearer',
-        userId: brokerUserId
+        userId: brokerUserId,
+        brokerUserId: brokerUserId
       });
       
       // Update broker_configs with user_id from Zerodha profile
