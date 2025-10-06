@@ -3,24 +3,10 @@ const Joi = require('joi');
 const crypto = require('crypto');
 const { v4: uuidv4, v5: uuidv5, validate: uuidValidate } = require('uuid');
 
+// Import centralized user resolution
+const resolveUserIdentifier = require('../services/resolveUserIdentifier');
+
 const USER_ID_NAMESPACE = process.env.BROKER_USER_NAMESPACE || 'e7c9b9f4-7a07-49f2-9b75-95f47b8f9b35';
-
-const normalizeUserIdentifier = (incoming) => {
-  if (!incoming) {
-    return null;
-  }
-
-  if (uuidValidate(incoming)) {
-    return incoming;
-  }
-
-  try {
-    return uuidv5(String(incoming), USER_ID_NAMESPACE);
-  } catch (error) {
-    console.warn('⚠️ Unable to normalize user identifier, falling back to raw value:', error);
-    return incoming;
-  }
-};
 
 const router = express.Router();
 
@@ -204,9 +190,20 @@ router.post('/setup-oauth', async (req, res) => {
     let { api_key, api_secret, user_id, frontend_url } = value;
 
     const originalUserId = user_id;
-    let normalizedUserId = normalizeUserIdentifier(user_id) || uuidv4();
+    // Use centralized resolver for user identification
+    let normalizedUserId = uuidv4(); // Default fallback
+    if (user_id) {
+      try {
+        const resolved = await resolveUserIdentifier(user_id, 'zerodha');
+        if (resolved && resolved.configId) {
+          normalizedUserId = resolved.configId;
+        }
+      } catch (error) {
+        console.warn('[OAuth] Failed to resolve user identifier, using fallback:', error);
+      }
+    }
 
-    console.log('[OAuth] Normalized user identifier', { originalUserId, normalizedUserId });
+    console.log('[OAuth] Resolved user identifier', { originalUserId, normalizedUserId });
 
     // Initialize services
     const brokerConfig = getBrokerConfig();
@@ -468,7 +465,21 @@ router.post('/generate-session', async (req, res) => {
 
     const { request_token, api_key, api_secret, user_id, config_id } = value;
 
-    const normalizedUserId = user_id ? (normalizeUserIdentifier(user_id) || uuidv4()) : (config_id ? null : uuidv4());
+    // Use centralized resolver for user identification
+    let normalizedUserId = null;
+    if (user_id) {
+      try {
+        const resolved = await resolveUserIdentifier(user_id, 'zerodha');
+        normalizedUserId = resolved?.configId || uuidv4();
+      } catch (error) {
+        console.warn('[OAuth] Failed to resolve user identifier, using fallback:', error);
+        normalizedUserId = uuidv4();
+      }
+    } else if (config_id) {
+      normalizedUserId = config_id;
+    } else {
+      normalizedUserId = uuidv4();
+    }
 
     const brokerService = getBrokerService();
 
@@ -916,7 +927,17 @@ router.get('/status', async (req, res) => {
     }
 
     if (!configId) {
-      const normalizedLookupId = normalizeUserIdentifier(user_id);
+      // Use centralized resolver for user identification
+      let normalizedLookupId = null;
+      if (user_id) {
+        try {
+          const resolved = await resolveUserIdentifier(user_id, 'zerodha');
+          normalizedLookupId = resolved?.configId || resolved?.brokerUserId || user_id;
+        } catch (error) {
+          console.warn('[OAuth] Failed to resolve user identifier:', error);
+          normalizedLookupId = user_id;
+        }
+      }
       const brokerConfig = getBrokerConfig();
       const cfg = await brokerConfig.getByUserAndBroker(normalizedLookupId, 'zerodha');
       if (!cfg) {
@@ -978,7 +999,17 @@ router.get('/session', async (req, res) => {
     if (config_id) {
       config = await brokerConfig.getById(config_id);
     } else {
-      const normalizedId = normalizeUserIdentifier(user_id);
+      // Use centralized resolver for user identification
+      let normalizedId = null;
+      if (user_id) {
+        try {
+          const resolved = await resolveUserIdentifier(user_id, 'zerodha');
+          normalizedId = resolved?.configId || resolved?.brokerUserId || user_id;
+        } catch (error) {
+          console.warn('[OAuth] Failed to resolve user identifier:', error);
+          normalizedId = user_id;
+        }
+      }
       config = await brokerConfig.getByUserAndBroker(normalizedId, 'zerodha');
     }
 
@@ -1076,7 +1107,17 @@ router.post('/session/create', async (req, res) => {
 
   try {
     const brokerConfig = getBrokerConfig();
-    const normalizedId = normalizeUserIdentifier(clientUserId);
+    // Use centralized resolver for user identification
+    let normalizedId = null;
+    if (clientUserId) {
+      try {
+        const resolved = await resolveUserIdentifier(clientUserId, 'zerodha');
+        normalizedId = resolved?.configId || resolved?.brokerUserId || clientUserId;
+      } catch (error) {
+        console.warn('[OAuth] Failed to resolve user identifier:', error);
+        normalizedId = clientUserId;
+      }
+    }
 
     const config = await brokerConfig.getByUserAndBroker(normalizedId, broker_name);
 
@@ -1134,7 +1175,17 @@ router.post('/token/update', async (req, res) => {
   }
 
   const { user_id, access_token, expires_in, expires_at, source } = value;
-  const normalizedUserId = normalizeUserIdentifier(user_id);
+  // Use centralized resolver for user identification
+  let normalizedUserId = null;
+  if (user_id) {
+    try {
+      const resolved = await resolveUserIdentifier(user_id, 'zerodha');
+      normalizedUserId = resolved?.configId || resolved?.brokerUserId || user_id;
+    } catch (error) {
+      console.warn('[OAuth] Failed to resolve user identifier:', error);
+      normalizedUserId = user_id;
+    }
+  }
   const brokerService = getBrokerService();
 
   try {
@@ -1181,7 +1232,7 @@ router.get('/token/expiry', async (req, res) => {
 
   try {
     const result = await brokerService.getTokenMetadata({
-      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
+      normalizedUserId: userId ? (await resolveUserIdentifier(userId, 'zerodha'))?.configId || userId : null,
       originalUserId: userId,
       configId
     });
@@ -1211,7 +1262,7 @@ router.get('/holdings', async (req, res) => {
   try {
     const brokerService = getBrokerService();
     const data = await brokerService.getHoldingsData({
-      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
+      normalizedUserId: userId ? (await resolveUserIdentifier(userId, 'zerodha'))?.configId || userId : null,
       originalUserId: userId,
       configId,
       bypassCache: parseBoolean(bypassCache)
@@ -1232,7 +1283,7 @@ router.get('/positions', async (req, res) => {
   try {
     const brokerService = getBrokerService();
     const data = await brokerService.getPositionsData({
-      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
+      normalizedUserId: userId ? (await resolveUserIdentifier(userId, 'zerodha'))?.configId || userId : null,
       originalUserId: userId,
       configId,
       bypassCache: parseBoolean(bypassCache)
@@ -1253,7 +1304,7 @@ router.get('/orders', async (req, res) => {
   try {
     const brokerService = getBrokerService();
     const data = await brokerService.getOrdersData({
-      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
+      normalizedUserId: userId ? (await resolveUserIdentifier(userId, 'zerodha'))?.configId || userId : null,
       originalUserId: userId,
       configId,
       bypassCache: parseBoolean(bypassCache)
@@ -1289,7 +1340,17 @@ const handleGetProfile = async (req, res, userIdParam, configIdParam) => {
       config = await brokerConfig.getById(configId);
     } else {
       // First try traditional query (for internal UUIDs)
-      const normalizedId = normalizeUserIdentifier(userId);
+      // Use centralized resolver for user identification
+      let normalizedId = null;
+      if (userId) {
+        try {
+          const resolved = await resolveUserIdentifier(userId, 'zerodha');
+          normalizedId = resolved?.configId || resolved?.brokerUserId || userId;
+        } catch (error) {
+          console.warn('[OAuth] Failed to resolve user identifier:', error);
+          normalizedId = userId;
+        }
+      }
       config = await brokerConfig.getByUserAndBroker(normalizedId, 'zerodha');
       
       // If no config found, try querying by broker_user_id from oauth_tokens
@@ -1368,7 +1429,17 @@ const handleGetMargins = async (req, res, userIdParam, configIdParam) => {
     if (configId) {
       config = await brokerConfig.getById(configId);
     } else {
-      const normalizedId = normalizeUserIdentifier(userId);
+      // Use centralized resolver for user identification
+      let normalizedId = null;
+      if (userId) {
+        try {
+          const resolved = await resolveUserIdentifier(userId, 'zerodha');
+          normalizedId = resolved?.configId || resolved?.brokerUserId || userId;
+        } catch (error) {
+          console.warn('[OAuth] Failed to resolve user identifier:', error);
+          normalizedId = userId;
+        }
+      }
       config = await brokerConfig.getByUserAndBroker(normalizedId, 'zerodha');
     }
 
@@ -1448,7 +1519,17 @@ router.get('/admin/session-state', verifyAdminKey, async (req, res) => {
     if (configId) {
       config = await brokerConfig.getById(configId);
     } else if (userId) {
-      const normalized = normalizeUserIdentifier(userId);
+      // Use centralized resolver for user identification
+      let normalized = null;
+      if (userId) {
+        try {
+          const resolved = await resolveUserIdentifier(userId, 'zerodha');
+          normalized = resolved?.configId || resolved?.brokerUserId || userId;
+        } catch (error) {
+          console.warn('[OAuth] Failed to resolve user identifier:', error);
+          normalized = userId;
+        }
+      }
       config = await brokerConfig.getByUserAndBroker(normalized, 'zerodha');
     }
 
@@ -1486,7 +1567,7 @@ router.get('/portfolio', async (req, res) => {
   try {
     const brokerService = getBrokerService();
     const data = await brokerService.getPortfolioSnapshot({
-      normalizedUserId: userId ? normalizeUserIdentifier(userId) : null,
+      normalizedUserId: userId ? (await resolveUserIdentifier(userId, 'zerodha'))?.configId || userId : null,
       originalUserId: userId,
       configId,
       bypassCache: parseBoolean(bypassCache)

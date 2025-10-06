@@ -99,7 +99,34 @@ class AIService {
   /**
    * Get service status
    */
-  async getServiceStatus() {
+  async getServiceStatus(userId = null) {
+    // If userId provided, check actual configuration
+    if (userId) {
+      try {
+        const preferencesService = require('./preferences');
+        const preferences = await preferencesService.getPreferences(userId);
+        
+        const hasConfiguredProvider = preferences && (
+          preferences.openai_api_key || 
+          preferences.claude_api_key || 
+          preferences.gemini_api_key
+        );
+        
+        return {
+          status: hasConfiguredProvider ? 'configured' : 'not_configured',
+          message: hasConfiguredProvider 
+            ? 'AI service is configured and ready'
+            : 'AI service requires API key configuration',
+          availableModels: [],
+          usage: this.usage,
+          instructions: 'Go to Settings → AI Configuration to add API keys'
+        };
+      } catch (error) {
+        console.warn('[AI] Error checking service status:', error);
+      }
+    }
+    
+    // Fallback for no userId or error
     return {
       status: 'not_configured',
       message: 'AI service requires API key configuration',
@@ -112,7 +139,34 @@ class AIService {
   /**
    * Health check
    */
-  async healthCheck() {
+  async healthCheck(userId = null) {
+    // If userId provided, check actual configuration
+    if (userId) {
+      try {
+        const preferencesService = require('./preferences');
+        const preferences = await preferencesService.getPreferences(userId);
+        
+        const hasConfiguredProvider = preferences && (
+          preferences.openai_api_key || 
+          preferences.claude_api_key || 
+          preferences.gemini_api_key
+        );
+        
+        return {
+          status: hasConfiguredProvider ? 'configured' : 'not_configured',
+          message: hasConfiguredProvider 
+            ? 'AI service is configured and ready'
+            : 'AI service requires configuration',
+          timestamp: new Date().toISOString(),
+          ready: hasConfiguredProvider,
+          instructions: 'Configure API keys in Settings to enable AI features'
+        };
+      } catch (error) {
+        console.warn('[AI] Error checking health:', error);
+      }
+    }
+    
+    // Fallback for no userId or error
     return {
       status: 'not_configured',
       message: 'AI service requires configuration',
