@@ -97,7 +97,7 @@ class StrategyEngine {
         riskLevel = 'moderate'
       } = params;
 
-      const preferences = await preferencesService.getPreferences(userId);
+      const preferences = await this.preferencesService.getPreferences(userId);
       if (!preferences?.openai_api_key) {
         throw new Error('OpenAI API key not configured');
       }
@@ -149,7 +149,7 @@ class StrategyEngine {
         constraints = {}
       } = params;
 
-      const preferences = await preferencesService.getPreferences(userId);
+      const preferences = await this.preferencesService.getPreferences(userId);
       if (!preferences?.openai_api_key) {
         throw new Error('OpenAI API key not configured');
       }
@@ -201,7 +201,7 @@ class StrategyEngine {
         investmentGoals = {}
       } = params;
 
-      const preferences = await preferencesService.getPreferences(userId);
+      const preferences = await this.preferencesService.getPreferences(userId);
       if (!preferences?.openai_api_key) {
         throw new Error('OpenAI API key not configured');
       }
