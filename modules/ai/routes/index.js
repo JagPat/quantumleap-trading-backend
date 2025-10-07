@@ -2,12 +2,16 @@ const express = require('express');
 const aiService = require('../services');
 const AIPreferencesService = require('../services/preferences');
 const analysisRoutes = require('./analysis');
+const enhancedRoutes = require('./enhanced');
 
 const router = express.Router();
 const preferencesService = new AIPreferencesService();
 
 // Mount analysis routes (portfolio analysis, trade analysis, strategy generation)
 router.use('/', analysisRoutes);
+
+// Mount enhanced Phase 2.3 routes
+router.use('/', enhancedRoutes);
 
 // Health check
 router.get('/health', async (req, res) => {
