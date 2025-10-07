@@ -10,10 +10,11 @@
  */
 
 const OpenAIProvider = require('./providers/openai');
-const preferencesService = require('./preferences');
+const AIPreferencesService = require('./preferences');
 
 class StrategyEngine {
   constructor() {
+    this.preferencesService = new AIPreferencesService();
     this.marketIndicators = {
       bullish: ['uptrend', 'breakout', 'momentum', 'support'],
       bearish: ['downtrend', 'breakdown', 'reversal', 'resistance'],
@@ -44,7 +45,7 @@ class StrategyEngine {
       } = params;
 
       // Get user's AI preferences
-      const preferences = await preferencesService.getPreferences(userId);
+      const preferences = await this.preferencesService.getPreferences(userId);
       if (!preferences?.openai_api_key) {
         throw new Error('OpenAI API key not configured');
       }
