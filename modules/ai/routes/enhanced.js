@@ -10,10 +10,11 @@
 
 const express = require('express');
 const StrategyEngine = require('../services/strategyEngine');
-const preferencesService = require('../services/preferences');
+const AIPreferencesService = require('../services/preferences');
 
 const router = express.Router();
 const strategyEngine = new StrategyEngine();
+const preferencesService = new AIPreferencesService();
 
 /**
  * POST /api/ai/strategy/advanced
