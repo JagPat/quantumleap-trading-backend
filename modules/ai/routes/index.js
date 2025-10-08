@@ -742,12 +742,14 @@ router.post('/message', async (req, res) => {
 
   } catch (error) {
     console.error('[AI][Message] Error:', error);
+    console.error('[AI][Message] Error stack:', error.stack);
     res.status(500).json({
       success: false,
       status: 'error',
       message: 'Failed to process message',
       endpoint: 'message',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: error.message,
+      details: error.stack
     });
   }
 });
