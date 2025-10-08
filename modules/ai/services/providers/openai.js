@@ -3,6 +3,8 @@
  * Handles communication with OpenAI's API for AI analysis
  */
 
+const axios = require('axios');
+
 class OpenAIProvider {
   constructor(apiKey) {
     if (!apiKey) {
@@ -20,29 +22,22 @@ class OpenAIProvider {
    */
   async chat(messages, options = {}) {
     try {
-      const response = await fetch(`${this.baseURL}/chat/completions`, {
-        method: 'POST',
+      const response = await axios.post(`${this.baseURL}/chat/completions`, {
+        model: options.model || this.model,
+        messages,
+        temperature: options.temperature || 0.7,
+        max_tokens: options.maxTokens || 2000,
+        top_p: options.topP || 1.0,
+        frequency_penalty: options.frequencyPenalty || 0,
+        presence_penalty: options.presencePenalty || 0
+      }, {
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: options.model || this.model,
-          messages,
-          temperature: options.temperature || 0.7,
-          max_tokens: options.maxTokens || 2000,
-          top_p: options.topP || 1.0,
-          frequency_penalty: options.frequencyPenalty || 0,
-          presence_penalty: options.presencePenalty || 0
-        })
+        }
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'OpenAI API request failed');
-      }
-
-      const data = await response.json();
+      const data = response.data;
       
       return {
         content: data.choices[0].message.content,
@@ -52,7 +47,9 @@ class OpenAIProvider {
       };
     } catch (error) {
       console.error('[OpenAI] Chat error:', error);
-      throw error;
+      // Extract error message from axios error
+      const errorMessage = error.response?.data?.error?.message || error.message || 'OpenAI API request failed';
+      throw new Error(errorMessage);
     }
   }
 
