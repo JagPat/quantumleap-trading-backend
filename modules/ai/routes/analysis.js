@@ -115,32 +115,58 @@ router.post('/analyze-portfolio', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[AI Analysis] Portfolio analysis error:', error);
+    console.error('[AI Analysis] Portfolio analysis error:', {
+      message: error.message,
+      statusCode: error.statusCode,
+      errorType: error.errorType,
+      errorCode: error.errorCode,
+      stack: error.stack?.split('\n').slice(0, 3).join('\n')
+    });
     
     // Handle specific error types
-    if (error.message?.includes('API key')) {
+    if (error.message?.includes('API key') || error.message?.includes('Incorrect API key')) {
       return res.status(401).json({
         success: false,
-        error: 'Invalid or expired API key. Please check your AI settings.',
+        error: 'Invalid or expired OpenAI API key. Please update your AI settings.',
         code: 'INVALID_API_KEY',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : 'API key validation failed'
       });
     }
 
-    if (error.message?.includes('quota') || error.message?.includes('rate limit')) {
+    if (error.message?.includes('quota') || error.message?.includes('rate limit') || error.statusCode === 429) {
       return res.status(429).json({
         success: false,
-        error: 'API rate limit exceeded. Please try again later.',
+        error: 'OpenAI API rate limit exceeded. Please try again in a few moments.',
         code: 'RATE_LIMIT_EXCEEDED',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : 'Rate limit reached'
       });
     }
 
-    res.status(500).json({
+    if (error.message?.includes('model') || error.errorCode === 'model_not_found') {
+      return res.status(400).json({
+        success: false,
+        error: 'The requested AI model is not available with your API key. Please check your OpenAI account.',
+        code: 'MODEL_NOT_AVAILABLE',
+        details: process.env.NODE_ENV === 'development' ? error.message : 'Model access denied'
+      });
+    }
+
+    if (error.message?.includes('timeout') || error.code === 'ECONNABORTED') {
+      return res.status(504).json({
+        success: false,
+        error: 'AI analysis request timed out. Please try again.',
+        code: 'REQUEST_TIMEOUT',
+        details: process.env.NODE_ENV === 'development' ? error.message : 'Request exceeded time limit'
+      });
+    }
+
+    // Generic 500 error
+    res.status(error.statusCode || 500).json({
       success: false,
       error: 'Failed to analyze portfolio. Please try again.',
       code: 'ANALYSIS_FAILED',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
     });
   }
 });

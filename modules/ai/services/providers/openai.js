@@ -6,13 +6,16 @@
 const axios = require('axios');
 
 class OpenAIProvider {
-  constructor(apiKey) {
+  constructor(apiKey, options = {}) {
     if (!apiKey) {
       throw new Error('OpenAI API key is required');
     }
     this.apiKey = apiKey;
     this.baseURL = 'https://api.openai.com/v1';
-    this.model = 'gpt-4'; // Can be configured: gpt-4, gpt-3.5-turbo, etc.
+    // Use gpt-3.5-turbo as default (more widely available, cheaper, faster)
+    // Can fallback to gpt-4 if explicitly requested and available
+    this.model = options.model || 'gpt-3.5-turbo';
+    this.fallbackModel = 'gpt-3.5-turbo'; // Always fallback to 3.5-turbo
   }
 
   /**
@@ -21,9 +24,13 @@ class OpenAIProvider {
    * @param {Object} options - Additional options (temperature, max_tokens, etc.)
    */
   async chat(messages, options = {}) {
+    const modelToUse = options.model || this.model;
+    
     try {
+      console.log(`[OpenAI] Making request with model: ${modelToUse}`);
+      
       const response = await axios.post(`${this.baseURL}/chat/completions`, {
-        model: options.model || this.model,
+        model: modelToUse,
         messages,
         temperature: options.temperature || 0.7,
         max_tokens: options.maxTokens || 2000,
@@ -34,10 +41,13 @@ class OpenAIProvider {
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 30000 // 30 second timeout
       });
 
       const data = response.data;
+      
+      console.log(`[OpenAI] Response received from ${data.model}, tokens: ${data.usage?.total_tokens}`);
       
       return {
         content: data.choices[0].message.content,
@@ -46,10 +56,40 @@ class OpenAIProvider {
         finishReason: data.choices[0].finish_reason
       };
     } catch (error) {
-      console.error('[OpenAI] Chat error:', error);
-      // Extract error message from axios error
-      const errorMessage = error.response?.data?.error?.message || error.message || 'OpenAI API request failed';
-      throw new Error(errorMessage);
+      console.error('[OpenAI] Chat error details:', {
+        model: modelToUse,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        errorType: error.response?.data?.error?.type,
+        errorMessage: error.response?.data?.error?.message,
+        errorCode: error.response?.data?.error?.code
+      });
+      
+      // Extract detailed error message
+      const errorData = error.response?.data?.error;
+      let errorMessage = error.message || 'OpenAI API request failed';
+      
+      if (errorData) {
+        errorMessage = errorData.message || errorData.type || errorMessage;
+        
+        // Handle specific error types
+        if (errorData.type === 'invalid_request_error' && errorData.code === 'model_not_found') {
+          // Try fallback model if primary model not available
+          if (!options.isRetry && modelToUse !== this.fallbackModel) {
+            console.log(`[OpenAI] Model ${modelToUse} not available, trying fallback: ${this.fallbackModel}`);
+            return await this.chat(messages, { ...options, model: this.fallbackModel, isRetry: true });
+          }
+          errorMessage = `Model ${modelToUse} not available. Please check your API key permissions.`;
+        }
+      }
+      
+      // Create detailed error
+      const detailedError = new Error(errorMessage);
+      detailedError.statusCode = error.response?.status;
+      detailedError.errorType = errorData?.type;
+      detailedError.errorCode = errorData?.code;
+      
+      throw detailedError;
     }
   }
 
@@ -59,6 +99,13 @@ class OpenAIProvider {
    * @returns {Object} Structured analysis
    */
   async analyzePortfolio(portfolioData) {
+    console.log('[OpenAI] Starting portfolio analysis...');
+    
+    // Validate portfolio data
+    if (!portfolioData || typeof portfolioData !== 'object') {
+      throw new Error('Invalid portfolio data: must be an object');
+    }
+    
     const prompt = this._buildPortfolioPrompt(portfolioData);
     
     const messages = [
@@ -67,22 +114,24 @@ class OpenAIProvider {
         content: `You are an expert financial analyst specializing in portfolio analysis and risk assessment. 
 Your task is to analyze trading portfolios and provide actionable insights.
 
-Response Format (JSON):
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON.
+
+Response Format:
 {
-  "summary": "Brief 2-3 sentence overview",
-  "insights": ["Key insight 1", "Key insight 2", ...],
-  "recommendations": ["Recommendation 1", "Recommendation 2", ...],
+  "summary": "Brief 2-3 sentence overview of portfolio health",
+  "insights": ["Key insight 1", "Key insight 2", "Key insight 3"],
+  "recommendations": ["Actionable recommendation 1", "Actionable recommendation 2", "Actionable recommendation 3"],
   "risk_assessment": {
     "score": 0-100,
     "level": "Low|Medium|High|Critical",
-    "factors": ["Risk factor 1", ...]
+    "factors": ["Risk factor 1", "Risk factor 2"]
   },
   "diversification": {
     "score": 0-100,
-    "analysis": "Brief analysis of diversification"
+    "analysis": "Brief analysis of diversification across sectors and instruments"
   },
-  "opportunities": ["Opportunity 1", "Opportunity 2", ...],
-  "concerns": ["Concern 1", "Concern 2", ...]
+  "opportunities": ["Growth opportunity 1", "Growth opportunity 2"],
+  "concerns": ["Concern 1", "Concern 2"]
 }`
       },
       {
@@ -92,36 +141,84 @@ Response Format (JSON):
     ];
 
     try {
-      const response = await this.chat(messages, { maxTokens: 3000 });
+      console.log('[OpenAI] Sending request to OpenAI API...');
+      const response = await this.chat(messages, { maxTokens: 3000, temperature: 0.3 });
+      
+      console.log('[OpenAI] Response received, parsing...');
       
       // Try to parse JSON response
       try {
-        const analysis = JSON.parse(response.content);
+        // Clean response content (remove markdown code blocks if present)
+        let content = response.content.trim();
+        if (content.startsWith('```json')) {
+          content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        } else if (content.startsWith('```')) {
+          content = content.replace(/```\n?/g, '').trim();
+        }
+        
+        const analysis = JSON.parse(content);
+        
+        console.log('[OpenAI] Successfully parsed analysis');
+        
         return {
           ...analysis,
           provider: 'openai',
           model: response.model,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          tokens_used: response.usage?.total_tokens || 0
         };
       } catch (parseError) {
+        console.error('[OpenAI] JSON parsing failed:', parseError.message);
+        console.log('[OpenAI] Raw response:', response.content.substring(0, 200));
+        
         // If JSON parsing fails, return structured fallback
         return {
-          summary: response.content.substring(0, 500),
-          insights: ['Raw analysis provided - see summary'],
-          recommendations: [],
-          risk_assessment: { score: 50, level: 'Medium', factors: [] },
-          diversification: { score: 50, analysis: 'Unable to parse analysis' },
-          opportunities: [],
-          concerns: [],
+          summary: response.content.substring(0, 500) + '...',
+          insights: [
+            'Portfolio analysis completed',
+            'Review the detailed summary for insights',
+            'Consider consulting with a financial advisor'
+          ],
+          recommendations: [
+            'Review portfolio diversification',
+            'Monitor high-risk positions',
+            'Consider rebalancing based on goals'
+          ],
+          risk_assessment: { 
+            score: 50, 
+            level: 'Medium', 
+            factors: ['Unable to parse detailed risk factors'] 
+          },
+          diversification: { 
+            score: 50, 
+            analysis: 'Detailed diversification analysis available in summary' 
+          },
+          opportunities: ['See summary for opportunities'],
+          concerns: ['See summary for concerns'],
           raw_response: response.content,
+          parsing_failed: true,
           provider: 'openai',
           model: response.model,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          tokens_used: response.usage?.total_tokens || 0
         };
       }
     } catch (error) {
-      console.error('[OpenAI] Portfolio analysis error:', error);
-      throw error;
+      console.error('[OpenAI] Portfolio analysis error:', {
+        message: error.message,
+        statusCode: error.statusCode,
+        errorType: error.errorType,
+        errorCode: error.errorCode
+      });
+      
+      // Re-throw with more context
+      const enhancedError = new Error(
+        `Portfolio analysis failed: ${error.message}`
+      );
+      enhancedError.originalError = error;
+      enhancedError.statusCode = error.statusCode;
+      
+      throw enhancedError;
     }
   }
 
