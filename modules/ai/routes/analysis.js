@@ -6,7 +6,8 @@
 const express = require('express');
 const router = express.Router();
 const OpenAIProvider = require('../services/providers/openai');
-const preferencesService = require('../services/preferences');
+const AIPreferencesService = require('../services/preferences');
+const preferencesService = new AIPreferencesService();
 
 /**
  * POST /api/ai/analyze-portfolio
