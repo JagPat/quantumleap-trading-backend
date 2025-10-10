@@ -1826,6 +1826,113 @@ router.get('/orders', async (req, res) => {
 });
 
 /**
+ * Get trading mode settings
+ * GET /broker/trading-mode
+ */
+router.get('/trading-mode', async (req, res) => {
+  try {
+    const { config_id: qConfigId } = req.query || {};
+    const userId = req.headers['x-user-id'];
+    const configId = req.headers['x-config-id'] || qConfigId;
+
+    if (!configId && !userId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'config_id or user_id is required'
+      });
+    }
+
+    console.log('[Broker][TradingMode] GET request:', { userId, configId });
+
+    const brokerService = getBrokerService();
+    const config = await brokerService.brokerConfig.findByConfigId(configId);
+
+    if (!config) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Broker configuration not found'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      data: {
+        trading_mode: config.trading_mode || 'paper',
+        max_daily_loss: config.max_daily_loss,
+        max_trades_per_day: config.max_trades_per_day || 10,
+        config_id: config.id
+      }
+    });
+
+  } catch (error) {
+    console.error('[Broker][TradingMode] GET error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to fetch trading mode settings'
+    });
+  }
+});
+
+/**
+ * Update trading mode settings
+ * PUT /broker/trading-mode
+ */
+router.put('/trading-mode', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const configId = req.headers['x-config-id'];
+    const { trading_mode, max_daily_loss, max_trades_per_day } = req.body;
+
+    if (!configId && !userId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'config_id or user_id is required'
+      });
+    }
+
+    if (!trading_mode || !['paper', 'live'].includes(trading_mode)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'trading_mode must be either "paper" or "live"'
+      });
+    }
+
+    console.log('[Broker][TradingMode] PUT request:', { 
+      userId, 
+      configId, 
+      trading_mode,
+      max_daily_loss,
+      max_trades_per_day
+    });
+
+    const brokerService = getBrokerService();
+    
+    // Update trading mode settings
+    await brokerService.updateTradingMode(configId, trading_mode, {
+      max_daily_loss,
+      max_trades_per_day
+    });
+
+    res.json({
+      status: 'success',
+      message: `Trading mode updated to ${trading_mode}`,
+      data: {
+        trading_mode,
+        max_daily_loss,
+        max_trades_per_day
+      }
+    });
+
+  } catch (error) {
+    console.error('[Broker][TradingMode] PUT error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to update trading mode settings'
+    });
+  }
+});
+
+/**
  * Health check for OAuth endpoints
  * GET /broker/health
  */

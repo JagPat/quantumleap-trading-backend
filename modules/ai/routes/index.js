@@ -3,6 +3,7 @@ const aiService = require('../services');
 const AIPreferencesService = require('../services/preferences');
 const analysisRoutes = require('./analysis');
 const enhancedRoutes = require('./enhanced');
+const automationRoutes = require('./automation');
 
 const router = express.Router();
 const preferencesService = new AIPreferencesService();
@@ -12,6 +13,9 @@ router.use('/', analysisRoutes);
 
 // Mount enhanced Phase 2.3 routes
 router.use('/', enhancedRoutes);
+
+// Mount strategy automation routes
+router.use('/', automationRoutes);
 
 // Health check
 router.get('/health', async (req, res) => {

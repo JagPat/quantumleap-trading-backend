@@ -28,6 +28,11 @@ module.exports = {
         this.logger.info('AI module routes registered at /api/modules/ai');
       }
       
+      // Initialize execution engine for strategy automation
+      const getExecutionEngine = require('./services/executionEngine');
+      this.executionEngine = getExecutionEngine();
+      this.logger.info('Strategy execution engine initialized');
+      
       this.status = 'initialized';
       this.initializedAt = new Date();
       
@@ -83,6 +88,15 @@ module.exports = {
     try {
       this.status = 'started';
       this.startedAt = new Date();
+      
+      // Start execution engine monitoring
+      if (this.executionEngine) {
+        await this.executionEngine.startMonitoring();
+        if (this.logger) {
+          this.logger.info('Strategy execution engine monitoring started');
+        }
+      }
+      
       if (this.logger) {
         this.logger.info('AI module started');
       }
@@ -98,6 +112,14 @@ module.exports = {
    */
   async stop() {
     try {
+      // Stop execution engine monitoring
+      if (this.executionEngine) {
+        this.executionEngine.stopMonitoring();
+        if (this.logger) {
+          this.logger.info('Strategy execution engine monitoring stopped');
+        }
+      }
+      
       this.status = 'stopped';
       this.stoppedAt = new Date();
       if (this.logger) {

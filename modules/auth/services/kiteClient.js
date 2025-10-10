@@ -396,6 +396,95 @@ class KiteClient {
   /**
    * Health check for Kite Connect service
    */
+  /**
+   * Place an order through Zerodha Kite
+   * @param {string} accessToken - Valid access token
+   * @param {string} apiKey - API key
+   * @param {Object} orderParams - Order parameters
+   * @returns {Object} Order placement result
+   */
+  async placeOrder(accessToken, apiKey, orderParams) {
+    try {
+      if (!accessToken || !apiKey) {
+        throw new Error('Access token and API key are required');
+      }
+
+      const {
+        symbol,
+        exchange = 'NSE',
+        transaction_type,
+        order_type = 'MARKET',
+        quantity,
+        price,
+        trigger_price,
+        product = 'CNC',
+        validity = 'DAY'
+      } = orderParams;
+
+      // Validate required parameters
+      if (!symbol || !transaction_type || !quantity) {
+        throw new Error('Symbol, transaction type, and quantity are required');
+      }
+
+      if (!['BUY', 'SELL'].includes(transaction_type)) {
+        throw new Error('Transaction type must be BUY or SELL');
+      }
+
+      // Create KiteConnect instance
+      const kc = this.createKiteInstance(apiKey, accessToken);
+
+      // Build order params for Kite API
+      const kiteOrderParams = {
+        exchange: exchange,
+        tradingsymbol: symbol,
+        transaction_type: transaction_type,
+        quantity: quantity,
+        product: product,
+        order_type: order_type,
+        validity: validity
+      };
+
+      // Add price for LIMIT orders
+      if (order_type === 'LIMIT' && price) {
+        kiteOrderParams.price = price;
+      }
+
+      // Add trigger price for SL orders
+      if ((order_type === 'SL' || order_type === 'SL-M') && trigger_price) {
+        kiteOrderParams.trigger_price = trigger_price;
+      }
+
+      console.log('[KiteClient] Placing order:', kiteOrderParams);
+
+      // Place order
+      const orderId = await kc.placeOrder('regular', kiteOrderParams);
+
+      console.log('[KiteClient] Order placed successfully:', orderId);
+
+      return {
+        success: true,
+        order_id: orderId,
+        status: 'OPEN', // Orders are typically OPEN initially
+        message: 'Order placed successfully',
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error('[KiteClient] Error placing order:', error);
+      
+      // Handle specific Kite errors
+      if (error.message.includes('Insufficient funds')) {
+        throw new Error('Insufficient funds in broker account');
+      } else if (error.message.includes('Invalid symbol')) {
+        throw new Error(`Invalid symbol: ${orderParams.symbol}`);
+      } else if (error.message.includes('Market closed')) {
+        throw new Error('Market is closed. Orders can only be placed during market hours.');
+      }
+
+      throw new Error(`Order placement failed: ${error.message}`);
+    }
+  }
+
   async healthCheck() {
     try {
       // Test basic connectivity to Zerodha servers

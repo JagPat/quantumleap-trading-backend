@@ -29,6 +29,137 @@ class StrategyEngine {
   }
 
   /**
+   * Generate goal-based automated trading strategy
+   * @param {Object} goals - User-defined trading goals
+   * @param {Object} preferences - User AI preferences
+   * @param {Object} portfolioContext - Current portfolio context (optional)
+   * @returns {Object} Strategy tailored to achieve specific goals
+   */
+  async generateGoalBasedStrategy(goals, preferences, portfolioContext = null) {
+    try {
+      const {
+        profitTarget,
+        timeframe,
+        maxLoss,
+        riskTolerance,
+        symbols
+      } = goals;
+
+      // Validate preferences
+      if (!preferences?.openai_api_key) {
+        throw new Error('OpenAI API key not configured');
+      }
+
+      const aiProvider = new OpenAIProvider(preferences.openai_api_key);
+
+      // Calculate daily target and risk metrics
+      const dailyTargetPercent = profitTarget / timeframe;
+      const riskRewardRatio = profitTarget / maxLoss;
+
+      // Build comprehensive prompt for goal-based strategy
+      const prompt = `
+Generate a precise, executable trading strategy to achieve the following goal:
+
+**Investment Goal:**
+- Profit Target: ${profitTarget}% over ${timeframe} days
+- Maximum Acceptable Loss: ${maxLoss}%
+- Daily Target Return: ${dailyTargetPercent.toFixed(2)}%
+- Risk/Reward Ratio: ${riskRewardRatio.toFixed(2)}:1
+- Risk Tolerance: ${riskTolerance}
+${symbols && symbols.length > 0 ? `- Target Symbols: ${symbols.join(', ')}` : '- Any suitable symbols'}
+
+**Required Strategy Components:**
+
+1. Entry Rules:
+   - Specific technical indicators or conditions for entering trades
+   - Ideal price levels or patterns to look for
+   - Timing considerations (time of day, market conditions)
+
+2. Exit Rules:
+   - Profit-taking levels (aligned with ${profitTarget}% target)
+   - Stop-loss levels (maximum ${maxLoss}% loss)
+   - Trailing stop strategy if applicable
+   - Time-based exits
+
+3. Position Sizing:
+   - How much capital to allocate per trade
+   - Maximum number of concurrent positions
+   - Risk per trade (suggested: ${(maxLoss / 3).toFixed(2)}% per trade for 3-trade buffer)
+
+4. Risk Management:
+   - Daily loss limits
+   - Maximum drawdown tolerance
+   - When to pause trading
+   - Portfolio heat management
+
+5. Expected Performance:
+   - Estimated win rate percentage
+   - Average profit per winning trade
+   - Average loss per losing trade
+   - Expected number of trades over ${timeframe} days
+
+Provide a structured JSON response with all these components clearly defined.
+`;
+
+      // Call OpenAI to generate strategy
+      const response = await aiProvider.chat(prompt, {
+        temperature: 0.7,
+        model: 'gpt-3.5-turbo',
+        response_format: { type: 'json_object' }
+      });
+
+      // Parse AI response
+      let strategyRules = {};
+      try {
+        strategyRules = JSON.parse(response.content || response.reply || '{}');
+      } catch (parseError) {
+        console.warn('[StrategyEngine] Failed to parse JSON response, using text format');
+        strategyRules = {
+          description: response.content || response.reply,
+          entry_rules: 'See description',
+          exit_rules: 'See description',
+          risk_management: `Max loss: ${maxLoss}%, Daily target: ${dailyTargetPercent.toFixed(2)}%`
+        };
+      }
+
+      // Calculate confidence score based on goal feasibility
+      let confidenceScore = 0.75; // Base confidence
+      if (dailyTargetPercent <= 0.5) confidenceScore = 0.9; // Very realistic
+      else if (dailyTargetPercent <= 1.0) confidenceScore = 0.8; // Realistic
+      else if (dailyTargetPercent <= 2.0) confidenceScore = 0.6; // Challenging
+      else confidenceScore = 0.4; // Very aggressive
+
+      // Adjust confidence based on risk/reward ratio
+      if (riskRewardRatio >= 2) confidenceScore += 0.05;
+      else if (riskRewardRatio < 1) confidenceScore -= 0.1;
+
+      // Cap confidence between 0 and 1
+      confidenceScore = Math.max(0.1, Math.min(0.99, confidenceScore));
+
+      return {
+        success: true,
+        strategy: strategyRules,
+        confidence: confidenceScore,
+        metadata: {
+          generated_at: new Date().toISOString(),
+          model: 'gpt-3.5-turbo',
+          goal_alignment: {
+            profit_target: profitTarget,
+            timeframe_days: timeframe,
+            daily_target: dailyTargetPercent.toFixed(2),
+            max_loss: maxLoss,
+            risk_reward_ratio: riskRewardRatio.toFixed(2)
+          }
+        }
+      };
+
+    } catch (error) {
+      console.error('[StrategyEngine] Error generating goal-based strategy:', error);
+      throw new Error(`Failed to generate goal-based strategy: ${error.message}`);
+    }
+  }
+
+  /**
    * Generate advanced trading strategy with multiple enhancements
    * @param {Object} params - Strategy parameters
    * @param {string} userId - User ID for AI preferences

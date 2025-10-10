@@ -548,6 +548,56 @@ class BrokerService {
     }
   }
 
+  /**
+   * Update trading mode and risk constraints
+   */
+  async updateTradingMode(configId, tradingMode, constraints = {}) {
+    try {
+      console.log('[BrokerService] Updating trading mode:', {
+        configId,
+        tradingMode,
+        constraints
+      });
+
+      const { max_daily_loss, max_trades_per_day } = constraints;
+
+      // Validate trading mode
+      if (!['paper', 'live'].includes(tradingMode)) {
+        throw new Error('Trading mode must be either "paper" or "live"');
+      }
+
+      // Validate constraints
+      if (max_daily_loss && (max_daily_loss < 0 || max_daily_loss > 1000000)) {
+        throw new Error('Max daily loss must be between 0 and 1,000,000');
+      }
+
+      if (max_trades_per_day && (max_trades_per_day < 1 || max_trades_per_day > 1000)) {
+        throw new Error('Max trades per day must be between 1 and 1000');
+      }
+
+      // Update database
+      const result = await this.brokerConfig.updateTradingMode(configId, {
+        trading_mode: tradingMode,
+        max_daily_loss,
+        max_trades_per_day
+      });
+
+      console.log('[BrokerService] Trading mode updated successfully:', {
+        configId,
+        tradingMode
+      });
+
+      return {
+        success: true,
+        ...result
+      };
+
+    } catch (error) {
+      console.error('[BrokerService] Error updating trading mode:', error);
+      throw error;
+    }
+  }
+
   async getPortfolioSnapshot({ normalizedUserId = null, originalUserId = null, configId = null, bypassCache = false } = {}) {
     try {
       const config = await this.resolveConfig({ normalizedUserId, originalUserId, configId });

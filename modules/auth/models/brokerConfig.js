@@ -263,6 +263,41 @@ class BrokerConfig {
     return result.rows.map(row => this.formatConfigResponse(row));
   }
 
+  /**
+   * Update trading mode and risk constraints
+   */
+  async updateTradingMode(configId, settings) {
+    const { trading_mode, max_daily_loss, max_trades_per_day } = settings;
+
+    const query = `
+      UPDATE broker_configs
+      SET 
+        trading_mode = $1,
+        max_daily_loss = $2,
+        max_trades_per_day = $3,
+        updated_at = NOW()
+      WHERE id = $4
+      RETURNING *
+    `;
+
+    try {
+      const result = await db.query(query, [
+        trading_mode,
+        max_daily_loss,
+        max_trades_per_day,
+        configId
+      ]);
+
+      if (result.rows.length === 0) {
+        throw new Error('Broker configuration not found');
+      }
+
+      return this.formatConfigResponse(result.rows[0]);
+    } catch (error) {
+      throw new Error(`Failed to update trading mode: ${error.message}`);
+    }
+  }
+
   async healthCheck() {
     const [total, connected, needsReauth] = await Promise.all([
       db.query('SELECT COUNT(*)::int AS count FROM broker_configs'),
