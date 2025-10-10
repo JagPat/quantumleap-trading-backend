@@ -274,18 +274,63 @@ class DatabaseMigrations {
 
   // Migration 004: Enhance OAuth status/session tracking
   async enhanceOAuthStatusTracking(client) {
+    // Add non-user_id columns first
     await client.query(`
       ALTER TABLE oauth_tokens
       ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'connected',
       ADD COLUMN IF NOT EXISTS source VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS last_refreshed TIMESTAMP,
-      ADD COLUMN IF NOT EXISTS user_id UUID
+      ADD COLUMN IF NOT EXISTS last_refreshed TIMESTAMP
     `);
 
     await client.query(`
       ALTER TABLE oauth_tokens
       ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false
     `);
+
+    // Handle user_id column with type checking and conversion
+    const userIdColumnCheck = await client.query(`
+      SELECT column_name, data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_name = 'oauth_tokens' 
+        AND column_name = 'user_id'
+    `);
+    
+    if (userIdColumnCheck.rows.length === 0) {
+      // Column doesn't exist, add it as UUID
+      await client.query(`
+        ALTER TABLE oauth_tokens
+        ADD COLUMN user_id UUID
+      `);
+    } else if (userIdColumnCheck.rows[0].udt_name !== 'uuid') {
+      // Column exists but wrong type (VARCHAR), need to convert
+      console.log(`⚠️  user_id column exists as ${userIdColumnCheck.rows[0].data_type}, converting to UUID...`);
+      
+      // Drop existing foreign key constraint if it exists
+      await client.query(`
+        ALTER TABLE oauth_tokens
+        DROP CONSTRAINT IF EXISTS oauth_tokens_user_id_fk
+      `);
+      
+      // Drop the index if it exists
+      await client.query(`
+        DROP INDEX IF EXISTS idx_oauth_tokens_user_unique
+      `);
+      
+      // Convert the column type using USING clause for safe conversion
+      // This will set NULL for any values that can't be converted to UUID
+      await client.query(`
+        ALTER TABLE oauth_tokens
+        ALTER COLUMN user_id TYPE UUID USING (
+          CASE 
+            WHEN user_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            THEN user_id::UUID
+            ELSE NULL
+          END
+        )
+      `);
+      
+      console.log('✅ user_id column converted to UUID');
+    }
 
     // Add foreign key constraint only if it doesn't exist
     const constraintExists = await client.query(`
@@ -301,6 +346,7 @@ class DatabaseMigrations {
         ADD CONSTRAINT oauth_tokens_user_id_fk
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       `);
+      console.log('✅ Foreign key constraint oauth_tokens_user_id_fk added');
     }
 
     await client.query(`
