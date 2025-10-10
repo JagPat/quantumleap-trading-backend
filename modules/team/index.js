@@ -9,6 +9,15 @@ module.exports = {
   provides: ['team-management', 'member-management', 'invitations'],
   
   routes: teamRoutes,
+
+  /**
+   * Get routes for dynamic mounting
+   * Required by module loader for route registration
+   * @returns {Router} Express router
+   */
+  getRoutes() {
+    return teamRoutes;
+  },
   service: teamService,
 
   /**

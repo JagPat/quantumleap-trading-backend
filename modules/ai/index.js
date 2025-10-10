@@ -12,6 +12,15 @@ module.exports = {
   service: aiService,
 
   /**
+   * Get routes for dynamic mounting
+   * Required by module loader for route registration
+   * @returns {Router} Express router with all AI routes
+   */
+  getRoutes() {
+    return aiRoutes;
+  },
+
+  /**
    * Initialize the AI module
    * @param {Object} container - Service container
    * @param {Object} app - Express app instance

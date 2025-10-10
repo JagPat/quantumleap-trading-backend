@@ -9,6 +9,15 @@ module.exports = {
   provides: ['contact-management', 'contact-groups', 'contact-tags', 'contact-import-export'],
   
   routes: contactRoutes,
+
+  /**
+   * Get routes for dynamic mounting
+   * Required by module loader for route registration
+   * @returns {Router} Express router
+   */
+  getRoutes() {
+    return contactRoutes;
+  },
   service: contactService,
 
   /**

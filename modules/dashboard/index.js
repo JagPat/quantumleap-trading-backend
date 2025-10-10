@@ -9,6 +9,15 @@ module.exports = {
   provides: ['dashboard-analytics', 'performance-metrics', 'user-insights'],
   
   routes: dashboardRoutes,
+
+  /**
+   * Get routes for dynamic mounting
+   * Required by module loader for route registration
+   * @returns {Router} Express router
+   */
+  getRoutes() {
+    return dashboardRoutes;
+  },
   service: dashboardService,
 
   /**
