@@ -39,7 +39,7 @@ module.exports = {
       container.register('Otp', Otp);
       
       // Register OAuth models
-      const BrokerConfig = require('../models/brokerConfig');
+      const BrokerConfig = require('./models/brokerConfig');
       const OAuthToken = require('../../database/models/OAuthToken');
       container.register('BrokerConfig', BrokerConfig);
       container.register('OAuthToken', OAuthToken);
