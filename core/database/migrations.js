@@ -287,11 +287,21 @@ class DatabaseMigrations {
       ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN DEFAULT false
     `);
 
-    await client.query(`
-      ALTER TABLE oauth_tokens
-      ADD CONSTRAINT IF NOT EXISTS oauth_tokens_user_id_fk
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    // Add foreign key constraint only if it doesn't exist
+    const constraintExists = await client.query(`
+      SELECT constraint_name 
+      FROM information_schema.table_constraints 
+      WHERE table_name = 'oauth_tokens' 
+        AND constraint_name = 'oauth_tokens_user_id_fk'
     `);
+    
+    if (constraintExists.rows.length === 0) {
+      await client.query(`
+        ALTER TABLE oauth_tokens
+        ADD CONSTRAINT oauth_tokens_user_id_fk
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      `);
+    }
 
     await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_tokens_user_unique
