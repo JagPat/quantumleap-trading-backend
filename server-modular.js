@@ -588,6 +588,16 @@ async function startServer() {
       
       // Initialize services in background after server is listening
       setImmediate(async () => {
+        // Run auto-migration first (before initializing services)
+        console.log('🔄 Running auto-migration check...');
+        try {
+          require('./scripts/auto-migrate-on-startup');
+          // Give migration a moment to complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } catch (error) {
+          console.warn('⚠️ Auto-migration failed, continuing startup:', error.message);
+        }
+        
         console.log('🔧 Initializing core services...');
         try {
           await initializeCoreServices();
