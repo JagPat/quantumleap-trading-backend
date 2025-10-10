@@ -4,12 +4,57 @@ const StrategyGoalsService = require('../services/strategyGoals');
 const StrategyEngine = require('../services/strategyEngine');
 const AIPreferencesService = require('../services/preferences');
 const PerformanceTracker = require('../services/performanceTracker');
+const GoalSuggestionEngine = require('../services/goalSuggestionEngine');
 const resolveUserIdentifier = require('../../auth/services/resolveUserIdentifier');
 
 const strategyGoalsService = new StrategyGoalsService();
 const strategyEngine = new StrategyEngine();
 const preferencesService = new AIPreferencesService();
 const performanceTracker = new PerformanceTracker();
+const goalSuggestionEngine = new GoalSuggestionEngine();
+
+/**
+ * POST /api/ai/goals/suggest
+ * Get AI-suggested trading goals based on portfolio and history
+ */
+router.post('/goals/suggest', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || req.session?.user_id;
+    const configId = req.headers['x-config-id'] || req.session?.config_id;
+    const { portfolio_data } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'User authentication required'
+      });
+    }
+
+    if (!portfolio_data) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'portfolio_data is required in request body'
+      });
+    }
+
+    console.log('[AutomationRoutes] Generating goal suggestions for user:', userId);
+
+    const result = await goalSuggestionEngine.suggestGoals(userId, configId, portfolio_data);
+
+    res.json({
+      status: 'success',
+      message: 'Goal suggestions generated successfully',
+      data: result
+    });
+
+  } catch (error) {
+    console.error('[AutomationRoutes] Error generating goal suggestions:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to generate goal suggestions'
+    });
+  }
+});
 
 /**
  * POST /api/ai/strategy-automation
