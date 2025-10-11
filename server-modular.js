@@ -103,6 +103,16 @@ console.log('🔍 [RockSolid] Version endpoint registered at /api/version');
 app.use('/api/ai', aiRoutes);
 console.log('🤖 [AI] AI routes registered at /api/ai/*');
 
+// Register V2 Portfolio routes
+try {
+  const { getPortfolioModule } = require('./modules/portfolio');
+  const portfolioModule = getPortfolioModule();
+  app.use('/api/v2/portfolio', portfolioModule.getRouter());
+  console.log('💼 [PortfolioV2] V2 portfolio routes registered at /api/v2/portfolio/*');
+} catch (portfolioError) {
+  console.warn('⚠️ [PortfolioV2] Could not load V2 portfolio routes:', portfolioError.message);
+}
+
 // Initialize core services
 async function initializeCoreServices() {
   try {

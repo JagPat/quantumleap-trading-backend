@@ -38,6 +38,12 @@ class DatabaseMigrations {
         name: 'add_research_and_learning_tables',
         up: this.addResearchAndLearningTables.bind(this),
         down: this.rollbackResearchAndLearningTables.bind(this)
+      },
+      {
+        version: '007',
+        name: 'add_capital_tracking',
+        up: this.addCapitalTracking.bind(this),
+        down: this.rollbackCapitalTracking.bind(this)
       }
     ];
   }
@@ -666,6 +672,50 @@ class DatabaseMigrations {
     await client.query(`DROP TABLE IF EXISTS research_data CASCADE`);
 
     console.log('✅ Research and learning tables dropped');
+  }
+
+  /**
+   * Migration 007: Capital Tracking
+   */
+  async addCapitalTracking(client) {
+    console.log('Adding capital tracking tables...');
+
+    // Create capital_snapshots table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS capital_snapshots (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        config_id UUID,
+        available_balance DECIMAL(15,2),
+        potential_liquidity DECIMAL(15,2),
+        total_actionable DECIMAL(15,2),
+        broker_data JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_capital_user 
+      ON capital_snapshots(user_id, created_at DESC)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_capital_config 
+      ON capital_snapshots(config_id, created_at DESC)
+    `);
+
+    console.log('✅ Capital tracking tables created successfully');
+  }
+
+  /**
+   * Rollback Migration 007
+   */
+  async rollbackCapitalTracking(client) {
+    console.log('Dropping capital tracking tables...');
+
+    await client.query(`DROP TABLE IF EXISTS capital_snapshots CASCADE`);
+
+    console.log('✅ Capital tracking tables dropped');
   }
 
   // Rollback to specific version
