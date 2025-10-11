@@ -6,41 +6,40 @@
 const express = require('express');
 const researchRoutes = require('./routes');
 
-class ResearchModule {
-  constructor() {
-    this.router = express.Router();
-    this.setupRoutes();
-  }
-
-  setupRoutes() {
-    console.log('[ResearchModule] Setting up V2 research routes');
-
-    // Mount routes
-    this.router.use('/', researchRoutes);
-
-    console.log('[ResearchModule] V2 routes registered:');
-    console.log('  - GET  /api/v2/research/:symbol');
-    console.log('  - GET  /api/v2/research/:symbol/summary');
-    console.log('  - POST /api/v2/research/clear-cache');
-  }
-
-  getRouter() {
-    return this.router;
-  }
-}
-
-// Singleton instance
-let researchModuleInstance = null;
-
-function getResearchModule() {
-  if (!researchModuleInstance) {
-    researchModuleInstance = new ResearchModule();
-  }
-  return researchModuleInstance;
-}
-
 module.exports = {
-  ResearchModule,
-  getResearchModule,
+  name: 'research',
+  version: '2.0.0',
+  description: 'Research aggregation V2 with AI-driven insights',
+  dependencies: ['database', 'logger'],
+  provides: ['research-aggregation', 'research-cache'],
+
+  /**
+   * Initialize the Research V2 module
+   */
+  async initialize(container, app, options = {}) {
+    try {
+      this.logger = container.get('logger');
+      this.logger.info('[ResearchModule] Setting up V2 research routes');
+
+      // Create router
+      const router = express.Router();
+      
+      // Mount routes
+      router.use('/', researchRoutes);
+
+      // Register at V2 endpoint
+      app.use('/api/v2/research', router);
+
+      this.logger.info('[ResearchModule] V2 routes registered:');
+      this.logger.info('  - GET  /api/v2/research/:symbol');
+      this.logger.info('  - GET  /api/v2/research/:symbol/summary');
+      this.logger.info('  - POST /api/v2/research/clear-cache');
+
+      return true;
+    } catch (error) {
+      console.error('[ResearchModule] Initialization error:', error);
+      throw error;
+    }
+  }
 };
 

@@ -7,52 +7,51 @@ const express = require('express');
 const rotationRoutes = require('./routes/rotation');
 const executionRoutes = require('./routes/execution');
 
-class TradingModule {
-  constructor() {
-    this.router = express.Router();
-    this.setupRoutes();
-  }
-
-  setupRoutes() {
-    console.log('[TradingModule] Setting up V2 trading routes');
-
-    // Mount routes
-    this.router.use('/', rotationRoutes);
-    this.router.use('/', executionRoutes);
-
-    console.log('[TradingModule] V2 routes registered:');
-    console.log('  - GET    /api/v2/trading/rotation-opportunities');
-    console.log('  - POST   /api/v2/trading/enable-rotation');
-    console.log('  - POST   /api/v2/trading/execute-rotation');
-    console.log('  - GET    /api/v2/trading/active-rotations');
-    console.log('  - GET    /api/v2/trading/rotation-history');
-    console.log('  - PUT    /api/v2/trading/rotation/:cycleId/status');
-    console.log('  - DELETE /api/v2/trading/rotation/:cycleId');
-    console.log('  - POST   /api/v2/trading/validate-trade');
-    console.log('  - POST   /api/v2/trading/prepare-trade');
-    console.log('  - POST   /api/v2/trading/execute-trade/:tradeId');
-    console.log('  - GET    /api/v2/trading/pending-trades');
-    console.log('  - DELETE /api/v2/trading/cancel-trade/:tradeId');
-    console.log('  - GET    /api/v2/trading/trade-history');
-  }
-
-  getRouter() {
-    return this.router;
-  }
-}
-
-// Singleton instance
-let tradingModuleInstance = null;
-
-function getTradingModule() {
-  if (!tradingModuleInstance) {
-    tradingModuleInstance = new TradingModule();
-  }
-  return tradingModuleInstance;
-}
-
 module.exports = {
-  TradingModule,
-  getTradingModule,
+  name: 'trading',
+  version: '2.0.0',
+  description: 'Trading operations V2 with rotational trading and execution',
+  dependencies: ['database', 'logger'],
+  provides: ['trading-rotation', 'trade-execution'],
+
+  /**
+   * Initialize the Trading V2 module
+   */
+  async initialize(container, app, options = {}) {
+    try {
+      this.logger = container.get('logger');
+      this.logger.info('[TradingModule] Setting up V2 trading routes');
+
+      // Create router
+      const router = express.Router();
+      
+      // Mount routes
+      router.use('/', rotationRoutes);
+      router.use('/', executionRoutes);
+
+      // Register at V2 endpoint
+      app.use('/api/v2/trading', router);
+
+      this.logger.info('[TradingModule] V2 routes registered:');
+      this.logger.info('  - GET    /api/v2/trading/rotation-opportunities');
+      this.logger.info('  - POST   /api/v2/trading/enable-rotation');
+      this.logger.info('  - POST   /api/v2/trading/execute-rotation');
+      this.logger.info('  - GET    /api/v2/trading/active-rotations');
+      this.logger.info('  - GET    /api/v2/trading/rotation-history');
+      this.logger.info('  - PUT    /api/v2/trading/rotation/:cycleId/status');
+      this.logger.info('  - DELETE /api/v2/trading/rotation/:cycleId');
+      this.logger.info('  - POST   /api/v2/trading/validate-trade');
+      this.logger.info('  - POST   /api/v2/trading/prepare-trade');
+      this.logger.info('  - POST   /api/v2/trading/execute-trade/:tradeId');
+      this.logger.info('  - GET    /api/v2/trading/pending-trades');
+      this.logger.info('  - DELETE /api/v2/trading/cancel-trade/:tradeId');
+      this.logger.info('  - GET    /api/v2/trading/trade-history');
+
+      return true;
+    } catch (error) {
+      console.error('[TradingModule] Initialization error:', error);
+      throw error;
+    }
+  }
 };
 
