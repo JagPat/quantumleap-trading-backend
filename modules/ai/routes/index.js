@@ -9,6 +9,9 @@ const consentRoutes = require('./consent');
 const executionRoutes = require('./execution');
 const analyticsRoutes = require('./analytics');
 const researchRoutes = require('./research');
+const learningRoutes = require('./learning');
+const confidenceRoutes = require('./confidence');
+const variantsRoutes = require('./variants');
 
 const router = express.Router();
 const preferencesService = new AIPreferencesService();
@@ -36,6 +39,15 @@ router.use('/analytics', analyticsRoutes);
 
 // Mount research routes
 router.use('/research', researchRoutes);
+
+// Mount learning routes (execution history, overrides, etc.)
+router.use('/learning', learningRoutes);
+
+// Mount confidence management routes
+router.use('/confidence', confidenceRoutes);
+
+// Mount variant management routes (A/B testing)
+router.use('/variants', variantsRoutes);
 
 // Health check
 router.get('/health', async (req, res) => {
