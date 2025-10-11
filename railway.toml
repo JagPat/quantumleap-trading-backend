@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-watchPatterns = ["src/**/*.ts", "src/**/*.js", "package.json", "tsconfig.json", "prisma/schema.prisma", "modules/**/*.js"]
+watchPatterns = ["**/*.js", "package.json", "modules/**", "routes/**", "middleware/**", "core/**"]
 
 [deploy]
 startCommand = "npm start"
