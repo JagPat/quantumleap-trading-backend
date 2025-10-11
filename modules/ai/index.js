@@ -79,6 +79,11 @@ module.exports = {
       this.onlineLearningService = new OnlineLearningService();
       this.logger.info('Online learning service initialized');
       
+      // ✅ NEW: Initialize Phase 7 integrator (provides hooks for execution engine)
+      const getPhase7Integrator = require('./services/phase7Integrator');
+      this.phase7Integrator = getPhase7Integrator();
+      this.logger.info('Phase 7 integrator initialized (hooks ready for execution engine)');
+      
       this.status = 'initialized';
       this.initializedAt = new Date();
       
