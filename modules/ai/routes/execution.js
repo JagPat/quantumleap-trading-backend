@@ -8,6 +8,7 @@ const router = express.Router();
 const db = require('../../../core/database/connection');
 const getExecutionEngine = require('../services/executionEngine');
 const getTradingModeManager = require('../services/tradingModeManager');
+const { getUserOverrideTracker } = require('../services/userOverrideTracker');
 
 /**
  * GET /api/modules/ai/execution/pending-trades
@@ -153,9 +154,9 @@ router.post('/pending-trades/:id/reject', async (req, res) => {
 
     console.log(`[AI/Execution] Rejecting trade ${tradeId} for user: ${userId}`);
 
-    // Verify trade belongs to user
+    // Verify trade belongs to user and get AI recommendation
     const tradeCheck = await db.query(
-      'SELECT id, user_id FROM strategy_trades WHERE id = $1',
+      'SELECT id, user_id, symbol, quantity, price, rationale FROM strategy_trades WHERE id = $1',
       [tradeId]
     );
 
@@ -173,6 +174,8 @@ router.post('/pending-trades/:id/reject', async (req, res) => {
       });
     }
 
+    const trade = tradeCheck.rows[0];
+
     // Update trade status to rejected
     await db.query(
       `UPDATE strategy_trades 
@@ -183,6 +186,29 @@ router.post('/pending-trades/:id/reject', async (req, res) => {
        WHERE id = $1`,
       [tradeId, reason || 'User rejected']
     );
+
+    // Track override in learning system
+    try {
+      const overrideTracker = getUserOverrideTracker();
+      const { reasonCategory, reasonText } = req.body;
+      
+      await overrideTracker.recordOverride(userId, null, {
+        executionId: null,
+        overrideType: 'reject',
+        aiRecommendation: {
+          symbol: trade.symbol,
+          quantity: trade.quantity,
+          price: trade.price,
+          rationale: trade.rationale
+        },
+        userAlternative: { action: 'rejected' },
+        reasonCategory: reasonCategory || 'user_preference',
+        reasonText: reasonText || reason || 'User rejected trade'
+      });
+    } catch (overrideError) {
+      console.warn('[AI/Execution] Failed to track override:', overrideError.message);
+      // Don't fail the rejection if override tracking fails
+    }
 
     res.json({
       success: true,
