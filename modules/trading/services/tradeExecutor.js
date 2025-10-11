@@ -3,7 +3,7 @@
  * Handles trade execution with validation, broker integration, and audit logging
  */
 
-const { query } = require('../../../core/database');
+const { query } = require('../../../core/database/connection');
 const { getCapitalService } = require('../../portfolio/services/capitalService');
 const { getDecisionAttributionTracker } = require('../../ai/services/decisionAttributionTracker');
 

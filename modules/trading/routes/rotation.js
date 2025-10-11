@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { getRotationalEngine } = require('../services/rotationalEngine');
-const { query } = require('../../../core/database');
+const { query } = require('../../../core/database/connection');
 
 /**
  * GET /api/v2/trading/rotation-opportunities

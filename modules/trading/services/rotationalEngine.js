@@ -4,7 +4,7 @@
  * Maintains portfolio composition while optimizing realized returns
  */
 
-const { query } = require('../../../core/database');
+const { query } = require('../../../core/database/connection');
 
 class RotationalEngine {
   constructor() {

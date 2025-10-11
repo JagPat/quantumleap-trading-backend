@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { getPortfolioReviewEngine } = require('../../ai/services/portfolioReviewEngine');
-const { query } = require('../../../core/database');
+const { query } = require('../../../core/database/connection');
 
 /**
  * GET /api/v2/portfolio/holdings-with-actions

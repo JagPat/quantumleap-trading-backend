@@ -4,7 +4,7 @@
  */
 
 const { getAIAgentRouter } = require('../../ai/services/aiAgentRouter');
-const { query } = require('../../../core/database');
+const { query } = require('../../../core/database/connection');
 
 class ResearchAggregator {
   constructor() {

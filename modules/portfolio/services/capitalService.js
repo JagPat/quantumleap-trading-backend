@@ -3,7 +3,7 @@
  * Fetches capital data from Zerodha API and calculates potential liquidity
  */
 
-const { query } = require('../../../core/database');
+const { query } = require('../../../core/database/connection');
 
 class CapitalService {
   constructor() {
