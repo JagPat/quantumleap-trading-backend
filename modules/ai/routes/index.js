@@ -13,6 +13,7 @@ const learningRoutes = require('./learning');
 const confidenceRoutes = require('./confidence');
 const variantsRoutes = require('./variants');
 const chatRoutes = require('./chat');
+const backtestingRoutes = require('./backtesting');
 
 const router = express.Router();
 const preferencesService = new AIPreferencesService();
@@ -52,6 +53,9 @@ router.use('/variants', variantsRoutes);
 
 // Mount chat routes (AI assistant)
 router.use('/chat', chatRoutes);
+
+// Mount backtesting routes
+router.use('/backtesting', backtestingRoutes);
 
 // Health check
 router.get('/health', async (req, res) => {
