@@ -5,6 +5,7 @@
 
 const express = require('express');
 const rotationRoutes = require('./routes/rotation');
+const executionRoutes = require('./routes/execution');
 
 class TradingModule {
   constructor() {
@@ -17,6 +18,7 @@ class TradingModule {
 
     // Mount routes
     this.router.use('/', rotationRoutes);
+    this.router.use('/', executionRoutes);
 
     console.log('[TradingModule] V2 routes registered:');
     console.log('  - GET    /api/v2/trading/rotation-opportunities');
@@ -26,6 +28,12 @@ class TradingModule {
     console.log('  - GET    /api/v2/trading/rotation-history');
     console.log('  - PUT    /api/v2/trading/rotation/:cycleId/status');
     console.log('  - DELETE /api/v2/trading/rotation/:cycleId');
+    console.log('  - POST   /api/v2/trading/validate-trade');
+    console.log('  - POST   /api/v2/trading/prepare-trade');
+    console.log('  - POST   /api/v2/trading/execute-trade/:tradeId');
+    console.log('  - GET    /api/v2/trading/pending-trades');
+    console.log('  - DELETE /api/v2/trading/cancel-trade/:tradeId');
+    console.log('  - GET    /api/v2/trading/trade-history');
   }
 
   getRouter() {
