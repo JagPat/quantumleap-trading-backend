@@ -48,8 +48,15 @@ class StrategyGoalsService {
     }
 
     // Symbols validation
-    if (goals.symbols && (!Array.isArray(goals.symbols) || goals.symbols.length === 0)) {
-      errors.push('At least one symbol must be specified');
+    // ✅ ALLOW: AI_SELECT string OR array of symbols
+    if (goals.symbols) {
+      const isAISelect = goals.symbols === 'AI_SELECT' || 
+                         (Array.isArray(goals.symbols) && goals.symbols.includes('AI_SELECT'));
+      const isValidArray = Array.isArray(goals.symbols) && goals.symbols.length > 0;
+      
+      if (!isAISelect && !isValidArray) {
+        errors.push('At least one symbol must be specified, or use "AI_SELECT" for AI-driven selection');
+      }
     }
 
     // Logical validation: profit target should be realistic given timeframe
