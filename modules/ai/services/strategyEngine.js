@@ -44,42 +44,86 @@ class StrategyEngine {
     try {
       console.log('[StrategyEngine] AI selecting stocks for goal (research-enhanced):', goal);
       
-      // ✅ NEW: Initialize research and regime services
-      const ResearchIngestionService = require('./researchIngestionService');
-      const MarketRegimeAnalyzer = require('./marketRegimeAnalyzer');
-      const FeedbackIntegrationService = require('./feedbackIntegrationService');
+      // ✅ NEW: Initialize research and regime services (with error handling)
+      let currentRegime = null;
+      let researchData = [];
+      let learnings = [];
       
-      const researchService = new ResearchIngestionService();
-      const regimeAnalyzer = new MarketRegimeAnalyzer();
-      const feedbackService = new FeedbackIntegrationService();
-      
-      // Get combined universe (top liquid + user holdings)
-      const universe = await this.marketUniverse.getCombinedUniverse(portfolioContext, 100);
-      const currentHoldings = portfolioContext?.holdings || [];
-      
-      // ✅ NEW: Fetch market regime
-      const currentRegime = await regimeAnalyzer.getActiveRegime();
-      console.log(`[StrategyEngine] Current market regime: ${currentRegime.regime} (${(currentRegime.confidence * 100).toFixed(0)}% confidence)`);
-      
-      // ✅ NEW: Fetch research data for top 30 stocks
-      const topSymbols = universe.slice(0, 30);
-      const researchData = [];
-      
-      for (const stock of topSymbols) {
+      try {
+        const ResearchIngestionService = require('./researchIngestionService');
+        const MarketRegimeAnalyzer = require('./marketRegimeAnalyzer');
+        const FeedbackIntegrationService = require('./feedbackIntegrationService');
+        
+        const researchService = new ResearchIngestionService();
+        const regimeAnalyzer = new MarketRegimeAnalyzer();
+        const feedbackService = new FeedbackIntegrationService();
+        
+        // Get combined universe (top liquid + user holdings)
+        const universe = await this.marketUniverse.getCombinedUniverse(portfolioContext, 100);
+        const currentHoldings = portfolioContext?.holdings || [];
+        
+        // ✅ NEW: Fetch market regime (with error handling)
         try {
-          const research = await researchService.getRelevantResearch(stock.symbol, 7);
-          researchData.push({
-            symbol: stock.symbol,
-            sector: stock.sector,
-            research
-          });
-        } catch (error) {
-          console.warn(`[StrategyEngine] Could not fetch research for ${stock.symbol}`);
+          currentRegime = await regimeAnalyzer.getActiveRegime();
+          console.log(`[StrategyEngine] Current market regime: ${currentRegime.regime} (${(currentRegime.confidence * 100).toFixed(0)}% confidence)`);
+        } catch (regimeError) {
+          console.warn('[StrategyEngine] Could not fetch market regime, using fallback:', regimeError.message);
+          currentRegime = {
+            regime: 'UNKNOWN',
+            confidence: 0.5,
+            reasoning: 'Regime detection unavailable',
+            sectorPreferences: [],
+            recommendedStrategy: 'moderate'
+          };
         }
+        
+        // ✅ NEW: Fetch research data for top 30 stocks (with error handling)
+        const topSymbols = universe.slice(0, 30);
+        
+        for (const stock of topSymbols) {
+          try {
+            const research = await researchService.getRelevantResearch(stock.symbol, 7);
+            researchData.push({
+              symbol: stock.symbol,
+              sector: stock.sector,
+              research
+            });
+          } catch (error) {
+            console.warn(`[StrategyEngine] Could not fetch research for ${stock.symbol}, using mock data`);
+            // Add with empty research
+            researchData.push({
+              symbol: stock.symbol,
+              sector: stock.sector,
+              research: { news: [], sentiment: null, fundamentals: null }
+            });
+          }
+        }
+        
+        // ✅ NEW: Get historical learnings (with error handling)
+        try {
+          learnings = await feedbackService.getContextualLearnings(null, 'stock_selection');
+        } catch (learningError) {
+          console.warn('[StrategyEngine] Could not fetch learnings, continuing without:', learningError.message);
+          learnings = [];
+        }
+        
+      } catch (phase7Error) {
+        console.error('[StrategyEngine] Phase 7 services initialization error, using fallbacks:', phase7Error.message);
+        // Continue with empty research data - won't break stock selection
+        currentRegime = {
+          regime: 'UNKNOWN',
+          confidence: 0.5,
+          reasoning: 'Phase 7 services unavailable',
+          sectorPreferences: [],
+          recommendedStrategy: 'moderate'
+        };
+        researchData = [];
+        learnings = [];
       }
       
-      // ✅ NEW: Get historical learnings
-      const learnings = await feedbackService.getContextualLearnings(null, 'stock_selection');
+      // Get combined universe (needs to be outside try-catch above)
+      const universe = await this.marketUniverse.getCombinedUniverse(portfolioContext, 100);
+      const currentHoldings = portfolioContext?.holdings || [];
       
       // ✅ ENHANCED: Build prompt with research + regime + learnings
       const prompt = `You are an expert portfolio manager with access to comprehensive research data. Select 3-5 optimal stocks to achieve the following goal:
@@ -101,21 +145,23 @@ ${currentHoldings.length > 0
   : 'No current holdings'}
 
 **✅ Available Stocks with Research Data:**
-${researchData.slice(0, 20).map(s => {
-  const news = s.research.news?.[0];
-  const sentiment = s.research.sentiment;
-  const fundamentals = s.research.fundamentals;
+${researchData.length > 0 ? researchData.slice(0, 20).map(s => {
+  const news = s.research?.news?.[0];
+  const sentiment = s.research?.sentiment;
+  const fundamentals = s.research?.fundamentals;
   return `
 ${s.symbol} (${s.sector}):
   - Recent News: ${news?.headline || 'No recent news'} [${news?.sentiment || 'neutral'}]
   - Sentiment: ${sentiment?.sentiment || 'neutral'} (Score: ${sentiment?.score?.toFixed(2) || 'N/A'}, Volume: ${sentiment?.volume || 0} mentions)
   - Fundamentals: PE=${fundamentals?.pe || 'N/A'}, ROE=${fundamentals?.roe || 'N/A'}%, Trend=${fundamentals?.trend || 'stable'}
   - Price: ₹${fundamentals?.currentPrice || 'N/A'} (Target: ₹${fundamentals?.targetPrice || 'N/A'})`;
-}).join('\n')}
-... and ${researchData.length - 20} more stocks with research
+}).join('\n') : 'Research data temporarily unavailable - using market liquidity and sector data'}
+${researchData.length > 20 ? `... and ${researchData.length - 20} more stocks with research` : ''}
 
 **✅ Historical Learnings (AI Performance Insights):**
-${feedbackService.formatLearningsForPrompt(learnings)}
+${learnings && learnings.length > 0 
+  ? learnings.map(l => `- ${l.insight} (Confidence: ${(l.confidence * 100).toFixed(0)}%, based on ${l.sampleSize} trades)`).join('\n')
+  : 'No historical learnings available yet.'}
 
 **Selection Criteria (Research-Driven):**
 1. **News Momentum**: Favor stocks with positive recent news and analyst upgrades
