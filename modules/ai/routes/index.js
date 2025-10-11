@@ -12,6 +12,7 @@ const researchRoutes = require('./research');
 const learningRoutes = require('./learning');
 const confidenceRoutes = require('./confidence');
 const variantsRoutes = require('./variants');
+const chatRoutes = require('./chat');
 
 const router = express.Router();
 const preferencesService = new AIPreferencesService();
@@ -48,6 +49,9 @@ router.use('/confidence', confidenceRoutes);
 
 // Mount variant management routes (A/B testing)
 router.use('/variants', variantsRoutes);
+
+// Mount chat routes (AI assistant)
+router.use('/chat', chatRoutes);
 
 // Health check
 router.get('/health', async (req, res) => {

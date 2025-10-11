@@ -84,6 +84,12 @@ module.exports = {
       this.phase7Integrator = getPhase7Integrator();
       this.logger.info('Phase 7 integrator initialized (hooks ready for execution engine)');
       
+      // ✅ Phase 13: Initialize AI Chat Service
+      const { getAIChatService } = require('./services/aiChatService');
+      this.chatService = getAIChatService();
+      await this.chatService.initialize();
+      this.logger.info('AI Chat Service initialized (Phase 13)');
+      
       this.status = 'initialized';
       this.initializedAt = new Date();
       

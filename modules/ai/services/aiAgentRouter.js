@@ -199,6 +199,41 @@ class AIAgentRouter {
       }
     };
   }
+
+  /**
+   * Chat with AI using appropriate provider
+   * @param {string} prompt - User message/prompt
+   * @param {Object} options - Chat options
+   * @returns {string} AI response
+   */
+  async chat(prompt, options = {}) {
+    try {
+      const { userId, temperature = 0.7, maxTokens = 500 } = options;
+      
+      // Get user preferences if userId provided
+      let preferences = null;
+      if (userId) {
+        preferences = await this.preferencesService.getPreferences(userId);
+      }
+      
+      // Get provider
+      const { ProviderFactory } = require('./providers/providerFactory');
+      const provider = await ProviderFactory.getProvider(userId, preferences);
+      
+      // Use the provider's chat completion
+      const response = await provider.chatCompletion([
+        { role: 'user', content: prompt }
+      ], {
+        temperature,
+        max_tokens: maxTokens
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('[AIAgentRouter] Chat error:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance
