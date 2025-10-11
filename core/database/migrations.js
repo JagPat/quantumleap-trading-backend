@@ -68,6 +68,12 @@ class DatabaseMigrations {
         name: 'add_self_learning_tables',
         up: this.addSelfLearningTables.bind(this),
         down: this.rollbackSelfLearningTables.bind(this)
+      },
+      {
+        version: '012',
+        name: 'add_rebalancing_tables',
+        up: this.addRebalancingTables.bind(this),
+        down: this.rollbackRebalancingTables.bind(this)
       }
     ];
   }
@@ -1140,6 +1146,42 @@ class DatabaseMigrations {
     `);
 
     console.log('✅ Self-learning tables rollback completed');
+  }
+
+  /**
+   * Migration 012: Add rebalancing tables
+   */
+  async addRebalancingTables(client) {
+    console.log('🔄 Creating rebalancing tables...');
+
+    // Read and execute migration SQL
+    const fs = require('fs');
+    const path = require('path');
+    const migrationSQL = fs.readFileSync(
+      path.join(__dirname, 'migrations', '012_add_rebalancing_tables.sql'),
+      'utf8'
+    );
+
+    await client.query(migrationSQL);
+
+    console.log('✅ Rebalancing tables created successfully');
+  }
+
+  async rollbackRebalancingTables(client) {
+    console.log('🔄 Rolling back rebalancing tables...');
+
+    await client.query(`
+      DROP INDEX IF EXISTS idx_user_preferences_user_id;
+      DROP INDEX IF EXISTS idx_rebalancing_trades_symbol;
+      DROP INDEX IF EXISTS idx_rebalancing_trades_rebalancing_id;
+      DROP INDEX IF EXISTS idx_rebalancing_events_created_at;
+      DROP INDEX IF EXISTS idx_rebalancing_events_user_id;
+      DROP TABLE IF EXISTS user_preferences CASCADE;
+      DROP TABLE IF EXISTS rebalancing_trades CASCADE;
+      DROP TABLE IF EXISTS rebalancing_events CASCADE;
+    `);
+
+    console.log('✅ Rebalancing tables rollback completed');
   }
 }
 
