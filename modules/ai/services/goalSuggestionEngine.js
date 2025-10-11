@@ -1,6 +1,7 @@
 const db = require('../../../core/database/connection');
 const OpenAIProvider = require('./providers/openai');
 const AIPreferencesService = require('./preferences');
+const StrategyEngine = require('./strategyEngine');
 
 /**
  * Goal Suggestion Engine
@@ -11,6 +12,7 @@ class GoalSuggestionEngine {
   constructor() {
     this.db = db;
     this.preferencesService = new AIPreferencesService();
+    this.strategyEngine = new StrategyEngine();
   }
 
   /**
@@ -49,6 +51,30 @@ class GoalSuggestionEngine {
       );
 
       console.log('[GoalSuggestionEngine] Generated 3 goal suggestions');
+
+      // ✅ NEW: For each suggestion, add AI-selected stocks
+      console.log('[GoalSuggestionEngine] Adding AI stock selections to each goal...');
+      
+      for (const suggestion of suggestions) {
+        try {
+          // Get AI stock selection for this goal
+          const selectedStocks = await this.strategyEngine.selectStocksForGoal(
+            suggestion,
+            portfolioData,
+            aiProvider
+          );
+          
+          suggestion.suggestedStocks = selectedStocks;
+          suggestion.stockSelectionMode = 'ai_selected';
+          
+          console.log(`[GoalSuggestionEngine] Added ${selectedStocks.length} AI-selected stocks to suggestion: ${suggestion.name}`);
+        } catch (stockError) {
+          console.warn(`[GoalSuggestionEngine] Failed to select stocks for suggestion ${suggestion.name}:`, stockError);
+          // Continue without stock selection if it fails
+          suggestion.suggestedStocks = [];
+          suggestion.stockSelectionMode = 'none';
+        }
+      }
 
       return {
         success: true,

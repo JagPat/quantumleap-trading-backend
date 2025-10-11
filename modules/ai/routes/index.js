@@ -6,6 +6,8 @@ const enhancedRoutes = require('./enhanced');
 const automationRoutes = require('./automation');
 const portfolioRoutes = require('./portfolio');
 const consentRoutes = require('./consent');
+const executionRoutes = require('./execution');
+const analyticsRoutes = require('./analytics');
 
 const router = express.Router();
 const preferencesService = new AIPreferencesService();
@@ -24,6 +26,12 @@ router.use('/portfolio', portfolioRoutes);
 
 // Mount consent management routes
 router.use('/consent', consentRoutes);
+
+// Mount execution routes (pending trades)
+router.use('/execution', executionRoutes);
+
+// Mount analytics routes
+router.use('/analytics', analyticsRoutes);
 
 // Health check
 router.get('/health', async (req, res) => {

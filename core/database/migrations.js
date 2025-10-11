@@ -441,6 +441,30 @@ class DatabaseMigrations {
       )
     `);
 
+    // Create AI usage metrics table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_usage_metrics (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        metric_type VARCHAR(50) NOT NULL,
+        metric_value TEXT,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // Create indexes for efficient querying
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_ai_metrics_user_type 
+      ON ai_usage_metrics(user_id, metric_type)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_ai_metrics_created 
+      ON ai_usage_metrics(created_at)
+    `);
+
+    console.log('✅ AI usage metrics table created');
     console.log('✅ Multi-agent AI preference columns added successfully');
   }
 
@@ -448,6 +472,9 @@ class DatabaseMigrations {
    * Rollback Migration 005
    */
   async rollbackMultiAgentAIPreferences(client) {
+    // Drop metrics table
+    await client.query(`DROP TABLE IF EXISTS ai_usage_metrics`);
+
     await client.query(`
       ALTER TABLE ai_preferences
       DROP CONSTRAINT IF EXISTS check_trading_mode,
