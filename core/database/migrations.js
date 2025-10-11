@@ -26,6 +26,12 @@ class DatabaseMigrations {
         name: 'enhance_oauth_status_tracking',
         up: this.enhanceOAuthStatusTracking.bind(this),
         down: this.rollbackOAuthStatusTracking.bind(this)
+      },
+      {
+        version: '005',
+        name: 'add_multi_agent_ai_preferences',
+        up: this.addMultiAgentAIPreferences.bind(this),
+        down: this.rollbackMultiAgentAIPreferences.bind(this)
       }
     ];
   }
@@ -387,6 +393,79 @@ class DatabaseMigrations {
       DROP COLUMN IF EXISTS needs_reauth,
       DROP COLUMN IF EXISTS last_token_refresh,
       DROP COLUMN IF EXISTS last_status_check
+    `);
+  }
+
+  /**
+   * Migration 005: Add Multi-Agent AI Preferences
+   * Adds provider selection per task type and trading mode management
+   */
+  async addMultiAgentAIPreferences(client) {
+    console.log('Adding multi-agent AI preference columns...');
+
+    // Add provider selection columns
+    await client.query(`
+      ALTER TABLE ai_preferences
+      ADD COLUMN IF NOT EXISTS strategy_provider VARCHAR(50) DEFAULT 'openai',
+      ADD COLUMN IF NOT EXISTS goal_provider VARCHAR(50) DEFAULT 'openai',
+      ADD COLUMN IF NOT EXISTS portfolio_provider VARCHAR(50) DEFAULT 'openai',
+      ADD COLUMN IF NOT EXISTS claude_api_key TEXT,
+      ADD COLUMN IF NOT EXISTS mistral_api_key TEXT
+    `);
+
+    // Add trading mode and consent columns
+    await client.query(`
+      ALTER TABLE ai_preferences
+      ADD COLUMN IF NOT EXISTS trading_mode VARCHAR(20) DEFAULT 'manual',
+      ADD COLUMN IF NOT EXISTS auto_trading_consent BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS consent_timestamp TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS consent_ip VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS consent_disclaimers JSONB
+    `);
+
+    // Add constraint for trading mode
+    await client.query(`
+      ALTER TABLE ai_preferences
+      ADD CONSTRAINT IF NOT EXISTS check_trading_mode 
+      CHECK (trading_mode IN ('manual', 'auto'))
+    `);
+
+    // Add constraint for provider values
+    await client.query(`
+      ALTER TABLE ai_preferences
+      ADD CONSTRAINT IF NOT EXISTS check_providers
+      CHECK (
+        strategy_provider IN ('openai', 'claude', 'mistral', 'auto') AND
+        goal_provider IN ('openai', 'claude', 'mistral', 'auto') AND
+        portfolio_provider IN ('openai', 'claude', 'mistral', 'auto')
+      )
+    `);
+
+    console.log('✅ Multi-agent AI preference columns added successfully');
+  }
+
+  /**
+   * Rollback Migration 005
+   */
+  async rollbackMultiAgentAIPreferences(client) {
+    await client.query(`
+      ALTER TABLE ai_preferences
+      DROP CONSTRAINT IF EXISTS check_trading_mode,
+      DROP CONSTRAINT IF EXISTS check_providers
+    `);
+
+    await client.query(`
+      ALTER TABLE ai_preferences
+      DROP COLUMN IF EXISTS strategy_provider,
+      DROP COLUMN IF EXISTS goal_provider,
+      DROP COLUMN IF EXISTS portfolio_provider,
+      DROP COLUMN IF EXISTS claude_api_key,
+      DROP COLUMN IF EXISTS mistral_api_key,
+      DROP COLUMN IF EXISTS trading_mode,
+      DROP COLUMN IF EXISTS auto_trading_consent,
+      DROP COLUMN IF EXISTS consent_timestamp,
+      DROP COLUMN IF EXISTS consent_ip,
+      DROP COLUMN IF EXISTS consent_disclaimers
     `);
   }
 

@@ -42,6 +42,15 @@ module.exports = {
       this.executionEngine = getExecutionEngine();
       this.logger.info('Strategy execution engine initialized');
       
+      // Initialize AI agent router and register portfolio engine
+      const getAIAgentRouter = require('./services/aiAgentRouter');
+      const getPortfolioActionEngine = require('./services/portfolioActionEngine');
+      
+      this.aiRouter = getAIAgentRouter();
+      this.portfolioEngine = getPortfolioActionEngine();
+      this.aiRouter.setPortfolioEngine(this.portfolioEngine);
+      this.logger.info('AI agent router initialized with portfolio engine');
+      
       this.status = 'initialized';
       this.initializedAt = new Date();
       

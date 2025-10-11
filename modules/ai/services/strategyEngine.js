@@ -11,10 +11,14 @@
 
 const OpenAIProvider = require('./providers/openai');
 const AIPreferencesService = require('./preferences');
+const getProviderFactory = require('./providers/providerFactory');
+const getMarketUniverse = require('./marketUniverse');
 
 class StrategyEngine {
   constructor() {
     this.preferencesService = new AIPreferencesService();
+    this.providerFactory = getProviderFactory();
+    this.marketUniverse = getMarketUniverse();
     this.marketIndicators = {
       bullish: ['uptrend', 'breakout', 'momentum', 'support'],
       bearish: ['downtrend', 'breakdown', 'reversal', 'resistance'],
@@ -26,6 +30,183 @@ class StrategyEngine {
       moderate: { maxPositionSize: 0.10, stopLoss: 0.03, takeProfit: 0.06 },
       aggressive: { maxPositionSize: 0.20, stopLoss: 0.05, takeProfit: 0.10 }
     };
+  }
+
+  /**
+   * AI-driven stock selection based on goal
+   * @param {Object} goal - User's trading goal
+   * @param {Object} portfolioContext - Current portfolio data
+   * @param {Object} aiProvider - AI provider instance
+   * @returns {Array} Selected stocks with allocation and rationale
+   */
+  async selectStocksForGoal(goal, portfolioContext, aiProvider) {
+    try {
+      console.log('[StrategyEngine] AI selecting stocks for goal:', goal);
+      
+      // Get combined universe (top liquid + user holdings)
+      const universe = await this.marketUniverse.getCombinedUniverse(portfolioContext, 100);
+      const currentHoldings = portfolioContext?.holdings || [];
+      
+      // Build prompt for AI stock selection
+      const prompt = `You are an expert portfolio manager. Select 3-5 optimal stocks to achieve the following goal:
+
+**Goal:**
+- Profit Target: ${goal.profitTarget || goal.profit_target}% in ${goal.timeframe} days
+- Risk Tolerance: ${goal.riskTolerance || goal.risk_tolerance}
+- Maximum Loss: ${goal.maxLoss || goal.max_loss}%
+
+**Available Stock Universe (Top 100 Liquid NSE Stocks):**
+${universe.slice(0, 30).map(s => `${s.symbol} (${s.sector})`).join(', ')}... and 70 more
+
+**User's Current Holdings:**
+${currentHoldings.length > 0 
+  ? currentHoldings.map(h => `${h.symbol || h.tradingsymbol}: ${((h.current_value || h.currentValue || 0) / (portfolioContext.summary?.total_value || 1) * 100).toFixed(1)}%`).join(', ')
+  : 'No current holdings'}
+
+**Selection Criteria:**
+1. Liquidity (must have high daily volume)
+2. Volatility match (align with risk tolerance)
+3. Sector diversification (max 2 stocks per sector)
+4. Correlation (avoid highly correlated stocks)
+5. Growth potential to meet profit target
+
+Return a JSON array with 3-5 stocks in this exact format:
+[
+  {
+    "symbol": "RELIANCE",
+    "allocation": 25,
+    "rationale": "High liquidity, strong fundamentals, low correlation with IT sector",
+    "sector": "Energy",
+    "expectedContribution": "8-10% return potential",
+    "riskLevel": "moderate"
+  }
+]
+
+Ensure allocations sum to 100% and prioritize goal achievement over holding specific stocks.`;
+
+      // Call AI to select stocks
+      const response = await aiProvider.chat([
+        { role: 'system', content: 'You are an expert stock selector for algorithmic trading.' },
+        { role: 'user', content: prompt }
+      ], { 
+        temperature: 0.5, // Lower temperature for more consistent selections
+        maxTokens: 2048 
+      });
+
+      // Parse AI response
+      let selectedStocks = [];
+      try {
+        const content = response.content || response.reply || '';
+        // Try to extract JSON from response
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          selectedStocks = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('No JSON array found in response');
+        }
+      } catch (parseError) {
+        console.error('[StrategyEngine] Failed to parse AI stock selection:', parseError);
+        // Fallback to user's holdings or default stocks
+        selectedStocks = this.getDefaultStockSelection(currentHoldings);
+      }
+
+      // Validate and normalize stock selection
+      selectedStocks = this.validateStockSelection(selectedStocks, universe);
+      
+      console.log(`[StrategyEngine] AI selected ${selectedStocks.length} stocks for goal`);
+      
+      return selectedStocks;
+      
+    } catch (error) {
+      console.error('[StrategyEngine] Error in AI stock selection:', error);
+      // Fallback to default selection
+      return this.getDefaultStockSelection(portfolioContext?.holdings || []);
+    }
+  }
+
+  /**
+   * Validate and normalize AI stock selection
+   */
+  validateStockSelection(selection, universe) {
+    const universeSymbols = universe.map(s => s.symbol);
+    const validated = [];
+    
+    for (const stock of selection) {
+      // Validate symbol exists in universe
+      if (!universeSymbols.includes(stock.symbol)) {
+        console.warn(`[StrategyEngine] Stock ${stock.symbol} not in universe, skipping`);
+        continue;
+      }
+      
+      // Normalize allocation to percentage
+      const allocation = typeof stock.allocation === 'string' 
+        ? parseFloat(stock.allocation.replace('%', ''))
+        : stock.allocation;
+      
+      validated.push({
+        symbol: stock.symbol,
+        allocation: allocation,
+        rationale: stock.rationale || 'Selected by AI',
+        sector: stock.sector || 'Unknown',
+        expectedContribution: stock.expectedContribution || 'N/A',
+        riskLevel: stock.riskLevel || 'moderate'
+      });
+    }
+    
+    // Ensure we have at least 3 stocks
+    if (validated.length < 3) {
+      console.warn('[StrategyEngine] Insufficient validated stocks, adding defaults');
+      const defaults = ['RELIANCE', 'TCS', 'HDFCBANK'];
+      for (const symbol of defaults) {
+        if (!validated.find(s => s.symbol === symbol)) {
+          validated.push({
+            symbol,
+            allocation: 20,
+            rationale: 'Default selection - high liquidity blue chip',
+            sector: 'Diversified',
+            expectedContribution: 'Stable returns',
+            riskLevel: 'low'
+          });
+        }
+      }
+    }
+    
+    // Normalize allocations to sum to 100%
+    const totalAllocation = validated.reduce((sum, s) => sum + s.allocation, 0);
+    if (Math.abs(totalAllocation - 100) > 1) {
+      const factor = 100 / totalAllocation;
+      validated.forEach(s => s.allocation = (s.allocation * factor).toFixed(2));
+    }
+    
+    return validated.slice(0, 5); // Max 5 stocks
+  }
+
+  /**
+   * Get default stock selection as fallback
+   */
+  getDefaultStockSelection(currentHoldings) {
+    if (currentHoldings && currentHoldings.length >= 3) {
+      // Use top 3 holdings
+      const top3 = currentHoldings
+        .sort((a, b) => (b.current_value || b.currentValue || 0) - (a.current_value || a.currentValue || 0))
+        .slice(0, 3);
+      
+      return top3.map((h, idx) => ({
+        symbol: h.symbol || h.tradingsymbol,
+        allocation: [40, 35, 25][idx],
+        rationale: 'Current holding - familiarity and existing position',
+        sector: 'Existing',
+        expectedContribution: 'Based on historical performance',
+        riskLevel: 'moderate'
+      }));
+    }
+    
+    // Absolute fallback to blue chips
+    return [
+      { symbol: 'RELIANCE', allocation: 35, rationale: 'Large cap, high liquidity', sector: 'Energy', riskLevel: 'low' },
+      { symbol: 'TCS', allocation: 35, rationale: 'IT sector leader, stable', sector: 'IT', riskLevel: 'low' },
+      { symbol: 'HDFCBANK', allocation: 30, rationale: 'Banking sector leader', sector: 'Banking', riskLevel: 'low' }
+    ];
   }
 
   /**
@@ -52,6 +233,31 @@ class StrategyEngine {
 
       const aiProvider = new OpenAIProvider(preferences.openai_api_key);
 
+      // ✅ AI-DRIVEN STOCK SELECTION
+      // If symbols === 'AI_SELECT' or empty, let AI choose optimal stocks
+      let selectedStocks = [];
+      let stockSelectionMode = 'user_provided';
+      
+      if (!symbols || symbols.length === 0 || symbols === 'AI_SELECT' || (Array.isArray(symbols) && symbols.includes('AI_SELECT'))) {
+        console.log('[StrategyEngine] Using AI-driven stock selection');
+        selectedStocks = await this.selectStocksForGoal(goals, portfolioContext, aiProvider);
+        stockSelectionMode = 'ai_selected';
+      } else {
+        console.log('[StrategyEngine] Using user-provided stocks:', symbols);
+        selectedStocks = symbols.map(symbol => ({
+          symbol,
+          allocation: (100 / symbols.length).toFixed(2),
+          rationale: 'User-selected',
+          sector: 'Unknown',
+          expectedContribution: 'User preference',
+          riskLevel: riskTolerance
+        }));
+        stockSelectionMode = 'user_provided';
+      }
+      
+      // Update symbols list for strategy generation
+      const finalSymbols = selectedStocks.map(s => s.symbol);
+
       // Calculate daily target and risk metrics
       const dailyTargetPercent = profitTarget / timeframe;
       const riskRewardRatio = profitTarget / maxLoss;
@@ -66,7 +272,8 @@ Generate a precise, executable trading strategy to achieve the following goal:
 - Daily Target Return: ${dailyTargetPercent.toFixed(2)}%
 - Risk/Reward Ratio: ${riskRewardRatio.toFixed(2)}:1
 - Risk Tolerance: ${riskTolerance}
-${symbols && symbols.length > 0 ? `- Target Symbols: ${symbols.join(', ')}` : '- Any suitable symbols'}
+- Target Symbols: ${finalSymbols.join(', ')} (${stockSelectionMode === 'ai_selected' ? 'AI-selected' : 'User-selected'})
+${stockSelectionMode === 'ai_selected' ? `\n**Stock Allocation:**\n${selectedStocks.map(s => `- ${s.symbol}: ${s.allocation}% (${s.rationale})`).join('\n')}` : ''}
 
 **Required Strategy Components:**
 
@@ -140,9 +347,12 @@ Provide a structured JSON response with all these components clearly defined.
         success: true,
         strategy: strategyRules,
         confidence: confidenceScore,
+        selectedStocks: selectedStocks,
+        stockSelectionMode: stockSelectionMode,
         metadata: {
           generated_at: new Date().toISOString(),
           model: 'gpt-3.5-turbo',
+          stock_selection: stockSelectionMode,
           goal_alignment: {
             profit_target: profitTarget,
             timeframe_days: timeframe,
