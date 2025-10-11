@@ -26,23 +26,33 @@ router.get('/rotation-opportunities', async (req, res) => {
 
     console.log('[RotationRoutes] Analyzing rotation opportunities for user:', userId);
 
-    // Get portfolio data
-    const portfolioResult = await db.query(
-      `SELECT data FROM portfolio_snapshots 
+    // Get live holdings from database (populated by Kite API sync)
+    const holdingsResult = await db.query(
+      `SELECT * FROM holdings 
        WHERE user_id = $1 AND config_id = $2 
-       ORDER BY created_at DESC LIMIT 1`,
+       ORDER BY last_updated DESC`,
       [userId, configId]
     );
 
-    if (portfolioResult.rows.length === 0) {
+    if (holdingsResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        error: 'No portfolio data found',
+        error: 'No portfolio holdings found. Please sync your portfolio from broker.',
+        hint: 'Connect your broker and refresh portfolio data'
       });
     }
 
-    const portfolioData = portfolioResult.rows[0].data;
-    const holdings = portfolioData.holdings || [];
+    // Transform holdings to expected format
+    const holdings = holdingsResult.rows.map(h => ({
+      symbol: h.symbol || h.tradingsymbol,
+      tradingsymbol: h.tradingsymbol,
+      quantity: h.quantity || h.shares,
+      average_price: h.average_price || h.averagePrice,
+      last_price: h.last_price || h.ltp || h.current_price,
+      current_value: h.current_value,
+      pnl: h.pnl,
+      pnl_percent: h.pnl_percent,
+    }));
 
     // Analyze rotation opportunities
     const rotationalEngine = getRotationalEngine();
