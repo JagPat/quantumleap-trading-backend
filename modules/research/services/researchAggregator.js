@@ -3,8 +3,8 @@
  * Aggregates research from multiple sources and provides LLM summarization
  */
 
-const { getAIAgentRouter } = require('../../ai/services/aiAgentRouter');
-const { query } = require('../../../core/database/connection');
+const getAIAgentRouter = require('../../ai/services/aiAgentRouter');
+const db = require('../../../core/database/connection');
 
 class ResearchAggregator {
   constructor() {
@@ -260,7 +260,7 @@ Provide a concise investment outlook.
     try {
       const expiresAt = new Date(Date.now() + this.cacheTimeout);
 
-      await query(
+      await db.query(
         `INSERT INTO research_cache 
          (symbol, research_type, data, confidence, expires_at, created_at)
          VALUES ($1, $2, $3, $4, $5, NOW())`,
@@ -280,7 +280,7 @@ Provide a concise investment outlook.
    */
   async getCachedResearch(symbol, researchType) {
     try {
-      const result = await query(
+      const result = await db.query(
         `SELECT data FROM research_cache 
          WHERE symbol = $1 AND research_type = $2 
          AND expires_at > NOW()
@@ -337,7 +337,7 @@ Provide a concise investment outlook.
    */
   async clearExpiredCache() {
     try {
-      await query(`DELETE FROM research_cache WHERE expires_at < NOW()`);
+      await db.query(`DELETE FROM research_cache WHERE expires_at < NOW()`);
       console.log('[ResearchAggregator] Cleared expired cache entries');
     } catch (error) {
       console.warn('[ResearchAggregator] Cache cleanup error:', error.message);

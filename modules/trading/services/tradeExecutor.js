@@ -3,7 +3,7 @@
  * Handles trade execution with validation, broker integration, and audit logging
  */
 
-const { query } = require('../../../core/database/connection');
+const db = require('../../../core/database/connection');
 const { getCapitalService } = require('../../portfolio/services/capitalService');
 const { getDecisionAttributionTracker } = require('../../ai/services/decisionAttributionTracker');
 
@@ -107,7 +107,7 @@ class TradeExecutor {
       }
 
       // Store trade preparation
-      const result = await query(
+      const result = await db.query(
         `INSERT INTO pending_trades 
          (user_id, config_id, symbol, action, quantity, target_value, order_type, limit_price, reasoning, status, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'PENDING', NOW())
@@ -142,7 +142,7 @@ class TradeExecutor {
       await this.initialize();
 
       // Get trade details
-      const tradeResult = await query(
+      const tradeResult = await db.query(
         `SELECT * FROM pending_trades WHERE id = $1`,
         [tradeId]
       );
@@ -194,7 +194,7 @@ class TradeExecutor {
       }
 
       // Update trade status
-      await query(
+      await db.query(
         `UPDATE pending_trades 
          SET status = $1, order_id = $2, executed_at = NOW()
          WHERE id = $3`,
@@ -242,7 +242,7 @@ class TradeExecutor {
    */
   async cancelTrade(tradeId, reason) {
     try {
-      await query(
+      await db.query(
         `UPDATE pending_trades 
          SET status = 'CANCELLED', reasoning = reasoning || ' [Cancelled: ' || $2 || ']'
          WHERE id = $1 AND status = 'PENDING'`,
@@ -268,7 +268,7 @@ class TradeExecutor {
    */
   async getPendingTrades(userId, configId) {
     try {
-      const result = await query(
+      const result = await db.query(
         `SELECT * FROM pending_trades 
          WHERE user_id = $1 AND config_id = $2 
          AND status = 'PENDING'
@@ -289,7 +289,7 @@ class TradeExecutor {
    */
   async getTradeHistory(userId, configId, days = 30) {
     try {
-      const result = await query(
+      const result = await db.query(
         `SELECT * FROM pending_trades 
          WHERE user_id = $1 AND config_id = $2 
          AND created_at >= NOW() - INTERVAL '${days} days'

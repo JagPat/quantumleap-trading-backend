@@ -3,7 +3,7 @@
  * Fetches capital data from Zerodha API and calculates potential liquidity
  */
 
-const { query } = require('../../../core/database/connection');
+const db = require('../../../core/database/connection');
 
 class CapitalService {
   constructor() {
@@ -145,7 +145,7 @@ class CapitalService {
   async getPortfolioSummary(userId, configId) {
     try {
       // Query portfolio summary from database
-      const result = await query(
+      const result = await db.query(
         `SELECT data FROM portfolio_snapshots 
          WHERE user_id = $1 AND config_id = $2 
          ORDER BY created_at DESC LIMIT 1`,
@@ -168,7 +168,7 @@ class CapitalService {
    */
   async storeCapitalSnapshot(userId, configId, capitalData) {
     try {
-      await query(
+      await db.query(
         `INSERT INTO capital_snapshots 
          (user_id, config_id, available_balance, potential_liquidity, total_actionable, broker_data, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
@@ -192,7 +192,7 @@ class CapitalService {
    */
   async getCapitalHistory(userId, configId, days = 30) {
     try {
-      const result = await query(
+      const result = await db.query(
         `SELECT * FROM capital_snapshots 
          WHERE user_id = $1 AND config_id = $2 
          AND created_at >= NOW() - INTERVAL '${days} days'

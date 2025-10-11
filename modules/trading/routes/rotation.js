@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { getRotationalEngine } = require('../services/rotationalEngine');
-const { query } = require('../../../core/database/connection');
+const db = require('../../../core/database/connection');
 
 /**
  * GET /api/v2/trading/rotation-opportunities
@@ -27,7 +27,7 @@ router.get('/rotation-opportunities', async (req, res) => {
     console.log('[RotationRoutes] Analyzing rotation opportunities for user:', userId);
 
     // Get portfolio data
-    const portfolioResult = await query(
+    const portfolioResult = await db.query(
       `SELECT data FROM portfolio_snapshots 
        WHERE user_id = $1 AND config_id = $2 
        ORDER BY created_at DESC LIMIT 1`,

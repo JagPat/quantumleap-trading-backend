@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { getPortfolioReviewEngine } = require('../../ai/services/portfolioReviewEngine');
-const { query } = require('../../../core/database/connection');
+const db = require('../../../core/database/connection');
 
 /**
  * GET /api/v2/portfolio/holdings-with-actions
@@ -27,7 +27,7 @@ router.get('/holdings-with-actions', async (req, res) => {
     console.log('[HoldingsRoutes] Fetching holdings with actions for user:', userId);
 
     // Get portfolio data
-    const portfolioResult = await query(
+    const portfolioResult = await db.query(
       `SELECT data FROM portfolio_snapshots 
        WHERE user_id = $1 AND config_id = $2 
        ORDER BY created_at DESC LIMIT 1`,
@@ -97,7 +97,7 @@ router.get('/holdings/:symbol/recommendation', async (req, res) => {
     console.log('[HoldingsRoutes] Getting recommendation for symbol:', symbol);
 
     // Get portfolio data
-    const portfolioResult = await query(
+    const portfolioResult = await db.query(
       `SELECT data FROM portfolio_snapshots 
        WHERE user_id = $1 AND config_id = $2 
        ORDER BY created_at DESC LIMIT 1`,

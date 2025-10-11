@@ -4,7 +4,7 @@
  * Maintains portfolio composition while optimizing realized returns
  */
 
-const { query } = require('../../../core/database/connection');
+const db = require('../../../core/database/connection');
 
 class RotationalEngine {
   constructor() {
@@ -89,7 +89,7 @@ class RotationalEngine {
       console.log('[RotationalEngine] Executing rotation for', rotation.symbol);
 
       // Store rotation cycle in database
-      const result = await query(
+      const result = await db.query(
         `INSERT INTO rotation_cycles 
          (user_id, config_id, symbol, entry_price, sell_price, rebuy_target, status, reasoning, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
@@ -145,7 +145,7 @@ class RotationalEngine {
       }
 
       const sql = `UPDATE rotation_cycles SET ${updates.join(', ')} WHERE id = $1 RETURNING *`;
-      const result = await query(sql, params);
+      const result = await db.query(sql, params);
 
       return result.rows[0];
 
@@ -160,7 +160,7 @@ class RotationalEngine {
    */
   async getActiveRotations(userId, configId) {
     try {
-      const result = await query(
+      const result = await db.query(
         `SELECT * FROM rotation_cycles 
          WHERE user_id = $1 AND config_id = $2 
          AND status IN ('ACTIVE', 'SOLD')
@@ -181,7 +181,7 @@ class RotationalEngine {
    */
   async getRotationHistory(userId, configId, days = 30) {
     try {
-      const result = await query(
+      const result = await db.query(
         `SELECT * FROM rotation_cycles 
          WHERE user_id = $1 AND config_id = $2 
          AND created_at >= NOW() - INTERVAL '${days} days'
@@ -202,7 +202,7 @@ class RotationalEngine {
    */
   async cancelRotation(cycleId, reason) {
     try {
-      await query(
+      await db.query(
         `UPDATE rotation_cycles 
          SET status = 'CANCELLED', reasoning = reasoning || ' [Cancelled: ' || $2 || ']'
          WHERE id = $1`,
@@ -291,7 +291,7 @@ class RotationalEngine {
   async toggleRotation(userId, symbol, enabled) {
     try {
       // Store rotation preference in user preferences
-      const result = await query(
+      const result = await db.query(
         `INSERT INTO rotation_preferences (user_id, symbol, enabled, updated_at)
          VALUES ($1, $2, $3, NOW())
          ON CONFLICT (user_id, symbol) 
@@ -314,7 +314,7 @@ class RotationalEngine {
    */
   async getRotationPreferences(userId) {
     try {
-      const result = await query(
+      const result = await db.query(
         `SELECT * FROM rotation_preferences WHERE user_id = $1`,
         [userId]
       );
