@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+watchPatterns = ["src/**/*.ts", "src/**/*.js", "package.json", "tsconfig.json", "prisma/schema.prisma", "modules/**/*.js"]
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "always"
