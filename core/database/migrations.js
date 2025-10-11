@@ -429,22 +429,36 @@ class DatabaseMigrations {
       ADD COLUMN IF NOT EXISTS consent_disclaimers JSONB
     `);
 
-    // Add constraint for trading mode
+    // Add constraint for trading mode (with IF NOT EXISTS check)
     await client.query(`
-      ALTER TABLE ai_preferences
-      ADD CONSTRAINT IF NOT EXISTS check_trading_mode 
-      CHECK (trading_mode IN ('manual', 'auto'))
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'check_trading_mode'
+        ) THEN
+          ALTER TABLE ai_preferences
+          ADD CONSTRAINT check_trading_mode 
+          CHECK (trading_mode IN ('manual', 'auto'));
+        END IF;
+      END $$;
     `);
 
-    // Add constraint for provider values
+    // Add constraint for provider values (with IF NOT EXISTS check)
     await client.query(`
-      ALTER TABLE ai_preferences
-      ADD CONSTRAINT IF NOT EXISTS check_providers
-      CHECK (
-        strategy_provider IN ('openai', 'claude', 'mistral', 'auto') AND
-        goal_provider IN ('openai', 'claude', 'mistral', 'auto') AND
-        portfolio_provider IN ('openai', 'claude', 'mistral', 'auto')
-      )
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'check_providers'
+        ) THEN
+          ALTER TABLE ai_preferences
+          ADD CONSTRAINT check_providers
+          CHECK (
+            strategy_provider IN ('openai', 'claude', 'mistral', 'auto') AND
+            goal_provider IN ('openai', 'claude', 'mistral', 'auto') AND
+            portfolio_provider IN ('openai', 'claude', 'mistral', 'auto')
+          );
+        END IF;
+      END $$;
     `);
 
     // Create AI usage metrics table
