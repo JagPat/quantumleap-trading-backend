@@ -50,6 +50,12 @@ class DatabaseMigrations {
         name: 'add_rotational_trading',
         up: this.addRotationalTrading.bind(this),
         down: this.rollbackRotationalTrading.bind(this)
+      },
+      {
+        version: '009',
+        name: 'add_research_cache',
+        up: this.addResearchCache.bind(this),
+        down: this.rollbackResearchCache.bind(this)
       }
     ];
   }
@@ -789,6 +795,49 @@ class DatabaseMigrations {
     await client.query(`DROP TABLE IF EXISTS rotation_cycles CASCADE`);
 
     console.log('✅ Rotational trading tables dropped');
+  }
+
+  /**
+   * Migration 009: Research Cache
+   */
+  async addResearchCache(client) {
+    console.log('Adding research cache tables...');
+
+    // Create research_cache table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS research_cache (
+        id SERIAL PRIMARY KEY,
+        symbol VARCHAR(50) NOT NULL,
+        research_type VARCHAR(50) NOT NULL,
+        data JSONB NOT NULL,
+        confidence DECIMAL(3,2),
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_research_symbol_type 
+      ON research_cache(symbol, research_type)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_research_expires 
+      ON research_cache(expires_at)
+    `);
+
+    console.log('✅ Research cache tables created successfully');
+  }
+
+  /**
+   * Rollback Migration 009
+   */
+  async rollbackResearchCache(client) {
+    console.log('Dropping research cache tables...');
+
+    await client.query(`DROP TABLE IF EXISTS research_cache CASCADE`);
+
+    console.log('✅ Research cache tables dropped');
   }
 
   // Rollback to specific version

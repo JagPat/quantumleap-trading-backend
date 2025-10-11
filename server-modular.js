@@ -123,6 +123,16 @@ try {
   console.warn('⚠️ [TradingV2] Could not load V2 trading routes:', tradingError.message);
 }
 
+// Register V2 Research routes
+try {
+  const { getResearchModule } = require('./modules/research');
+  const researchModule = getResearchModule();
+  app.use('/api/v2/research', researchModule.getRouter());
+  console.log('🔬 [ResearchV2] V2 research routes registered at /api/v2/research/*');
+} catch (researchError) {
+  console.warn('⚠️ [ResearchV2] Could not load V2 research routes:', researchError.message);
+}
+
 // Initialize core services
 async function initializeCoreServices() {
   try {
