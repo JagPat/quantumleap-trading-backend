@@ -554,7 +554,49 @@ router.get('/status', async (req, res) => {
   }
 });
 
-// Missing AI routes - return "not implemented" responses
+// Strategy management endpoints
+// GET /api/ai/strategy - Get saved strategies for user
+router.get('/strategy', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const configId = req.headers['x-config-id'];
+
+    console.log('[AI][Strategy] GET request from user:', userId);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: 'user_id is required in headers (X-User-ID)',
+        endpoint: 'strategy'
+      });
+    }
+
+    // For now, return empty array - full implementation in strategy automation routes
+    // This prevents 404 errors in the frontend
+    res.status(200).json({
+      success: true,
+      status: 'success',
+      data: {
+        strategies: [],
+        message: 'Use /api/modules/ai/strategy-automation for full strategy management'
+      },
+      endpoint: 'strategy'
+    });
+
+  } catch (error) {
+    console.error('[AI][Strategy] Error:', error);
+    res.status(500).json({
+      success: false,
+      status: 'error',
+      message: 'Failed to fetch strategies',
+      endpoint: 'strategy',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// POST /api/ai/strategy - Generate a new strategy
 router.post('/strategy', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];

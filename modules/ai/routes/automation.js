@@ -41,10 +41,15 @@ router.post('/goals/suggest', async (req, res) => {
 
     const result = await goalSuggestionEngine.suggestGoals(userId, configId, portfolio_data);
 
+    // Return response in expected format
     res.json({
       status: 'success',
       message: 'Goal suggestions generated successfully',
-      data: result
+      data: {
+        suggestions: result.suggestions,
+        portfolio_analysis: result.portfolio_analysis,
+        based_on: result.based_on
+      }
     });
 
   } catch (error) {
