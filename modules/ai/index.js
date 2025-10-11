@@ -51,6 +51,34 @@ module.exports = {
       this.aiRouter.setPortfolioEngine(this.portfolioEngine);
       this.logger.info('AI agent router initialized with portfolio engine');
       
+      // ✅ NEW: Initialize daily learning job scheduler
+      const cron = require('node-cron');
+      const DailyLearningJob = require('./jobs/dailyLearningJob');
+      
+      this.learningJob = new DailyLearningJob();
+      
+      // Schedule job: Every day at 6:00 AM IST (Asia/Kolkata timezone)
+      this.dailyJobSchedule = cron.schedule('0 6 * * *', async () => {
+        this.logger.info('[AI Module] Daily learning job triggered by scheduler');
+        try {
+          const report = await this.learningJob.run();
+          await this.learningJob.recordExecution(report);
+          this.logger.info('[AI Module] Daily learning job completed successfully');
+        } catch (error) {
+          this.logger.error('[AI Module] Daily learning job failed:', error);
+        }
+      }, {
+        timezone: "Asia/Kolkata",
+        scheduled: true
+      });
+      
+      this.logger.info('Daily learning job scheduled (6:00 AM IST)');
+      
+      // ✅ NEW: Initialize online learning service
+      const OnlineLearningService = require('./services/onlineLearningService');
+      this.onlineLearningService = new OnlineLearningService();
+      this.logger.info('Online learning service initialized');
+      
       this.status = 'initialized';
       this.initializedAt = new Date();
       
