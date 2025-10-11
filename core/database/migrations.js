@@ -56,6 +56,12 @@ class DatabaseMigrations {
         name: 'add_research_cache',
         up: this.addResearchCache.bind(this),
         down: this.rollbackResearchCache.bind(this)
+      },
+      {
+        version: '010',
+        name: 'add_portfolio_snapshots',
+        up: this.addPortfolioSnapshots.bind(this),
+        down: this.rollbackPortfolioSnapshots.bind(this)
       }
     ];
   }
@@ -871,6 +877,85 @@ class DatabaseMigrations {
       console.error('❌ Rollback failed:', error);
       throw error;
     }
+  }
+
+  // ==================== Migration 010: Portfolio Snapshots ====================
+  async addPortfolioSnapshots(client) {
+    console.log('📊 Creating portfolio snapshots table for historical tracking...');
+
+    await client.query(`
+      -- Portfolio Snapshots: Historical portfolio state for AI learning
+      CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        config_id VARCHAR(255),
+        snapshot_date TIMESTAMP DEFAULT NOW(),
+        
+        -- Complete portfolio state
+        holdings JSONB NOT NULL,  -- All holdings at this point in time
+        total_value NUMERIC(15, 2) NOT NULL,
+        invested_value NUMERIC(15, 2),
+        total_pnl NUMERIC(15, 2),
+        total_pnl_percent NUMERIC(10, 4),
+        
+        -- Metadata
+        holdings_count INTEGER,
+        unique_symbols INTEGER,
+        snapshot_type VARCHAR(50) DEFAULT 'auto',  -- auto, manual, daily, weekly, monthly
+        trigger_event VARCHAR(100),  -- sync, rebalance, rotation, trade_execution
+        
+        -- AI context (what AI was doing at this time)
+        ai_action_id INTEGER,  -- Link to AI decision that triggered this
+        ai_suggestion_applied BOOLEAN DEFAULT false,
+        
+        -- Performance metrics
+        sharpe_ratio NUMERIC(10, 4),
+        max_drawdown NUMERIC(10, 4),
+        win_rate NUMERIC(10, 4),
+        
+        -- Diversification metrics
+        sector_allocation JSONB,  -- {technology: 40%, pharma: 30%}
+        concentration_risk NUMERIC(10, 4),  -- % in top 5 holdings
+        
+        created_at TIMESTAMP DEFAULT NOW(),
+        
+        CONSTRAINT fk_portfolio_snapshot_user FOREIGN KEY (user_id) 
+          REFERENCES users(user_id) ON DELETE CASCADE
+      );
+
+      -- Indexes for fast queries
+      CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_user_date 
+        ON portfolio_snapshots(user_id, snapshot_date DESC);
+      
+      CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_config 
+        ON portfolio_snapshots(config_id, snapshot_date DESC);
+      
+      CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_type 
+        ON portfolio_snapshots(snapshot_type, snapshot_date DESC);
+
+      -- GIN index for querying holdings JSON
+      CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_holdings 
+        ON portfolio_snapshots USING GIN (holdings);
+
+      COMMENT ON TABLE portfolio_snapshots IS 
+        'Historical portfolio snapshots for AI learning, performance tracking, and trend analysis';
+    `);
+
+    console.log('✅ Portfolio snapshots table created successfully');
+  }
+
+  async rollbackPortfolioSnapshots(client) {
+    console.log('🔄 Rolling back portfolio snapshots table...');
+
+    await client.query(`
+      DROP INDEX IF EXISTS idx_portfolio_snapshots_holdings;
+      DROP INDEX IF EXISTS idx_portfolio_snapshots_type;
+      DROP INDEX IF EXISTS idx_portfolio_snapshots_config;
+      DROP INDEX IF EXISTS idx_portfolio_snapshots_user_date;
+      DROP TABLE IF EXISTS portfolio_snapshots CASCADE;
+    `);
+
+    console.log('✅ Portfolio snapshots rollback completed');
   }
 }
 

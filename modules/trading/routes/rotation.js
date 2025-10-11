@@ -26,33 +26,60 @@ router.get('/rotation-opportunities', async (req, res) => {
 
     console.log('[RotationRoutes] Analyzing rotation opportunities for user:', userId);
 
-    // Get live holdings from database (populated by Kite API sync)
-    const holdingsResult = await db.query(
-      `SELECT * FROM holdings 
-       WHERE user_id = $1 AND config_id = $2 
-       ORDER BY last_updated DESC`,
-      [userId, configId]
-    );
+    let holdings = [];
+    let dataSource = 'unknown';
 
-    if (holdingsResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'No portfolio holdings found. Please sync your portfolio from broker.',
-        hint: 'Connect your broker and refresh portfolio data'
-      });
+    // Strategy 1: Try to get from latest snapshot (historical data - better for AI learning)
+    try {
+      const snapshotResult = await db.query(
+        `SELECT holdings, snapshot_date FROM portfolio_snapshots 
+         WHERE user_id = $1 AND config_id = $2 
+         ORDER BY snapshot_date DESC LIMIT 1`,
+        [userId, configId]
+      );
+
+      if (snapshotResult.rows.length > 0) {
+        const snapshotHoldings = snapshotResult.rows[0].holdings;
+        holdings = Object.values(snapshotHoldings);
+        dataSource = 'snapshot';
+        console.log('[RotationRoutes] Using snapshot data from:', snapshotResult.rows[0].snapshot_date);
+      }
+    } catch (error) {
+      console.log('[RotationRoutes] Snapshot not available, using real-time data:', error.message);
     }
 
-    // Transform holdings to expected format
-    const holdings = holdingsResult.rows.map(h => ({
-      symbol: h.symbol || h.tradingsymbol,
-      tradingsymbol: h.tradingsymbol,
-      quantity: h.quantity || h.shares,
-      average_price: h.average_price || h.averagePrice,
-      last_price: h.last_price || h.ltp || h.current_price,
-      current_value: h.current_value,
-      pnl: h.pnl,
-      pnl_percent: h.pnl_percent,
-    }));
+    // Strategy 2: Fallback to real-time holdings (always works)
+    if (holdings.length === 0) {
+      const holdingsResult = await db.query(
+        `SELECT * FROM holdings 
+         WHERE user_id = $1 AND config_id = $2 
+         ORDER BY last_updated DESC`,
+        [userId, configId]
+      );
+
+      if (holdingsResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'No portfolio holdings found. Please sync your portfolio from broker.',
+          hint: 'Connect your broker and refresh portfolio data'
+        });
+      }
+
+      // Transform holdings to expected format
+      holdings = holdingsResult.rows.map(h => ({
+        symbol: h.symbol || h.tradingsymbol,
+        tradingsymbol: h.tradingsymbol,
+        quantity: h.quantity || h.shares,
+        average_price: h.average_price || h.averagePrice,
+        last_price: h.last_price || h.ltp || h.current_price,
+        current_value: h.current_value,
+        pnl: h.pnl,
+        pnl_percent: h.pnl_percent,
+      }));
+
+      dataSource = 'real-time';
+      console.log('[RotationRoutes] Using real-time holdings data');
+    }
 
     // Analyze rotation opportunities
     const rotationalEngine = getRotationalEngine();
@@ -63,11 +90,15 @@ router.get('/rotation-opportunities', async (req, res) => {
       data: {
         opportunities,
         count: opportunities.length,
+        dataSource,  // 'snapshot' or 'real-time'
         summary: {
           high_priority: opportunities.filter(o => o.priority === 'HIGH').length,
           medium_priority: opportunities.filter(o => o.priority === 'MEDIUM').length,
           low_priority: opportunities.filter(o => o.priority === 'LOW').length,
         },
+        note: dataSource === 'snapshot' 
+          ? 'Using historical data for better AI learning' 
+          : 'Using real-time data (historical snapshots will enable better analysis)'
       },
     });
 
