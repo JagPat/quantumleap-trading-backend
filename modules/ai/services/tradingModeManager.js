@@ -47,6 +47,8 @@ class TradingModeManager {
         throw new Error(`Invalid trading mode: ${mode}. Must be 'manual' or 'auto'`);
       }
 
+      console.log(`[TradingModeManager] Setting mode for user ${userId} to: ${mode}`);
+
       // If switching to auto, verify consent exists
       if (mode === 'auto') {
         const hasConsent = await this.hasAutoTradingConsent(userId);
@@ -55,13 +57,26 @@ class TradingModeManager {
         }
       }
 
-      await this.db.query(
-        `UPDATE ai_preferences 
-         SET trading_mode = $1, 
-             updated_at = NOW()
-         WHERE user_id = $2`,
-        [mode, userId]
+      // Use UPSERT to handle cases where ai_preferences row doesn't exist
+      const result = await this.db.query(
+        `INSERT INTO ai_preferences (
+           user_id, 
+           trading_mode, 
+           created_at, 
+           updated_at
+         )
+         VALUES ($1, $2, NOW(), NOW())
+         ON CONFLICT (user_id)
+         DO UPDATE SET
+           trading_mode = $2,
+           updated_at = NOW()
+         RETURNING trading_mode`,
+        [userId, mode]
       );
+
+      if (!result.rows || result.rows.length === 0) {
+        throw new Error('Failed to update trading mode - no rows affected');
+      }
 
       // Emit mode change event
       this.eventBus.emit('trading:mode-changed', {
@@ -82,6 +97,12 @@ class TradingModeManager {
 
     } catch (error) {
       console.error('[TradingModeManager] Error setting mode:', error);
+      console.error('[TradingModeManager] Error details:', {
+        userId,
+        mode,
+        errorMessage: error.message,
+        errorStack: error.stack
+      });
       throw error;
     }
   }
@@ -133,20 +154,38 @@ class TradingModeManager {
    */
   async grantAutoTradingConsent(userId, consentData = {}) {
     try {
-      await this.db.query(
-        `UPDATE ai_preferences 
-         SET auto_trading_consent = true,
-             consent_timestamp = NOW(),
-             consent_ip = $2,
-             consent_disclaimers = $3,
-             updated_at = NOW()
-         WHERE user_id = $1`,
+      console.log(`[TradingModeManager] Granting auto-trading consent for user: ${userId}`);
+
+      // Use UPSERT to handle cases where ai_preferences row doesn't exist
+      const result = await this.db.query(
+        `INSERT INTO ai_preferences (
+           user_id,
+           auto_trading_consent,
+           consent_timestamp,
+           consent_ip,
+           consent_disclaimers,
+           created_at,
+           updated_at
+         )
+         VALUES ($1, true, NOW(), $2, $3, NOW(), NOW())
+         ON CONFLICT (user_id)
+         DO UPDATE SET
+           auto_trading_consent = true,
+           consent_timestamp = NOW(),
+           consent_ip = $2,
+           consent_disclaimers = $3,
+           updated_at = NOW()
+         RETURNING consent_timestamp`,
         [
           userId,
           consentData.ip || 'unknown',
           JSON.stringify(consentData.disclaimers || [])
         ]
       );
+
+      if (!result.rows || result.rows.length === 0) {
+        throw new Error('Failed to record consent - no rows affected');
+      }
 
       // Emit consent event
       this.eventBus.emit('trading:consent-granted', {
@@ -165,6 +204,12 @@ class TradingModeManager {
 
     } catch (error) {
       console.error('[TradingModeManager] Error granting consent:', error);
+      console.error('[TradingModeManager] Error details:', {
+        userId,
+        consentData,
+        errorMessage: error.message,
+        errorStack: error.stack
+      });
       throw error;
     }
   }
@@ -174,15 +219,32 @@ class TradingModeManager {
    */
   async revokeAutoTradingConsent(userId) {
     try {
-      await this.db.query(
-        `UPDATE ai_preferences 
-         SET auto_trading_consent = false,
-             trading_mode = 'manual',
-             consent_timestamp = NULL,
-             updated_at = NOW()
-         WHERE user_id = $1`,
+      console.log(`[TradingModeManager] Revoking auto-trading consent for user: ${userId}`);
+
+      // Use UPSERT to handle cases where ai_preferences row doesn't exist
+      const result = await this.db.query(
+        `INSERT INTO ai_preferences (
+           user_id,
+           auto_trading_consent,
+           trading_mode,
+           consent_timestamp,
+           created_at,
+           updated_at
+         )
+         VALUES ($1, false, 'manual', NULL, NOW(), NOW())
+         ON CONFLICT (user_id)
+         DO UPDATE SET
+           auto_trading_consent = false,
+           trading_mode = 'manual',
+           consent_timestamp = NULL,
+           updated_at = NOW()
+         RETURNING trading_mode`,
         [userId]
       );
+
+      if (!result.rows || result.rows.length === 0) {
+        throw new Error('Failed to revoke consent - no rows affected');
+      }
 
       this.eventBus.emit('trading:consent-revoked', {
         userId,
@@ -198,6 +260,11 @@ class TradingModeManager {
 
     } catch (error) {
       console.error('[TradingModeManager] Error revoking consent:', error);
+      console.error('[TradingModeManager] Error details:', {
+        userId,
+        errorMessage: error.message,
+        errorStack: error.stack
+      });
       throw error;
     }
   }
