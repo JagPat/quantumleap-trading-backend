@@ -73,19 +73,28 @@ router.post('/strategy-automation', async (req, res) => {
     const userId = req.headers['x-user-id'] || req.session?.user_id;
     const configId = req.headers['x-config-id'] || req.session?.config_id;
 
+    // ✅ ENHANCED LOGGING: Log full request context
+    console.log('[AutomationRoutes] ========== STRATEGY AUTOMATION REQUEST ==========');
+    console.log('[AutomationRoutes] Request payload:', {
+      profitTarget,
+      timeframe,
+      maxLoss,
+      riskTolerance,
+      symbols,
+      name,
+      userId: userId || 'MISSING',
+      configId: configId || 'MISSING'
+    });
+
     if (!userId) {
+      console.warn('[AutomationRoutes] ❌ Request rejected: No user authentication');
       return res.status(401).json({
         status: 'error',
         message: 'User authentication required'
       });
     }
 
-    console.log('[AutomationRoutes] Creating strategy automation:', {
-      userId,
-      profitTarget,
-      timeframe,
-      maxLoss
-    });
+    console.log('[AutomationRoutes] ✅ User authenticated, proceeding with automation creation');
 
     // Store the goals
     const goalsResult = await strategyGoalsService.storeGoals(userId, configId, {
@@ -112,6 +121,17 @@ router.post('/strategy-automation', async (req, res) => {
     const preferences = prefsResult.preferences || {};
 
     // Generate AI strategy based on goals
+    console.log('[AutomationRoutes] Calling strategyEngine.generateGoalBasedStrategy...');
+    console.log('[AutomationRoutes] Goal parameters:', {
+      profitTarget: automation.profitTargetPercent,
+      timeframe: automation.timeframeDays,
+      maxLoss: automation.maxLossPercent,
+      riskTolerance: automation.riskTolerance,
+      symbols: automation.symbols,
+      symbolsType: typeof automation.symbols,
+      symbolsIsArray: Array.isArray(automation.symbols)
+    });
+    
     try {
       const strategyResult = await strategyEngine.generateGoalBasedStrategy(
         {
@@ -125,6 +145,14 @@ router.post('/strategy-automation', async (req, res) => {
         null // portfolioContext - can be added later
       );
 
+      console.log('[AutomationRoutes] ✅ Strategy generation completed:', {
+        success: strategyResult.success,
+        hasStrategy: !!strategyResult.strategy,
+        confidence: strategyResult.confidence,
+        selectedStocksCount: strategyResult.selectedStocks?.length || 0,
+        stockSelectionMode: strategyResult.stockSelectionMode
+      });
+
       // Attach strategy to automation
       if (strategyResult.success && strategyResult.strategy) {
         await strategyGoalsService.updateWithStrategy(
@@ -133,6 +161,8 @@ router.post('/strategy-automation', async (req, res) => {
           strategyResult.confidence || 0.75
         );
 
+        console.log('[AutomationRoutes] ✅ Strategy automation created successfully (ID: ' + automation.id + ')');
+        
         return res.status(201).json({
           status: 'success',
           message: 'Strategy automation created successfully',
@@ -140,21 +170,37 @@ router.post('/strategy-automation', async (req, res) => {
             automation: {
               ...automation,
               strategyRules: strategyResult.strategy,
-              aiConfidenceScore: strategyResult.confidence || 0.75
+              aiConfidenceScore: strategyResult.confidence || 0.75,
+              selectedStocks: strategyResult.selectedStocks,
+              stockSelectionMode: strategyResult.stockSelectionMode
             },
             requiresApproval: true
           }
         });
       }
     } catch (aiError) {
-      console.error('[AutomationRoutes] AI strategy generation failed:', aiError);
+      console.error('[AutomationRoutes] ❌ AI strategy generation failed');
+      console.error('[AutomationRoutes] Error name:', aiError.name);
+      console.error('[AutomationRoutes] Error message:', aiError.message);
+      console.error('[AutomationRoutes] Error stack:', aiError.stack);
+      console.error('[AutomationRoutes] Error context:', {
+        userId,
+        configId,
+        automationId: automation?.id,
+        symbols: automation?.symbols
+      });
+      
       // Still return the automation, but without strategy rules
       return res.status(201).json({
         status: 'partial_success',
         message: 'Goals saved, but AI strategy generation failed. Please try again.',
         data: {
           automation,
-          error: aiError.message
+          error: aiError.message,
+          errorDetails: {
+            name: aiError.name,
+            fallbackUsed: 'Phase 7 services may be unavailable'
+          }
         }
       });
     }
@@ -169,10 +215,25 @@ router.post('/strategy-automation', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[AutomationRoutes] Error creating automation:', error);
+    console.error('[AutomationRoutes] ========== FATAL ERROR IN STRATEGY AUTOMATION ==========');
+    console.error('[AutomationRoutes] Error name:', error.name);
+    console.error('[AutomationRoutes] Error message:', error.message);
+    console.error('[AutomationRoutes] Error stack:', error.stack);
+    console.error('[AutomationRoutes] Request body:', req.body);
+    console.error('[AutomationRoutes] User context:', {
+      userId: req.headers['x-user-id'],
+      configId: req.headers['x-config-id']
+    });
+    console.error('[AutomationRoutes] ========================================================');
+    
     res.status(500).json({
       status: 'error',
-      message: error.message || 'Failed to create strategy automation'
+      message: error.message || 'Failed to create strategy automation',
+      errorType: error.name,
+      details: process.env.NODE_ENV === 'development' ? {
+        stack: error.stack,
+        fullError: error.toString()
+      } : undefined
     });
   }
 });
