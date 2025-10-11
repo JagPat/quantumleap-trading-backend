@@ -34,6 +34,7 @@ class StrategyEngine {
 
   /**
    * AI-driven stock selection based on goal
+   * ENHANCED with research data + market regime context
    * @param {Object} goal - User's trading goal
    * @param {Object} portfolioContext - Current portfolio data
    * @param {Object} aiProvider - AI provider instance
@@ -41,46 +42,105 @@ class StrategyEngine {
    */
   async selectStocksForGoal(goal, portfolioContext, aiProvider) {
     try {
-      console.log('[StrategyEngine] AI selecting stocks for goal:', goal);
+      console.log('[StrategyEngine] AI selecting stocks for goal (research-enhanced):', goal);
+      
+      // ✅ NEW: Initialize research and regime services
+      const ResearchIngestionService = require('./researchIngestionService');
+      const MarketRegimeAnalyzer = require('./marketRegimeAnalyzer');
+      const FeedbackIntegrationService = require('./feedbackIntegrationService');
+      
+      const researchService = new ResearchIngestionService();
+      const regimeAnalyzer = new MarketRegimeAnalyzer();
+      const feedbackService = new FeedbackIntegrationService();
       
       // Get combined universe (top liquid + user holdings)
       const universe = await this.marketUniverse.getCombinedUniverse(portfolioContext, 100);
       const currentHoldings = portfolioContext?.holdings || [];
       
-      // Build prompt for AI stock selection
-      const prompt = `You are an expert portfolio manager. Select 3-5 optimal stocks to achieve the following goal:
+      // ✅ NEW: Fetch market regime
+      const currentRegime = await regimeAnalyzer.getActiveRegime();
+      console.log(`[StrategyEngine] Current market regime: ${currentRegime.regime} (${(currentRegime.confidence * 100).toFixed(0)}% confidence)`);
+      
+      // ✅ NEW: Fetch research data for top 30 stocks
+      const topSymbols = universe.slice(0, 30);
+      const researchData = [];
+      
+      for (const stock of topSymbols) {
+        try {
+          const research = await researchService.getRelevantResearch(stock.symbol, 7);
+          researchData.push({
+            symbol: stock.symbol,
+            sector: stock.sector,
+            research
+          });
+        } catch (error) {
+          console.warn(`[StrategyEngine] Could not fetch research for ${stock.symbol}`);
+        }
+      }
+      
+      // ✅ NEW: Get historical learnings
+      const learnings = await feedbackService.getContextualLearnings(null, 'stock_selection');
+      
+      // ✅ ENHANCED: Build prompt with research + regime + learnings
+      const prompt = `You are an expert portfolio manager with access to comprehensive research data. Select 3-5 optimal stocks to achieve the following goal:
 
 **Goal:**
 - Profit Target: ${goal.profitTarget || goal.profit_target}% in ${goal.timeframe} days
 - Risk Tolerance: ${goal.riskTolerance || goal.risk_tolerance}
 - Maximum Loss: ${goal.maxLoss || goal.max_loss}%
 
-**Available Stock Universe (Top 100 Liquid NSE Stocks):**
-${universe.slice(0, 30).map(s => `${s.symbol} (${s.sector})`).join(', ')}... and 70 more
+**✅ Market Context:**
+- Current Regime: ${currentRegime.regime} (Confidence: ${(currentRegime.confidence * 100).toFixed(0)}%)
+- Regime Reasoning: ${currentRegime.reasoning}
+- Recommended Strategy: ${currentRegime.recommendedStrategy || 'Moderate'}
+- Sector Preferences: ${currentRegime.sectorPreferences?.join(', ') || 'Balanced diversification'}
 
 **User's Current Holdings:**
 ${currentHoldings.length > 0 
   ? currentHoldings.map(h => `${h.symbol || h.tradingsymbol}: ${((h.current_value || h.currentValue || 0) / (portfolioContext.summary?.total_value || 1) * 100).toFixed(1)}%`).join(', ')
   : 'No current holdings'}
 
-**Selection Criteria:**
-1. Liquidity (must have high daily volume)
-2. Volatility match (align with risk tolerance)
-3. Sector diversification (max 2 stocks per sector)
-4. Correlation (avoid highly correlated stocks)
-5. Growth potential to meet profit target
+**✅ Available Stocks with Research Data:**
+${researchData.slice(0, 20).map(s => {
+  const news = s.research.news?.[0];
+  const sentiment = s.research.sentiment;
+  const fundamentals = s.research.fundamentals;
+  return `
+${s.symbol} (${s.sector}):
+  - Recent News: ${news?.headline || 'No recent news'} [${news?.sentiment || 'neutral'}]
+  - Sentiment: ${sentiment?.sentiment || 'neutral'} (Score: ${sentiment?.score?.toFixed(2) || 'N/A'}, Volume: ${sentiment?.volume || 0} mentions)
+  - Fundamentals: PE=${fundamentals?.pe || 'N/A'}, ROE=${fundamentals?.roe || 'N/A'}%, Trend=${fundamentals?.trend || 'stable'}
+  - Price: ₹${fundamentals?.currentPrice || 'N/A'} (Target: ₹${fundamentals?.targetPrice || 'N/A'})`;
+}).join('\n')}
+... and ${researchData.length - 20} more stocks with research
+
+**✅ Historical Learnings (AI Performance Insights):**
+${feedbackService.formatLearningsForPrompt(learnings)}
+
+**Selection Criteria (Research-Driven):**
+1. **News Momentum**: Favor stocks with positive recent news and analyst upgrades
+2. **Sentiment Alignment**: Match sentiment with goal (bullish sentiment for growth goals)
+3. **Regime Fit**: In ${currentRegime.regime} regime, ${currentRegime.regime === 'BULL' ? 'prioritize growth/momentum stocks' : currentRegime.regime === 'BEAR' ? 'prioritize defensive/quality stocks' : 'focus on balanced allocation'}
+4. **Fundamental Quality**: Avoid stocks with deteriorating fundamentals or negative trends
+5. **Diversification**: Max 2 stocks per sector, avoid highly correlated positions
+6. **Liquidity**: Only high-volume stocks from top 100 liquid universe
+7. **Historical Performance**: Consider learnings from past trades (if available)
 
 Return a JSON array with 3-5 stocks in this exact format:
 [
   {
     "symbol": "RELIANCE",
-    "allocation": 25,
-    "rationale": "High liquidity, strong fundamentals, low correlation with IT sector",
+    "allocation": 30,
+    "rationale": "Strong Q2 earnings beat (fundamentals), positive analyst upgrades (news), bullish sentiment 85% (2,400 mentions), fits BULL regime",
     "sector": "Energy",
     "expectedContribution": "8-10% return potential",
-    "riskLevel": "moderate"
+    "riskLevel": "moderate",
+    "data_sources": ["fundamentals", "news", "sentiment", "regime"],
+    "research_summary": "Recent Q2 results exceeded estimates by 12%. Target price raised to ₹3,200 from ₹2,900."
   }
 ]
+
+**IMPORTANT**: Include data_sources array showing which research influenced your decision. This enables learning from outcomes.
 
 Ensure allocations sum to 100% and prioritize goal achievement over holding specific stocks.`;
 
@@ -114,6 +174,15 @@ Ensure allocations sum to 100% and prioritize goal achievement over holding spec
       selectedStocks = this.validateStockSelection(selectedStocks, universe);
       
       console.log(`[StrategyEngine] AI selected ${selectedStocks.length} stocks for goal`);
+      
+      // ✅ NEW: Store decision with attribution for learning
+      // This will be called externally after strategy automation is created
+      // Store context for later attribution
+      selectedStocks._researchContext = {
+        regime: currentRegime,
+        researchData: researchData,
+        learnings: learnings
+      };
       
       return selectedStocks;
       
