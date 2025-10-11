@@ -62,6 +62,12 @@ class DatabaseMigrations {
         name: 'add_portfolio_snapshots',
         up: this.addPortfolioSnapshots.bind(this),
         down: this.rollbackPortfolioSnapshots.bind(this)
+      },
+      {
+        version: '011',
+        name: 'add_self_learning_tables',
+        up: this.addSelfLearningTables.bind(this),
+        down: this.rollbackSelfLearningTables.bind(this)
       }
     ];
   }
@@ -956,6 +962,184 @@ class DatabaseMigrations {
     `);
 
     console.log('✅ Portfolio snapshots rollback completed');
+  }
+
+  // ==================== Migration 011: Self-Learning AI Tables ====================
+  async addSelfLearningTables(client) {
+    console.log('🧠 Creating self-learning AI tables...');
+
+    // 1. Strategy Executions Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS strategy_executions (
+        id SERIAL PRIMARY KEY,
+        strategy_id INT,
+        user_id VARCHAR(255) NOT NULL,
+        config_id VARCHAR(255),
+        execution_type VARCHAR(20) DEFAULT 'auto',
+        executed_at TIMESTAMP DEFAULT NOW(),
+        capital_allocated NUMERIC(15, 2),
+        assets_involved JSONB,
+        ai_confidence_score FLOAT,
+        market_regime VARCHAR(50),
+        regime_confidence FLOAT,
+        decision_id INT,
+        outcome_summary JSONB,
+        attribution_metadata JSONB,
+        status VARCHAR(20) DEFAULT 'pending',
+        closed_at TIMESTAMP,
+        CONSTRAINT chk_execution_type CHECK (execution_type IN ('auto', 'manual', 'paper', 'backtest')),
+        CONSTRAINT chk_execution_status CHECK (status IN ('pending', 'active', 'closed', 'cancelled'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_executions_strategy 
+        ON strategy_executions(strategy_id, executed_at DESC);
+      
+      CREATE INDEX IF NOT EXISTS idx_executions_user 
+        ON strategy_executions(user_id, executed_at DESC);
+      
+      CREATE INDEX IF NOT EXISTS idx_executions_status 
+        ON strategy_executions(status, executed_at DESC);
+
+      COMMENT ON TABLE strategy_executions IS 
+        'Tracks every strategy execution with full context for AI learning';
+    `);
+
+    console.log('✅ Strategy executions table created');
+
+    // 2. User Overrides Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_overrides (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        decision_id INT,
+        execution_id INT,
+        override_type VARCHAR(20) NOT NULL,
+        override_timestamp TIMESTAMP DEFAULT NOW(),
+        ai_recommendation JSONB NOT NULL,
+        user_alternative JSONB,
+        override_reason_category VARCHAR(100),
+        override_reason_text TEXT,
+        outcome_tracked BOOLEAN DEFAULT FALSE,
+        outcome_pnl NUMERIC(12, 2),
+        outcome_pnl_percent FLOAT,
+        ai_would_have_pnl NUMERIC(12, 2),
+        CONSTRAINT chk_override_type CHECK (override_type IN ('reject', 'modify', 'partial_accept'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_overrides_user 
+        ON user_overrides(user_id, override_timestamp DESC);
+      
+      CREATE INDEX IF NOT EXISTS idx_overrides_decision 
+        ON user_overrides(decision_id);
+      
+      CREATE INDEX IF NOT EXISTS idx_overrides_type 
+        ON user_overrides(override_type, override_timestamp DESC);
+
+      COMMENT ON TABLE user_overrides IS 
+        'Comprehensive tracking of user override behavior with counterfactual analysis';
+    `);
+
+    console.log('✅ User overrides table created');
+
+    // 3. Strategy Variants Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS strategy_variants (
+        id SERIAL PRIMARY KEY,
+        base_strategy_id INT,
+        variant_name VARCHAR(100) NOT NULL,
+        variant_config JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        is_active BOOLEAN DEFAULT TRUE,
+        test_group VARCHAR(50),
+        performance_metrics JSONB
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_variants_base 
+        ON strategy_variants(base_strategy_id, is_active);
+      
+      CREATE INDEX IF NOT EXISTS idx_variants_test_group 
+        ON strategy_variants(test_group, created_at DESC);
+
+      COMMENT ON TABLE strategy_variants IS 
+        'A/B testing and strategy evolution tracking';
+    `);
+
+    console.log('✅ Strategy variants table created');
+
+    // 4. Performance Benchmarks Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS performance_benchmarks (
+        id SERIAL PRIMARY KEY,
+        benchmark_type VARCHAR(50) NOT NULL,
+        date DATE NOT NULL,
+        open_value NUMERIC(12, 2),
+        close_value NUMERIC(12, 2),
+        daily_return_percent FLOAT,
+        period_return_30d FLOAT,
+        period_return_90d FLOAT,
+        UNIQUE(benchmark_type, date)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_benchmarks_type_date 
+        ON performance_benchmarks(benchmark_type, date DESC);
+
+      COMMENT ON TABLE performance_benchmarks IS 
+        'Market benchmark data for performance comparison (NIFTY50, sectors, etc.)';
+    `);
+
+    console.log('✅ Performance benchmarks table created');
+
+    // 5. AI Confidence History Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_confidence_history (
+        id SERIAL PRIMARY KEY,
+        decision_id INT NOT NULL,
+        original_confidence FLOAT NOT NULL,
+        adjusted_confidence FLOAT NOT NULL,
+        adjustment_reason VARCHAR(200),
+        adjustment_trigger VARCHAR(50) NOT NULL,
+        adjusted_at TIMESTAMP DEFAULT NOW(),
+        adjusted_by VARCHAR(255) NOT NULL,
+        CONSTRAINT chk_adjustment_trigger CHECK (adjustment_trigger IN ('trade_outcome', 'user_override', 'manual_review', 'benchmark_comparison'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_confidence_decision 
+        ON ai_confidence_history(decision_id, adjusted_at DESC);
+
+      COMMENT ON TABLE ai_confidence_history IS 
+        'Tracks evolution of AI confidence scores over time';
+    `);
+
+    console.log('✅ AI confidence history table created');
+    console.log('🎓 All self-learning tables created successfully');
+  }
+
+  async rollbackSelfLearningTables(client) {
+    console.log('🔄 Rolling back self-learning tables...');
+
+    await client.query(`
+      DROP INDEX IF EXISTS idx_confidence_decision;
+      DROP TABLE IF EXISTS ai_confidence_history CASCADE;
+
+      DROP INDEX IF EXISTS idx_benchmarks_type_date;
+      DROP TABLE IF EXISTS performance_benchmarks CASCADE;
+
+      DROP INDEX IF EXISTS idx_variants_test_group;
+      DROP INDEX IF EXISTS idx_variants_base;
+      DROP TABLE IF EXISTS strategy_variants CASCADE;
+
+      DROP INDEX IF EXISTS idx_overrides_type;
+      DROP INDEX IF EXISTS idx_overrides_decision;
+      DROP INDEX IF EXISTS idx_overrides_user;
+      DROP TABLE IF EXISTS user_overrides CASCADE;
+
+      DROP INDEX IF EXISTS idx_executions_status;
+      DROP INDEX IF EXISTS idx_executions_user;
+      DROP INDEX IF EXISTS idx_executions_strategy;
+      DROP TABLE IF EXISTS strategy_executions CASCADE;
+    `);
+
+    console.log('✅ Self-learning tables rollback completed');
   }
 }
 

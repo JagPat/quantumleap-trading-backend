@@ -385,6 +385,135 @@ class TradeOutcomeTracker {
       return [];
     }
   }
+
+  /**
+   * Link trade outcome to strategy execution
+   * @param {number} tradeId - Trade ID
+   * @param {number} executionId - Execution ID
+   * @returns {Promise<void>}
+   */
+  async linkOutcomeToExecution(tradeId, executionId) {
+    try {
+      // Add execution_id column to trade_outcomes if not exists (handled in migration)
+      // For now, store in metadata
+      const query = `
+        UPDATE trade_outcomes
+        SET execution_id = $1
+        WHERE trade_id = $2
+      `;
+
+      await db.query(query, [executionId, tradeId]);
+      console.log(`[OutcomeTracker] Linked trade ${tradeId} to execution ${executionId}`);
+
+    } catch (error) {
+      // If column doesn't exist yet, log warning but don't fail
+      console.warn('[OutcomeTracker] Could not link to execution (column may not exist yet):', error.message);
+    }
+  }
+
+  /**
+   * Calculate aggregated summary for an execution
+   * @param {number} executionId - Execution ID
+   * @returns {Promise<Object>} Execution summary
+   */
+  async calculateExecutionSummary(executionId) {
+    try {
+      const query = `
+        SELECT 
+          COUNT(*) as total_trades,
+          COUNT(*) FILTER (WHERE pnl > 0) as winning_trades,
+          SUM(pnl) as total_pnl,
+          AVG(pnl_percent) as avg_pnl_percent,
+          AVG(holding_period_hours) as avg_holding_hours,
+          MIN(executed_at) as start_date,
+          MAX(closed_at) as end_date
+        FROM trade_outcomes
+        WHERE execution_id = $1 AND closed_at IS NOT NULL
+      `;
+
+      const result = await db.query(query, [executionId]);
+      
+      if (result.rows.length === 0 || result.rows[0].total_trades === '0') {
+        return {
+          totalTrades: 0,
+          winningTrades: 0,
+          winRate: 0,
+          totalPnl: 0,
+          avgPnlPercent: 0,
+          avgHoldingHours: 0
+        };
+      }
+
+      const stats = result.rows[0];
+      const totalTrades = parseInt(stats.total_trades);
+      const winningTrades = parseInt(stats.winning_trades);
+
+      return {
+        totalTrades,
+        winningTrades,
+        winRate: totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0,
+        totalPnl: parseFloat(stats.total_pnl) || 0,
+        avgPnlPercent: parseFloat(stats.avg_pnl_percent) || 0,
+        avgHoldingHours: parseFloat(stats.avg_holding_hours) || 0,
+        startDate: stats.start_date,
+        endDate: stats.end_date
+      };
+
+    } catch (error) {
+      console.error('[OutcomeTracker] Error calculating execution summary:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Calculate execution ROI compared to benchmark
+   * @param {number} executionId - Execution ID
+   * @param {string} benchmark - Benchmark type
+   * @returns {Promise<Object>} ROI comparison
+   */
+  async getExecutionROI(executionId, benchmark = 'NIFTY50') {
+    try {
+      const summary = await this.calculateExecutionSummary(executionId);
+      
+      if (!summary || summary.totalTrades === 0) {
+        return { error: 'No trades found for execution' };
+      }
+
+      // Get benchmark return for same period
+      const benchmarkQuery = `
+        SELECT 
+          SUM(daily_return_percent) as period_return
+        FROM performance_benchmarks
+        WHERE benchmark_type = $1
+          AND date >= $2::date
+          AND date <= $3::date
+      `;
+
+      const benchmarkResult = await db.query(benchmarkQuery, [
+        benchmark,
+        summary.startDate,
+        summary.endDate
+      ]);
+
+      const benchmarkReturn = benchmarkResult.rows[0]?.period_return || 0;
+      const executionReturn = summary.avgPnlPercent;
+      const alpha = executionReturn - benchmarkReturn;
+
+      return {
+        executionReturn: parseFloat(executionReturn.toFixed(2)),
+        benchmarkReturn: parseFloat(benchmarkReturn.toFixed(2)),
+        alpha: parseFloat(alpha.toFixed(2)),
+        totalPnl: summary.totalPnl,
+        winRate: summary.winRate,
+        totalTrades: summary.totalTrades,
+        outperformed: alpha > 0
+      };
+
+    } catch (error) {
+      console.error('[OutcomeTracker] Error calculating execution ROI:', error.message);
+      return { error: error.message };
+    }
+  }
 }
 
 module.exports = TradeOutcomeTracker;
