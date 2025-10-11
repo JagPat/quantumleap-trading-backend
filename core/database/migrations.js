@@ -32,6 +32,12 @@ class DatabaseMigrations {
         name: 'add_multi_agent_ai_preferences',
         up: this.addMultiAgentAIPreferences.bind(this),
         down: this.rollbackMultiAgentAIPreferences.bind(this)
+      },
+      {
+        version: '006',
+        name: 'add_research_and_learning_tables',
+        up: this.addResearchAndLearningTables.bind(this),
+        down: this.rollbackResearchAndLearningTables.bind(this)
       }
     ];
   }
@@ -494,6 +500,158 @@ class DatabaseMigrations {
       DROP COLUMN IF EXISTS consent_ip,
       DROP COLUMN IF EXISTS consent_disclaimers
     `);
+  }
+
+  /**
+   * Migration 006: Add Research and Learning Tables
+   */
+  async addResearchAndLearningTables(client) {
+    console.log('Creating research and learning tables...');
+
+    // 1. Research Data Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS research_data (
+        id SERIAL PRIMARY KEY,
+        symbol VARCHAR(20) NOT NULL,
+        data_type VARCHAR(50) NOT NULL,
+        source VARCHAR(100) NOT NULL,
+        content TEXT,
+        metadata JSONB,
+        relevance_score FLOAT,
+        fetched_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_research_symbol_type 
+      ON research_data(symbol, data_type)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_research_fetched 
+      ON research_data(fetched_at DESC)
+    `);
+
+    // 2. Market Regimes Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS market_regimes (
+        id SERIAL PRIMARY KEY,
+        regime_type VARCHAR(50) NOT NULL,
+        confidence FLOAT NOT NULL,
+        indicators JSONB,
+        llm_reasoning TEXT,
+        detected_at TIMESTAMP DEFAULT NOW(),
+        valid_until TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_regimes_valid 
+      ON market_regimes(valid_until DESC)
+    `);
+
+    // 3. AI Decisions Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_decisions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        decision_type VARCHAR(50) NOT NULL,
+        decision_data JSONB NOT NULL,
+        market_regime VARCHAR(50),
+        regime_confidence FLOAT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_decisions_user 
+      ON ai_decisions(user_id, created_at DESC)
+    `);
+
+    // 4. AI Decision Attributions Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_decision_attributions (
+        id SERIAL PRIMARY KEY,
+        decision_id INT REFERENCES ai_decisions(id) ON DELETE CASCADE,
+        data_source VARCHAR(50) NOT NULL,
+        source_detail VARCHAR(200),
+        attribution_weight FLOAT,
+        content_summary TEXT
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_attributions_decision 
+      ON ai_decision_attributions(decision_id)
+    `);
+
+    // 5. Trade Outcomes Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS trade_outcomes (
+        id SERIAL PRIMARY KEY,
+        trade_id INT,
+        decision_id INT REFERENCES ai_decisions(id) ON DELETE SET NULL,
+        symbol VARCHAR(20) NOT NULL,
+        entry_price DECIMAL(10,2),
+        exit_price DECIMAL(10,2),
+        quantity INT,
+        pnl DECIMAL(12,2),
+        pnl_percent FLOAT,
+        holding_period_hours INT,
+        exit_reason VARCHAR(100),
+        user_override BOOLEAN DEFAULT FALSE,
+        override_reason TEXT,
+        executed_at TIMESTAMP,
+        closed_at TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_outcomes_decision 
+      ON trade_outcomes(decision_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_outcomes_symbol_date 
+      ON trade_outcomes(symbol, closed_at DESC)
+    `);
+
+    // 6. Learning Insights Table (cache for generated insights)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS learning_insights (
+        id SERIAL PRIMARY KEY,
+        insight_type VARCHAR(50) NOT NULL,
+        insight_text TEXT NOT NULL,
+        confidence FLOAT,
+        sample_size INT,
+        metadata JSONB,
+        generated_at TIMESTAMP DEFAULT NOW(),
+        expires_at TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_insights_expires 
+      ON learning_insights(expires_at DESC)
+    `);
+
+    console.log('✅ Research and learning tables created successfully');
+  }
+
+  /**
+   * Rollback Migration 006
+   */
+  async rollbackResearchAndLearningTables(client) {
+    console.log('Dropping research and learning tables...');
+
+    await client.query(`DROP TABLE IF EXISTS learning_insights CASCADE`);
+    await client.query(`DROP TABLE IF EXISTS trade_outcomes CASCADE`);
+    await client.query(`DROP TABLE IF EXISTS ai_decision_attributions CASCADE`);
+    await client.query(`DROP TABLE IF EXISTS ai_decisions CASCADE`);
+    await client.query(`DROP TABLE IF EXISTS market_regimes CASCADE`);
+    await client.query(`DROP TABLE IF EXISTS research_data CASCADE`);
+
+    console.log('✅ Research and learning tables dropped');
   }
 
   // Rollback to specific version
