@@ -44,6 +44,12 @@ class DatabaseMigrations {
         name: 'add_capital_tracking',
         up: this.addCapitalTracking.bind(this),
         down: this.rollbackCapitalTracking.bind(this)
+      },
+      {
+        version: '008',
+        name: 'add_rotational_trading',
+        up: this.addRotationalTrading.bind(this),
+        down: this.rollbackRotationalTrading.bind(this)
       }
     ];
   }
@@ -716,6 +722,73 @@ class DatabaseMigrations {
     await client.query(`DROP TABLE IF EXISTS capital_snapshots CASCADE`);
 
     console.log('✅ Capital tracking tables dropped');
+  }
+
+  /**
+   * Migration 008: Rotational Trading
+   */
+  async addRotationalTrading(client) {
+    console.log('Adding rotational trading tables...');
+
+    // Create rotation_cycles table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS rotation_cycles (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        config_id UUID,
+        symbol VARCHAR(50) NOT NULL,
+        entry_price DECIMAL(10,2),
+        sell_price DECIMAL(10,2),
+        rebuy_target DECIMAL(10,2),
+        status VARCHAR(20) DEFAULT 'ACTIVE', -- ACTIVE, SOLD, REBOUGHT, CANCELLED
+        reasoning TEXT,
+        pnl DECIMAL(10,2),
+        created_at TIMESTAMP DEFAULT NOW(),
+        sold_at TIMESTAMP,
+        rebought_at TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_rotation_user_symbol 
+      ON rotation_cycles(user_id, symbol, status)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_rotation_status 
+      ON rotation_cycles(status, created_at DESC)
+    `);
+
+    // Create rotation_preferences table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS rotation_preferences (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        symbol VARCHAR(50) NOT NULL,
+        enabled BOOLEAN DEFAULT true,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, symbol)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_rotation_prefs_user 
+      ON rotation_preferences(user_id)
+    `);
+
+    console.log('✅ Rotational trading tables created successfully');
+  }
+
+  /**
+   * Rollback Migration 008
+   */
+  async rollbackRotationalTrading(client) {
+    console.log('Dropping rotational trading tables...');
+
+    await client.query(`DROP TABLE IF EXISTS rotation_preferences CASCADE`);
+    await client.query(`DROP TABLE IF EXISTS rotation_cycles CASCADE`);
+
+    console.log('✅ Rotational trading tables dropped');
   }
 
   // Rollback to specific version

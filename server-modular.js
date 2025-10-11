@@ -113,6 +113,16 @@ try {
   console.warn('⚠️ [PortfolioV2] Could not load V2 portfolio routes:', portfolioError.message);
 }
 
+// Register V2 Trading routes
+try {
+  const { getTradingModule } = require('./modules/trading');
+  const tradingModule = getTradingModule();
+  app.use('/api/v2/trading', tradingModule.getRouter());
+  console.log('💰 [TradingV2] V2 trading routes registered at /api/v2/trading/*');
+} catch (tradingError) {
+  console.warn('⚠️ [TradingV2] Could not load V2 trading routes:', tradingError.message);
+}
+
 // Initialize core services
 async function initializeCoreServices() {
   try {
