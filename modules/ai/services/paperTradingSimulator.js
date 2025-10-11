@@ -122,6 +122,35 @@ class PaperTradingSimulator {
       // Update virtual position if trade completed
       if (status === 'COMPLETE') {
         this._updateVirtualPosition(automation_id, symbol, transaction_type, quantity, executed_price);
+        
+        // ✅ PHASE 7 HOOK 2: Trigger online learning when SELL completes (position closes)
+        if (transaction_type === 'SELL' && pnl !== null) {
+          try {
+            const getPhase7Integrator = require('./phase7Integrator');
+            const integrator = getPhase7Integrator();
+            
+            const pnl_percent = position ? ((executed_price - position.average_price) / position.average_price * 100) : 0;
+            
+            await integrator.handleTradeClose(
+              {
+                id: result.rows[0].id,
+                symbol: symbol,
+                decision_id: null, // Will be set if automation has decision_id
+                user_id: automation_id // Using automation_id as user_id proxy
+              },
+              {
+                exit_price: executed_price,
+                pnl: pnl,
+                pnl_percent: pnl_percent,
+                exit_reason: order.trigger_reason || 'strategy_signal',
+                user_override: false
+              }
+            );
+          } catch (integrationError) {
+            console.warn('[PaperSimulator] Phase 7 integration warning:', integrationError.message);
+            // Don't fail trade if learning fails
+          }
+        }
       }
 
       console.log('[PaperSimulator] Order simulated successfully:', {

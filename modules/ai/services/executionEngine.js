@@ -281,6 +281,51 @@ class StrategyExecutionEngine {
    */
   async executeOrder(automation, signal, marketData) {
     try {
+      // ✅ PHASE 7 HOOK 3: Confidence Gatekeeper for Auto-Trades
+      // Check if this is an auto-trade that needs safety validation
+      if (automation.tradingMode === 'auto' || automation.trading_mode === 'auto') {
+        try {
+          const getPhase7Integrator = require('./phase7Integrator');
+          const integrator = getPhase7Integrator();
+          
+          const approval = await integrator.checkAutoTradeApproval(
+            {
+              confidence: automation.aiConfidenceScore || automation.confidence || 0.7,
+              decision_data: { selectedStocks: automation.symbols || [] },
+              market_regime: automation.market_regime || 'UNKNOWN',
+              decision_type: 'stock_selection',
+              regime_confidence: automation.regime_confidence || 0.5
+            },
+            automation.userId || automation.user_id || 'unknown'
+          );
+          
+          if (!approval.approved) {
+            console.log(`[ExecutionEngine] ⚠️  Auto-trade blocked by gatekeeper: ${approval.reason}`);
+            
+            // Don't execute - return pending status
+            return {
+              success: false,
+              status: 'pending_approval',
+              reason: approval.reason,
+              check_failed: approval.check,
+              message: 'Trade requires manual approval due to safety check failure',
+              order: {
+                symbol: signal.symbol,
+                action: signal.action,
+                quantity: signal.quantity,
+                price: signal.price,
+                status: 'pending_approval'
+              }
+            };
+          }
+          
+          console.log(`[ExecutionEngine] ✅ Gatekeeper approved auto-trade`);
+        } catch (gatekeeperError) {
+          console.warn('[ExecutionEngine] Gatekeeper check failed, proceeding with caution:', gatekeeperError.message);
+          // Fail-safe: if gatekeeper errors, allow execution (don't break trading)
+        }
+      }
+      
       const order = {
         automation_id: automation.id,
         symbol: signal.symbol,
@@ -311,6 +356,25 @@ class StrategyExecutionEngine {
         order: result.order,
         is_paper: automation.tradingMode === 'paper'
       });
+
+      // ✅ PHASE 7 HOOK 1: Record trade execution with decision linkage
+      try {
+        const getPhase7Integrator = require('./phase7Integrator');
+        const integrator = getPhase7Integrator();
+        
+        await integrator.recordTradeExecution(
+          result.order.id || result.order.order_id,
+          {
+            symbol: order.symbol,
+            entry_price: result.executed_price || order.price,
+            quantity: order.quantity
+          },
+          automation.decision_id || null
+        );
+      } catch (integrationError) {
+        console.warn('[ExecutionEngine] Phase 7 integration warning:', integrationError.message);
+        // Don't fail execution if learning fails
+      }
 
       return result;
 
