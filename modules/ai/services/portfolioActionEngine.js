@@ -25,16 +25,53 @@ class PortfolioActionEngine {
 
   /**
    * Analyze portfolio and suggest actions to achieve goal
+   * ENHANCED with research data + market regime context
    * @param {Object} portfolioData - Current portfolio
    * @param {Object} goal - User's trading goal (optional)
+   * @param {string} userId - User ID for attribution tracking
    * @returns {Object} Suggested actions with reasoning
    */
-  async analyzeAndSuggestActions(portfolioData, goal = null) {
+  async analyzeAndSuggestActions(portfolioData, goal = null, userId = null) {
     try {
-      console.log('[PortfolioActionEngine] Analyzing portfolio for action suggestions');
+      console.log('[PortfolioActionEngine] Analyzing portfolio for action suggestions (research-enhanced)');
+      
+      // ✅ NEW: Initialize research and regime services
+      const ResearchIngestionService = require('./researchIngestionService');
+      const MarketRegimeAnalyzer = require('./marketRegimeAnalyzer');
+      const FeedbackIntegrationService = require('./feedbackIntegrationService');
+      const DecisionAttributionTracker = require('./decisionAttributionTracker');
+      
+      const researchService = new ResearchIngestionService();
+      const regimeAnalyzer = new MarketRegimeAnalyzer();
+      const feedbackService = new FeedbackIntegrationService();
+      const attributionTracker = new DecisionAttributionTracker();
       
       // Calculate current portfolio weights
       const currentWeights = this.analyzeWeights(portfolioData);
+      
+      // ✅ NEW: Fetch market regime
+      const currentRegime = await regimeAnalyzer.getActiveRegime();
+      console.log(`[PortfolioActionEngine] Current market regime: ${currentRegime.regime}`);
+      
+      // ✅ NEW: Fetch research data for all holdings
+      const holdings = currentWeights.holdings || [];
+      const holdingsResearch = [];
+      
+      for (const holding of holdings) {
+        try {
+          const research = await researchService.getRelevantResearch(holding.symbol, 7);
+          holdingsResearch.push({
+            symbol: holding.symbol,
+            currentWeight: holding.weight,
+            research
+          });
+        } catch (error) {
+          console.warn(`[PortfolioActionEngine] Could not fetch research for ${holding.symbol}`);
+        }
+      }
+      
+      // ✅ NEW: Get historical learnings
+      const learnings = await feedbackService.getContextualLearnings(null, 'portfolio_action');
       
       // Calculate ideal allocation based on goal
       const idealAllocation = await this.calculateIdealAllocation(
@@ -43,11 +80,28 @@ class PortfolioActionEngine {
         currentWeights
       );
       
-      // Generate action suggestions
-      const actions = this.generateActions(currentWeights, idealAllocation, portfolioData);
+      // ✅ ENHANCED: Generate research-aware actions
+      const actions = await this.generateResearchAwareActions(
+        currentWeights,
+        idealAllocation,
+        portfolioData,
+        holdingsResearch,
+        currentRegime,
+        goal
+      );
       
       // Calculate risk impact of suggested actions
       const riskImpact = this.calculateRiskImpact(currentWeights, idealAllocation);
+      
+      // ✅ NEW: Store decision with attribution if userId provided
+      if (userId && actions.length > 0) {
+        await attributionTracker.recordPortfolioAction(
+          userId,
+          actions,
+          currentRegime,
+          holdingsResearch
+        );
+      }
       
       return {
         success: true,
@@ -56,6 +110,9 @@ class PortfolioActionEngine {
         idealWeights: idealAllocation.weights,
         riskImpact,
         summary: this.generateSummary(actions),
+        regime: currentRegime, // ✅ NEW
+        researchUsed: holdingsResearch.length, // ✅ NEW
+        learningsApplied: learnings.length, // ✅ NEW
         timestamp: new Date().toISOString()
       };
       
@@ -266,6 +323,237 @@ class PortfolioActionEngine {
     actions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     return actions;
+  }
+
+  /**
+   * Generate research-aware action suggestions
+   * ENHANCED version that considers news, sentiment, fundamentals, and regime
+   */
+  async generateResearchAwareActions(currentWeights, idealAllocation, portfolioData, holdingsResearch, regime, goal) {
+    const actions = [];
+    const currentHoldings = currentWeights.holdings || [];
+    const idealWeights = idealAllocation.weights || {};
+
+    // Analyze each holding with research context
+    for (const holding of currentHoldings) {
+      const currentWeight = holding.weight;
+      const idealWeight = idealWeights[holding.symbol] || 0;
+      const delta = currentWeight - idealWeight;
+      
+      // Find research for this holding
+      const holdingResearch = holdingsResearch.find(h => h.symbol === holding.symbol);
+      const research = holdingResearch?.research || {};
+      
+      // Analyze research signals
+      const signals = this.analyzeResearchSignals(research, regime);
+      
+      // DILUTE: Overweight OR negative signals
+      if (delta > this.thresholds.overweight || (signals.overall === 'negative' && currentWeight > 0.05)) {
+        let reason = '';
+        let priority = 'MEDIUM';
+        
+        if (delta > this.thresholds.overweight) {
+          reason = `Overexposed by ${(delta * 100).toFixed(1)}% - `;
+          priority = delta > 0.35 ? 'HIGH' : 'MEDIUM';
+        }
+        
+        // Add research-based reasoning
+        if (signals.overall === 'negative') {
+          const negativeFactors = [];
+          if (signals.news === 'negative') negativeFactors.push('negative news');
+          if (signals.sentiment === 'bearish') negativeFactors.push(`bearish sentiment (${(research.sentiment?.score * 100).toFixed(0)}%)`);
+          if (signals.fundamentals === 'deteriorating') negativeFactors.push('deteriorating fundamentals');
+          
+          reason += negativeFactors.length > 0 
+            ? `Research signals: ${negativeFactors.join(', ')}`
+            : 'Reduce position to manage risk';
+            
+          priority = 'HIGH'; // Negative signals = high priority
+        } else {
+          reason += 'Reduce position to manage concentration risk';
+        }
+        
+        actions.push({
+          type: 'DILUTE',
+          symbol: holding.symbol,
+          currentWeight: (currentWeight * 100).toFixed(2) + '%',
+          idealWeight: (idealWeight * 100).toFixed(2) + '%',
+          delta: (Math.abs(delta) * 100).toFixed(2) + '%',
+          reason,
+          priority,
+          researchSignals: signals, // ✅ NEW
+          data_sources: this.getDataSourcesUsed(signals), // ✅ NEW
+          suggestedAction: `Sell ${((Math.abs(delta) * currentWeights.totalValue) / holding.avgPrice).toFixed(0)} shares`,
+          expectedValue: (Math.abs(delta) * currentWeights.totalValue).toFixed(2)
+        });
+        continue;
+      }
+      
+      // ACCUMULATE: Underweight OR positive signals
+      if ((delta < -this.thresholds.underweight && idealWeight > this.thresholds.minAllocation) || 
+          (signals.overall === 'positive' && currentWeight < 0.15)) {
+        let reason = '';
+        let priority = 'LOW';
+        
+        if (delta < -this.thresholds.underweight) {
+          reason = `Underweight by ${(Math.abs(delta) * 100).toFixed(1)}% - `;
+          priority = Math.abs(delta) > 0.10 ? 'MEDIUM' : 'LOW';
+        }
+        
+        // Add research-based reasoning
+        if (signals.overall === 'positive') {
+          const positiveFactors = [];
+          if (signals.news === 'positive') positiveFactors.push('positive news momentum');
+          if (signals.sentiment === 'bullish') positiveFactors.push(`bullish sentiment (${(research.sentiment?.score * 100).toFixed(0)}%)`);
+          if (signals.fundamentals === 'improving') positiveFactors.push('improving fundamentals');
+          
+          reason += positiveFactors.length > 0
+            ? `Research signals: ${positiveFactors.join(', ')}`
+            : 'Increase position for growth potential';
+            
+          priority = regime.regime === 'BULL' ? 'MEDIUM' : 'LOW'; // Higher priority in bull market
+        } else {
+          reason += 'Increase position to match ideal allocation';
+        }
+        
+        actions.push({
+          type: 'ACCUMULATE',
+          symbol: holding.symbol,
+          currentWeight: (currentWeight * 100).toFixed(2) + '%',
+          idealWeight: (idealWeight * 100).toFixed(2) + '%',
+          delta: (Math.abs(delta) * 100).toFixed(2) + '%',
+          reason,
+          priority,
+          researchSignals: signals, // ✅ NEW
+          data_sources: this.getDataSourcesUsed(signals), // ✅ NEW
+          suggestedAction: `Buy ${((Math.abs(delta) * currentWeights.totalValue) / holding.avgPrice).toFixed(0)} shares`,
+          expectedValue: (Math.abs(delta) * currentWeights.totalValue).toFixed(2)
+        });
+        continue;
+      }
+      
+      // EXIT: Small position with losses OR strongly negative signals
+      const isVerySmall = currentWeight < this.thresholds.minAllocation;
+      const isSignificantLoss = holding.pnlPercent < -15;
+      
+      if ((isVerySmall && holding.pnlPercent < -5) || isSignificantLoss || 
+          (signals.overall === 'very_negative' && holding.pnlPercent < 0)) {
+        let reason = '';
+        
+        if (signals.overall === 'very_negative') {
+          reason = `Strong negative signals across multiple data sources - `;
+        }
+        
+        reason += isVerySmall 
+          ? `Position too small (${(currentWeight * 100).toFixed(2)}%) and unprofitable`
+          : `Significant loss of ${holding.pnlPercent.toFixed(1)}%`;
+        
+        // Add regime context
+        if (regime.regime === 'BEAR') {
+          reason += ' - BEAR market suggests defensive positioning';
+        }
+        
+        actions.push({
+          type: 'EXIT',
+          symbol: holding.symbol,
+          currentWeight: (currentWeight * 100).toFixed(2) + '%',
+          reason,
+          priority: signals.overall === 'very_negative' ? 'HIGH' : (isSignificantLoss ? 'HIGH' : 'LOW'),
+          researchSignals: signals, // ✅ NEW
+          data_sources: this.getDataSourcesUsed(signals), // ✅ NEW
+          suggestedAction: `Sell all ${holding.quantity} shares`,
+          expectedValue: holding.value.toFixed(2),
+          currentPnL: holding.pnl.toFixed(2)
+        });
+      }
+    }
+
+    // Sort actions by priority
+    const priorityOrder = { 'HIGH': 0, 'MEDIUM': 1, 'LOW': 2 };
+    actions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+    return actions;
+  }
+
+  /**
+   * Analyze research signals for a holding
+   */
+  analyzeResearchSignals(research, regime) {
+    const signals = {
+      news: 'neutral',
+      sentiment: 'neutral',
+      fundamentals: 'stable',
+      overall: 'neutral'
+    };
+    
+    let positiveCount = 0;
+    let negativeCount = 0;
+    
+    // Analyze news
+    if (research.news && research.news.length > 0) {
+      const recentNews = research.news.slice(0, 3);
+      const positiveNews = recentNews.filter(n => n.sentiment === 'positive').length;
+      const negativeNews = recentNews.filter(n => n.sentiment === 'negative').length;
+      
+      if (positiveNews > negativeNews) {
+        signals.news = 'positive';
+        positiveCount++;
+      } else if (negativeNews > positiveNews) {
+        signals.news = 'negative';
+        negativeCount++;
+      }
+    }
+    
+    // Analyze sentiment
+    if (research.sentiment) {
+      const score = research.sentiment.score || 0.5;
+      if (score > 0.65) {
+        signals.sentiment = 'bullish';
+        positiveCount++;
+      } else if (score < 0.35) {
+        signals.sentiment = 'bearish';
+        negativeCount++;
+      }
+    }
+    
+    // Analyze fundamentals
+    if (research.fundamentals) {
+      const trend = research.fundamentals.trend;
+      if (trend === 'improving') {
+        signals.fundamentals = 'improving';
+        positiveCount++;
+      } else if (trend === 'deteriorating') {
+        signals.fundamentals = 'deteriorating';
+        negativeCount++;
+      }
+    }
+    
+    // Determine overall signal
+    if (positiveCount >= 2) {
+      signals.overall = 'positive';
+    } else if (negativeCount >= 2) {
+      signals.overall = 'negative';
+    } else if (negativeCount === 3) {
+      signals.overall = 'very_negative';
+    }
+    
+    // Regime adjustment
+    if (regime && regime.regime === 'BEAR' && signals.overall === 'neutral') {
+      signals.overall = 'negative'; // More conservative in bear market
+    }
+    
+    return signals;
+  }
+
+  /**
+   * Get list of data sources used in signal analysis
+   */
+  getDataSourcesUsed(signals) {
+    const sources = [];
+    if (signals.news !== 'neutral') sources.push('news');
+    if (signals.sentiment !== 'neutral') sources.push('sentiment');
+    if (signals.fundamentals !== 'stable') sources.push('fundamentals');
+    return sources;
   }
 
   /**
